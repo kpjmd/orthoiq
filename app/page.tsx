@@ -1,6 +1,8 @@
 import { fetchMetadata } from "frames.js/next";
 import OrthoFrame from '@/components/OrthoFrame';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata() {
   return {
     title: "OrthoIQ - Ask the Orthopedic AI",
