@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "app/api/claude/route.ts": {
+      "maxDuration": 60
+    },
+    "app/frames/route.tsx": {
+      "maxDuration": 30
+    },
+    "app/api/health/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/health/database/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/health/claude/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/.well-known/farcaster.json",
+      "destination": "/api/farcaster-manifest"
+    }
+  ]
+}

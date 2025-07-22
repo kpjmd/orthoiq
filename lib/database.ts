@@ -1,10 +1,25 @@
 import { createClient } from '@vercel/postgres';
 import { Question } from './types';
 
-// Create a database client
+// Create a database client with timeout configuration
 function getClient() {
+  const connectionString = process.env.DATABASE_URL;
+  
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+  
+  // Log connection info for debugging (without sensitive data)
+  const urlParts = connectionString.match(/^postgres:\/\/.*@([^:\/]+)/);
+  const host = urlParts ? urlParts[1] : 'unknown';
+  console.log(`Creating database client for host: ${host}`);
+  
   return createClient({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
+    connectionTimeoutMillis: 10000, // 10 second connection timeout
+    query_timeout: 30000, // 30 second query timeout
+    statement_timeout: 30000, // 30 second statement timeout
+    idle_in_transaction_session_timeout: 60000 // 60 second idle timeout
   });
 }
 
@@ -13,7 +28,9 @@ export async function initDatabase() {
   const client = getClient();
   
   try {
+    console.log('Attempting to connect to database...');
     await client.connect();
+    console.log('Database connection established');
     
     await client.sql`
       CREATE TABLE IF NOT EXISTS questions (
@@ -49,9 +66,21 @@ export async function initDatabase() {
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     throw error;
   } finally {
-    await client.end();
+    try {
+      await client.end();
+      console.log('Database connection closed');
+    } catch (endError) {
+      console.error('Error closing database connection:', endError);
+    }
   }
 }
 
