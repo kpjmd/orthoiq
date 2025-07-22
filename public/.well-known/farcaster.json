@@ -10,7 +10,7 @@
     "iconUrl": "https://orthoiq.vercel.app/icon.png",
     "splashImageUrl": "https://orthoiq.vercel.app/og-image.png",
     "splashBackgroundColor": "#1e3a8a",
-    "homeUrl": "https://orthoiq.vercel.app/frames",
+    "homeUrl": "https://orthoiq.vercel.app/mini",
     "webhookUrl": "https://orthoiq.vercel.app/api/webhook"
   }
 }
