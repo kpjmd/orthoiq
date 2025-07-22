@@ -68,6 +68,8 @@ const handleRequest = frames(async (ctx) => {
     
     try {
       // Call Claude API to get answer
+      console.log(`Frame API call - FID: ${userFid}, Question: ${userQuestion.slice(0, 50)}...`);
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_HOST}/api/claude`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,12 +77,18 @@ const handleRequest = frames(async (ctx) => {
           question: userQuestion,
           fid: userFid
         }),
+        // Add timeout for frames
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       });
       
       const data = await response.json();
       
+      console.log(`Frame API response - Status: ${response.status}, HasError: ${!!data.error}`);
+      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to get AI response');
+        const errorMessage = data.error || `API error (${response.status})`;
+        console.error(`Frame API error:`, { status: response.status, error: data.error, details: data.details });
+        throw new Error(errorMessage);
       }
       
       const aiAnswer = data.response || "I apologize, but I couldn't generate a response at this time.";
@@ -113,22 +121,55 @@ const handleRequest = frames(async (ctx) => {
         ],
       };
     } catch (error) {
-      console.error('Error getting AI response:', error);
+      console.error('Error getting AI response in frame:', error);
+      
+      // Determine error type and provide specific messaging
+      let errorTitle = "Technical Issue";
+      let errorMessage = "I'm experiencing a technical issue. Please try again later.";
+      let errorIcon = "⚠️";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('rate limit') || error.message.includes('429')) {
+          errorTitle = "Rate Limit Reached";
+          errorMessage = "You've reached your daily question limit (1 per day). Please try again tomorrow.";
+          errorIcon = "⏰";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorTitle = "Connection Issue";
+          errorMessage = "Unable to connect to our AI service. Please check your connection and try again.";
+          errorIcon = "🌐";
+        } else if (error.message.includes('API') || error.message.includes('Claude')) {
+          errorTitle = "AI Service Issue";
+          errorMessage = "Our AI service is temporarily unavailable. Please try again in a few minutes.";
+          errorIcon = "🤖";
+        } else if (error.message.includes('database') || error.message.includes('Database')) {
+          errorTitle = "Service Unavailable";
+          errorMessage = "Our service is temporarily down for maintenance. Please try again later.";
+          errorIcon = "🔧";
+        }
+      }
       
       return {
         image: (
-          <div tw="flex flex-col w-full h-full bg-red-50 items-center justify-center p-8">
-            <div tw="text-5xl mb-4">⚠️</div>
-            <div tw="text-2xl font-bold text-red-800 mb-4">Error</div>
-            <div tw="text-lg text-red-700 text-center mb-6 max-w-md">
-              Sorry, I could not process your question right now. This might be due to rate limiting or a technical issue.
+          <div tw="flex flex-col w-full h-full bg-red-50 items-center justify-center p-6">
+            <div tw="text-5xl mb-4">{errorIcon}</div>
+            <div tw="text-2xl font-bold text-red-800 mb-4">{errorTitle}</div>
+            <div tw="text-lg text-red-700 text-center mb-6 max-w-lg leading-tight">
+              {errorMessage}
             </div>
-            <div tw="text-sm text-red-600">Please try again later</div>
+            <div tw="text-sm text-red-600 text-center mb-4">
+              If this persists, please contact support
+            </div>
+            <div tw="text-xs text-gray-500 text-center px-4">
+              Error ID: {Math.random().toString(36).substring(7)}
+            </div>
           </div>
         ),
         buttons: [
+          <Button key="retry" action="post" target="/question">
+            Try Again
+          </Button>,
           <Button key="back-home" action="post" target="/">
-            ← Back to Home
+            ← Home
           </Button>,
         ],
       };
