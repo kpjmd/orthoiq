@@ -34,11 +34,40 @@ export default function OrthoFrame({ className = "" }: OrthoFrameProps) {
         }),
       });
 
-      const data = await res.json();
-
+      // Check if response is ok before trying to parse JSON
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to get response');
+        // Try to get error message from response
+        let errorMessage = `API error (${res.status})`;
+        const contentType = res.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            // If JSON parsing fails, try to get text
+            try {
+              const errorText = await res.text();
+              errorMessage = errorText || errorMessage;
+            } catch {
+              // Use default error message
+            }
+          }
+        } else {
+          // Response is not JSON, try to get as text
+          try {
+            const errorText = await res.text();
+            errorMessage = errorText || errorMessage;
+          } catch {
+            // Use default error message
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
+
+      // Only parse as JSON if response is ok
+      const data = await res.json();
 
       setResponse(data.response);
       

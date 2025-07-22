@@ -15,7 +15,7 @@ const handleRequest = frames(async (ctx) => {
   if (!message) {
     return {
       image: (
-        <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 to-blue-600 text-white items-center justify-center p-8">
+        <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
           <div tw="text-6xl font-bold mb-4">🦴 OrthoIQ</div>
           <div tw="text-3xl mb-6">Ask the Orthopedic AI</div>
           <div tw="text-xl text-center mb-8 max-w-lg">
@@ -84,15 +84,45 @@ const handleRequest = frames(async (ctx) => {
         signal: AbortSignal.timeout(30000) // 30 second timeout
       });
       
-      const data = await response.json();
+      console.log(`Frame API response - Status: ${response.status}`);
       
-      console.log(`Frame API response - Status: ${response.status}, HasError: ${!!data.error}`);
-      
+      // Handle non-OK responses before parsing JSON
       if (!response.ok) {
-        const errorMessage = data.error || `API error (${response.status})`;
-        console.error(`Frame API error:`, { status: response.status, error: data.error, details: data.details });
+        let errorMessage = `API error (${response.status})`;
+        let errorDetails = null;
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+            errorDetails = errorData.details;
+          } catch (parseError) {
+            // Try to get error as text
+            try {
+              const errorText = await response.text();
+              errorMessage = errorText || errorMessage;
+            } catch {
+              // Use default error message
+            }
+          }
+        } else {
+          // Response is not JSON
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch {
+            // Use default error message
+          }
+        }
+        
+        console.error(`Frame API error:`, { status: response.status, error: errorMessage, details: errorDetails });
         throw new Error(errorMessage);
       }
+      
+      // Only parse JSON if response is OK
+      const data = await response.json();
+      console.log(`Frame API response parsed successfully`);
       
       const aiAnswer = data.response || "I apologize, but I couldn't generate a response at this time.";
       
@@ -182,7 +212,7 @@ const handleRequest = frames(async (ctx) => {
   // Default fallback to home
   return {
     image: (
-      <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 to-blue-600 text-white items-center justify-center p-8">
+      <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
         <div tw="text-6xl font-bold mb-4">🦴 OrthoIQ</div>
         <div tw="text-3xl mb-6">Ask the Orthopedic AI</div>
         <div tw="text-xl text-center mb-8 max-w-lg">

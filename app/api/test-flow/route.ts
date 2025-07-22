@@ -81,7 +81,15 @@ export async function GET() {
           headers: { 'Content-Type': 'application/json' }
         });
         
-        const data = await response.json();
+        let data;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          // Handle non-JSON responses
+          const text = await response.text();
+          data = { message: text, isText: true };
+        }
         
         results.tests[results.tests.length - 1] = {
           name: `Health Check - ${endpoint}`,
@@ -122,7 +130,15 @@ export async function GET() {
         })
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Handle non-JSON responses
+        const text = await response.text();
+        data = { error: text, isText: true };
+      }
       
       results.tests[results.tests.length - 1] = {
         name: 'Claude API Test',
