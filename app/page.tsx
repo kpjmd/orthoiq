@@ -4,19 +4,27 @@ import OrthoFrame from '@/components/OrthoFrame';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata() {
+  const baseUrl = process.env.NEXT_PUBLIC_HOST || 
+                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  
+  let frameMetadata = {};
+  try {
+    frameMetadata = await fetchMetadata(new URL("/frames", baseUrl));
+  } catch (error) {
+    console.warn("Failed to fetch frame metadata:", error);
+    // Provide fallback frame metadata
+    frameMetadata = {
+      "fc:frame": "vNext",
+      "fc:frame:image": `${baseUrl}/og-image.png`,
+      "fc:frame:button:1": "Ask Question",
+      "fc:frame:post_url": `${baseUrl}/frames`,
+    };
+  }
+                  
   return {
     title: "OrthoIQ - Ask the Orthopedic AI",
     description: "AI assistant for orthopedic and sports medicine questions",
-    other: {
-      ...(await fetchMetadata(
-        new URL(
-          "/frames",
-          process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : "http://localhost:3000"
-        )
-      )),
-    },
+    other: frameMetadata,
   };
 }
 

@@ -3,6 +3,9 @@ import { NextRequest } from "next/server";
 
 const frames = createFrames({
   basePath: "/frames",
+  initialState: {},
+  middleware: [],
+  debug: process.env.NODE_ENV === "development",
 });
 
 const handleRequest = frames(async (ctx) => {

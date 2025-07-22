@@ -1,10 +1,21 @@
-import { sql } from '@vercel/postgres';
+import { createClient } from '@vercel/postgres';
 import { Question } from './types';
+
+// Create a database client
+function getClient() {
+  return createClient({
+    connectionString: process.env.DATABASE_URL,
+  });
+}
 
 // Database initialization - creates tables if they don't exist
 export async function initDatabase() {
+  const client = getClient();
+  
   try {
-    await sql`
+    await client.connect();
+    
+    await client.sql`
       CREATE TABLE IF NOT EXISTS questions (
         id SERIAL PRIMARY KEY,
         fid VARCHAR(255) NOT NULL,
@@ -17,15 +28,15 @@ export async function initDatabase() {
       );
     `;
 
-    await sql`
+    await client.sql`
       CREATE INDEX IF NOT EXISTS idx_questions_fid ON questions(fid);
     `;
 
-    await sql`
+    await client.sql`
       CREATE INDEX IF NOT EXISTS idx_questions_created_at ON questions(created_at);
     `;
 
-    await sql`
+    await client.sql`
       CREATE TABLE IF NOT EXISTS rate_limits (
         fid VARCHAR(255) PRIMARY KEY,
         count INTEGER DEFAULT 0,
@@ -39,6 +50,8 @@ export async function initDatabase() {
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
+  } finally {
+    await client.end();
   }
 }
 
@@ -50,21 +63,29 @@ export async function logInteraction(
   isFiltered: boolean = false,
   confidence: number = 0.0
 ): Promise<void> {
+  const client = getClient();
+  
   try {
-    await sql`
+    await client.connect();
+    await client.sql`
       INSERT INTO questions (fid, question, response, is_filtered, confidence)
       VALUES (${fid}, ${question}, ${response}, ${isFiltered}, ${confidence})
     `;
   } catch (error) {
     console.error('Error logging interaction:', error);
     throw error;
+  } finally {
+    await client.end();
   }
 }
 
 // Get interaction history for a user
 export async function getUserHistory(fid: string, limit: number = 10): Promise<Question[]> {
+  const client = getClient();
+  
   try {
-    const result = await sql`
+    await client.connect();
+    const result = await client.sql`
       SELECT id, fid, question, response, is_filtered as "isFiltered", 
              confidence, created_at as timestamp
       FROM questions 
@@ -84,31 +105,37 @@ export async function getUserHistory(fid: string, limit: number = 10): Promise<Q
   } catch (error) {
     console.error('Error getting user history:', error);
     return [];
+  } finally {
+    await client.end();
   }
 }
 
 // Get analytics data
 export async function getAnalytics() {
+  const client = getClient();
+  
   try {
-    const totalQuestions = await sql`
+    await client.connect();
+    
+    const totalQuestions = await client.sql`
       SELECT COUNT(*) as count FROM questions
     `;
 
-    const uniqueUsers = await sql`
+    const uniqueUsers = await client.sql`
       SELECT COUNT(DISTINCT fid) as count FROM questions
     `;
 
-    const questionsToday = await sql`
+    const questionsToday = await client.sql`
       SELECT COUNT(*) as count FROM questions 
       WHERE created_at >= CURRENT_DATE
     `;
 
-    const avgConfidence = await sql`
+    const avgConfidence = await client.sql`
       SELECT AVG(confidence) as avg_confidence FROM questions 
       WHERE confidence > 0
     `;
 
-    const filteredQuestions = await sql`
+    const filteredQuestions = await client.sql`
       SELECT COUNT(*) as count FROM questions 
       WHERE is_filtered = true
     `;
@@ -129,17 +156,22 @@ export async function getAnalytics() {
       avgConfidence: 0,
       filteredQuestions: 0
     };
+  } finally {
+    await client.end();
   }
 }
 
 // Database-backed rate limiting (alternative to in-memory)
 export async function checkRateLimitDB(fid: string): Promise<{allowed: boolean, resetTime?: Date}> {
+  const client = getClient();
+  
   try {
+    await client.connect();
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Check recent questions count
-    const recentQuestions = await sql`
+    const recentQuestions = await client.sql`
       SELECT COUNT(*) as count FROM questions 
       WHERE fid = ${fid} AND created_at > ${oneDayAgo.toISOString()}
     `;
@@ -155,16 +187,21 @@ export async function checkRateLimitDB(fid: string): Promise<{allowed: boolean, 
     console.error('Error checking rate limit:', error);
     // Default to allowing on error
     return { allowed: true };
+  } finally {
+    await client.end();
   }
 }
 
 // Clean up old data (optional maintenance function)
 export async function cleanupOldData(daysToKeep: number = 30) {
+  const client = getClient();
+  
   try {
+    await client.connect();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-    const result = await sql`
+    const result = await client.sql`
       DELETE FROM questions 
       WHERE created_at < ${cutoffDate.toISOString()}
     `;
@@ -174,5 +211,7 @@ export async function cleanupOldData(daysToKeep: number = 30) {
   } catch (error) {
     console.error('Error cleaning up old data:', error);
     throw error;
+  } finally {
+    await client.end();
   }
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { logInteraction } from '@/lib/database';
-import { sql } from '@vercel/postgres';
+import { createClient } from '@vercel/postgres';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Only allow debug endpoint in development
@@ -39,8 +39,13 @@ export async function GET(request: NextRequest) {
 
     // Test 2: Database Connection
     if (test === 'all' || test === 'db') {
+      const client = createClient({
+        connectionString: process.env.DATABASE_URL,
+      });
+      
       try {
-        const dbResult = await sql`SELECT NOW() as current_time`;
+        await client.connect();
+        const dbResult = await client.sql`SELECT NOW() as current_time`;
         results.tests.database = {
           status: 'connected',
           currentTime: dbResult.rows[0].current_time,
@@ -51,6 +56,8 @@ export async function GET(request: NextRequest) {
           status: 'error',
           error: dbError instanceof Error ? dbError.message : 'Unknown database error'
         };
+      } finally {
+        await client.end();
       }
     }
 
@@ -135,8 +142,13 @@ export async function GET(request: NextRequest) {
 
     // Test 7: Database Tables
     if (test === 'all' || test === 'tables') {
+      const client = createClient({
+        connectionString: process.env.DATABASE_URL,
+      });
+      
       try {
-        const tables = await sql`
+        await client.connect();
+        const tables = await client.sql`
           SELECT table_name 
           FROM information_schema.tables 
           WHERE table_schema = 'public'
@@ -152,6 +164,8 @@ export async function GET(request: NextRequest) {
           status: 'error',
           error: tableError instanceof Error ? tableError.message : 'Unknown table error'
         };
+      } finally {
+        await client.end();
       }
     }
 

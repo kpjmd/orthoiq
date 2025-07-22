@@ -1,21 +1,26 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { createClient } from '@vercel/postgres';
 import { initDatabase } from '@/lib/database';
 
 export async function GET() {
+  const client = createClient({
+    connectionString: process.env.DATABASE_URL,
+  });
+  
   try {
     const startTime = Date.now();
+    await client.connect();
     
     // Test basic connection
-    await sql`SELECT 1 as connection_test`;
+    await client.sql`SELECT 1 as connection_test`;
     const connectionTime = Date.now() - startTime;
 
     // Check database version and connection info
-    const versionResult = await sql`SELECT version()`;
+    const versionResult = await client.sql`SELECT version()`;
     const version = versionResult.rows[0]?.version || 'Unknown';
 
     // Check if required tables exist
-    const tablesResult = await sql`
+    const tablesResult = await client.sql`
       SELECT 
         table_name,
         column_name,
@@ -41,11 +46,11 @@ export async function GET() {
     const counts: any = {};
     try {
       if (tables.questions) {
-        const questionsCount = await sql`SELECT COUNT(*) as count FROM questions`;
+        const questionsCount = await client.sql`SELECT COUNT(*) as count FROM questions`;
         counts.questions = parseInt(questionsCount.rows[0].count);
       }
       if (tables.rate_limits) {
-        const rateLimitsCount = await sql`SELECT COUNT(*) as count FROM rate_limits`;
+        const rateLimitsCount = await client.sql`SELECT COUNT(*) as count FROM rate_limits`;
         counts.rate_limits = parseInt(rateLimitsCount.rows[0].count);
       }
     } catch (countError) {
@@ -90,6 +95,8 @@ export async function GET() {
         databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing'
       }
     }, { status: 503 });
+  } finally {
+    await client.end();
   }
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { createClient } from '@vercel/postgres';
 import Anthropic from '@anthropic-ai/sdk';
 
 export async function GET() {
@@ -42,14 +42,19 @@ async function checkEnvironment() {
 }
 
 async function checkDatabase() {
+  const client = createClient({
+    connectionString: process.env.DATABASE_URL,
+  });
+  
   try {
     const startTime = Date.now();
+    await client.connect();
     
     // Test basic connection
-    await sql`SELECT 1 as test`;
+    await client.sql`SELECT 1 as test`;
     
     // Check if required tables exist
-    const tablesExist = await sql`
+    const tablesExist = await client.sql`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
@@ -79,6 +84,8 @@ async function checkDatabase() {
       message: 'Database connection failed',
       error: error instanceof Error ? error.message : 'Unknown database error'
     };
+  } finally {
+    await client.end();
   }
 }
 
