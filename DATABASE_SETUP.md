@@ -1,57 +1,75 @@
 # Database Setup Guide for OrthoIQ
 
-## Important: Database Configuration
+## Current Setup: Neon Database
 
-This application uses `@vercel/postgres` client library which requires a standard PostgreSQL connection string.
+This application now uses **Neon** serverless PostgreSQL database with the `@neondatabase/serverless` client library.
 
-### Current Issue
-If you're seeing errors like:
+### Why We Switched to Neon
+
+Previously, we had issues with:
 - `Error: Unexpected server response: 404` 
 - Connection attempts to `wss://db.prisma.io/v2`
 - `FUNCTION_INVOCATION_TIMEOUT` errors
 
-This is because the application is trying to use Prisma Postgres with the Vercel Postgres client library.
+These occurred because we were using Prisma Postgres (which requires Prisma Client) with the `@vercel/postgres` library.
 
-### Solution
+### Current Configuration
 
-You have **Prisma Postgres** installed with these environment variables:
-- `POSTGRES_URL` - Standard PostgreSQL connection
-- `PRISMA_DATABASE_URL` - Prisma Accelerate connection (not compatible with @vercel/postgres)
+#### Database Client
+- **Library**: `@neondatabase/serverless`
+- **Benefits**: 
+  - Optimized for serverless environments
+  - Sub-1 second cold starts
+  - Scale-to-zero capabilities
+  - No WebSocket proxy issues
 
-#### In Vercel Dashboard:
+#### Environment Variables
 
-1. Go to your project settings → Environment Variables
-2. Update the `DATABASE_URL` variable to use the same value as `POSTGRES_URL`:
-   ```
-   DATABASE_URL="postgres://[your-connection-string]@db.prisma.io:5432/?sslmode=require"
-   ```
-3. This should be the standard PostgreSQL connection string, NOT the Prisma Accelerate URL
-
-#### In Local Development:
-
-Update your `.env.local` file:
-```env
-DATABASE_URL=postgres://[your-connection-string]@db.prisma.io:5432/?sslmode=require
+**In Vercel Dashboard:**
+```
+DATABASE_URL=postgres://neondb_owner:npg_ZKzSHOs3o0rM@ep-solitary-queen-aditm6fh-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
 ```
 
-### Alternative: Switch to Prisma Client
+**In Local Development (.env.local):**
+```env
+DATABASE_URL=postgres://neondb_owner:npg_ZKzSHOs3o0rM@ep-solitary-queen-aditm6fh-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+```
 
-If you want to use Prisma's advanced features (like connection pooling via Accelerate), you would need to:
-1. Install Prisma dependencies
-2. Set up Prisma schema
-3. Replace `@vercel/postgres` with Prisma Client throughout the codebase
-4. Use `PRISMA_DATABASE_URL` for the connection
+### Database Features
+
+#### Tables Created Automatically
+- `questions` - Stores Q&A interactions with FID, question, response, confidence
+- `rate_limits` - Stores rate limiting data per user
+
+#### Neon Benefits
+- **Database Branching**: Create instant copies for development/staging
+- **Serverless**: Automatic scaling and suspension
+- **Connection Pooling**: Uses `-pooler` endpoint for optimal performance
+- **No Connection Limits**: Perfect for serverless functions
 
 ### Verifying the Setup
 
-After updating the DATABASE_URL:
+1. Check health endpoint: `https://your-app.vercel.app/api/health`
+2. Database health: `https://your-app.vercel.app/api/health/database`
+3. All checks should show as "healthy"
 
-1. Redeploy your application on Vercel
-2. Check the health endpoint: `https://your-app.vercel.app/api/health`
-3. The database check should show as "healthy"
+### Migration Complete
+
+✅ **What was changed:**
+- Replaced `@vercel/postgres` with `@neondatabase/serverless`
+- Updated all database connection code to use Neon's SQL client
+- Removed connection/disconnection management (handled automatically)
+- Updated all health check endpoints
+
+✅ **What works now:**
+- No timeout errors
+- Instant database connections
+- Proper error handling
+- All existing functionality maintained
 
 ### Notes
 
-- The WebSocket error to `db.prisma.io` happens because Prisma Accelerate uses a proxy that requires Prisma Client
-- `@vercel/postgres` expects a direct PostgreSQL connection, not a Prisma proxy
-- Both Vercel Postgres and Prisma Postgres are PostgreSQL databases, but they use different connection methods
+- Neon connections are stateless - no need to manage connections
+- The `-pooler` endpoint provides connection pooling automatically
+- Scale-to-zero means no database costs when idle
+- Perfect for Vercel serverless deployments

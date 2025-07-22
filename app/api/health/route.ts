@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 import Anthropic from '@anthropic-ai/sdk';
 
 export async function GET() {
@@ -42,19 +42,23 @@ async function checkEnvironment() {
 }
 
 async function checkDatabase() {
-  const client = createClient({
-    connectionString: process.env.DATABASE_URL,
-  });
+  if (!process.env.DATABASE_URL) {
+    return {
+      status: 'unhealthy',
+      message: 'DATABASE_URL environment variable not configured'
+    };
+  }
+
+  const sql = neon(process.env.DATABASE_URL);
   
   try {
     const startTime = Date.now();
-    await client.connect();
     
     // Test basic connection
-    await client.sql`SELECT 1 as test`;
+    await sql`SELECT 1 as test`;
     
     // Check if required tables exist
-    const tablesExist = await client.sql`
+    const tablesExist = await sql`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
@@ -63,13 +67,13 @@ async function checkDatabase() {
     
     const duration = Date.now() - startTime;
     const expectedTables = ['questions', 'rate_limits'];
-    const existingTables = tablesExist.rows.map(row => row.table_name);
+    const existingTables = tablesExist.map((row: any) => row.table_name);
     const missingTables = expectedTables.filter(table => !existingTables.includes(table));
     
     return {
       status: missingTables.length === 0 ? 'healthy' : 'degraded',
       message: missingTables.length === 0 
-        ? `Database connection successful (${duration}ms)` 
+        ? `Neon database connection successful (${duration}ms)` 
         : `Database connected but missing tables: ${missingTables.join(', ')}`,
       details: {
         responseTime: `${duration}ms`,
@@ -81,11 +85,9 @@ async function checkDatabase() {
   } catch (error) {
     return {
       status: 'unhealthy',
-      message: 'Database connection failed',
+      message: 'Neon database connection failed',
       error: error instanceof Error ? error.message : 'Unknown database error'
     };
-  } finally {
-    await client.end();
   }
 }
 

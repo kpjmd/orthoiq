@@ -1,8 +1,8 @@
-import { createClient } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 import { Question } from './types';
 
-// Create a database client with timeout configuration
-function getClient() {
+// Create a Neon SQL client
+function getSql() {
   const connectionString = process.env.DATABASE_URL;
   
   if (!connectionString) {
@@ -12,27 +12,19 @@ function getClient() {
   // Log connection info for debugging (without sensitive data)
   const urlParts = connectionString.match(/^postgres:\/\/.*@([^:\/]+)/);
   const host = urlParts ? urlParts[1] : 'unknown';
-  console.log(`Creating database client for host: ${host}`);
+  console.log(`Creating Neon SQL client for host: ${host}`);
   
-  return createClient({
-    connectionString,
-    connectionTimeoutMillis: 10000, // 10 second connection timeout
-    query_timeout: 30000, // 30 second query timeout
-    statement_timeout: 30000, // 30 second statement timeout
-    idle_in_transaction_session_timeout: 60000 // 60 second idle timeout
-  });
+  return neon(connectionString);
 }
 
 // Database initialization - creates tables if they don't exist
 export async function initDatabase() {
-  const client = getClient();
+  const sql = getSql();
   
   try {
-    console.log('Attempting to connect to database...');
-    await client.connect();
-    console.log('Database connection established');
+    console.log('Attempting to initialize database with Neon...');
     
-    await client.sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS questions (
         id SERIAL PRIMARY KEY,
         fid VARCHAR(255) NOT NULL,
@@ -45,15 +37,15 @@ export async function initDatabase() {
       );
     `;
 
-    await client.sql`
+    await sql`
       CREATE INDEX IF NOT EXISTS idx_questions_fid ON questions(fid);
     `;
 
-    await client.sql`
+    await sql`
       CREATE INDEX IF NOT EXISTS idx_questions_created_at ON questions(created_at);
     `;
 
-    await client.sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS rate_limits (
         fid VARCHAR(255) PRIMARY KEY,
         count INTEGER DEFAULT 0,
@@ -63,7 +55,7 @@ export async function initDatabase() {
       );
     `;
 
-    console.log('Database initialized successfully');
+    console.log('Database initialized successfully with Neon');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -74,13 +66,6 @@ export async function initDatabase() {
       });
     }
     throw error;
-  } finally {
-    try {
-      await client.end();
-      console.log('Database connection closed');
-    } catch (endError) {
-      console.error('Error closing database connection:', endError);
-    }
   }
 }
 
@@ -92,29 +77,25 @@ export async function logInteraction(
   isFiltered: boolean = false,
   confidence: number = 0.0
 ): Promise<void> {
-  const client = getClient();
+  const sql = getSql();
   
   try {
-    await client.connect();
-    await client.sql`
+    await sql`
       INSERT INTO questions (fid, question, response, is_filtered, confidence)
       VALUES (${fid}, ${question}, ${response}, ${isFiltered}, ${confidence})
     `;
   } catch (error) {
     console.error('Error logging interaction:', error);
     throw error;
-  } finally {
-    await client.end();
   }
 }
 
 // Get interaction history for a user
 export async function getUserHistory(fid: string, limit: number = 10): Promise<Question[]> {
-  const client = getClient();
+  const sql = getSql();
   
   try {
-    await client.connect();
-    const result = await client.sql`
+    const result = await sql`
       SELECT id, fid, question, response, is_filtered as "isFiltered", 
              confidence, created_at as timestamp
       FROM questions 
@@ -123,7 +104,7 @@ export async function getUserHistory(fid: string, limit: number = 10): Promise<Q
       LIMIT ${limit}
     `;
 
-    return result.rows.map(row => ({
+    return result.map((row: any) => ({
       id: row.id.toString(),
       fid: row.fid,
       question: row.question,
@@ -134,47 +115,43 @@ export async function getUserHistory(fid: string, limit: number = 10): Promise<Q
   } catch (error) {
     console.error('Error getting user history:', error);
     return [];
-  } finally {
-    await client.end();
   }
 }
 
 // Get analytics data
 export async function getAnalytics() {
-  const client = getClient();
+  const sql = getSql();
   
   try {
-    await client.connect();
-    
-    const totalQuestions = await client.sql`
+    const totalQuestions = await sql`
       SELECT COUNT(*) as count FROM questions
     `;
 
-    const uniqueUsers = await client.sql`
+    const uniqueUsers = await sql`
       SELECT COUNT(DISTINCT fid) as count FROM questions
     `;
 
-    const questionsToday = await client.sql`
+    const questionsToday = await sql`
       SELECT COUNT(*) as count FROM questions 
       WHERE created_at >= CURRENT_DATE
     `;
 
-    const avgConfidence = await client.sql`
+    const avgConfidence = await sql`
       SELECT AVG(confidence) as avg_confidence FROM questions 
       WHERE confidence > 0
     `;
 
-    const filteredQuestions = await client.sql`
+    const filteredQuestions = await sql`
       SELECT COUNT(*) as count FROM questions 
       WHERE is_filtered = true
     `;
 
     return {
-      totalQuestions: parseInt(totalQuestions.rows[0].count),
-      uniqueUsers: parseInt(uniqueUsers.rows[0].count),
-      questionsToday: parseInt(questionsToday.rows[0].count),
-      avgConfidence: parseFloat(avgConfidence.rows[0].avg_confidence) || 0,
-      filteredQuestions: parseInt(filteredQuestions.rows[0].count)
+      totalQuestions: parseInt(totalQuestions[0].count),
+      uniqueUsers: parseInt(uniqueUsers[0].count),
+      questionsToday: parseInt(questionsToday[0].count),
+      avgConfidence: parseFloat(avgConfidence[0].avg_confidence) || 0,
+      filteredQuestions: parseInt(filteredQuestions[0].count)
     };
   } catch (error) {
     console.error('Error getting analytics:', error);
@@ -185,27 +162,24 @@ export async function getAnalytics() {
       avgConfidence: 0,
       filteredQuestions: 0
     };
-  } finally {
-    await client.end();
   }
 }
 
 // Database-backed rate limiting (alternative to in-memory)
 export async function checkRateLimitDB(fid: string): Promise<{allowed: boolean, resetTime?: Date}> {
-  const client = getClient();
+  const sql = getSql();
   
   try {
-    await client.connect();
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // Check recent questions count
-    const recentQuestions = await client.sql`
+    const recentQuestions = await sql`
       SELECT COUNT(*) as count FROM questions 
       WHERE fid = ${fid} AND created_at > ${oneDayAgo.toISOString()}
     `;
 
-    const count = parseInt(recentQuestions.rows[0].count);
+    const count = parseInt(recentQuestions[0].count);
     const allowed = count < 1; // 1 question per day
 
     return {
@@ -216,31 +190,26 @@ export async function checkRateLimitDB(fid: string): Promise<{allowed: boolean, 
     console.error('Error checking rate limit:', error);
     // Default to allowing on error
     return { allowed: true };
-  } finally {
-    await client.end();
   }
 }
 
 // Clean up old data (optional maintenance function)
 export async function cleanupOldData(daysToKeep: number = 30) {
-  const client = getClient();
+  const sql = getSql();
   
   try {
-    await client.connect();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-    const result = await client.sql`
+    const result = await sql`
       DELETE FROM questions 
       WHERE created_at < ${cutoffDate.toISOString()}
     `;
 
-    console.log(`Cleaned up ${result.rowCount} old records`);
-    return result.rowCount;
+    console.log(`Cleaned up ${result.length} old records`);
+    return result.length;
   } catch (error) {
     console.error('Error cleaning up old data:', error);
     throw error;
-  } finally {
-    await client.end();
   }
 }

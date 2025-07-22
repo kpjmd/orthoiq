@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { logInteraction } from '@/lib/database';
-import { createClient } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Only allow debug endpoint in development
@@ -39,25 +39,27 @@ export async function GET(request: NextRequest) {
 
     // Test 2: Database Connection
     if (test === 'all' || test === 'db') {
-      const client = createClient({
-        connectionString: process.env.DATABASE_URL,
-      });
-      
-      try {
-        await client.connect();
-        const dbResult = await client.sql`SELECT NOW() as current_time`;
-        results.tests.database = {
-          status: 'connected',
-          currentTime: dbResult.rows[0].current_time,
-          message: 'Database connection successful'
-        };
-      } catch (dbError) {
+      if (!process.env.DATABASE_URL) {
         results.tests.database = {
           status: 'error',
-          error: dbError instanceof Error ? dbError.message : 'Unknown database error'
+          error: 'DATABASE_URL not configured'
         };
-      } finally {
-        await client.end();
+      } else {
+        const sql = neon(process.env.DATABASE_URL);
+        
+        try {
+          const dbResult = await sql`SELECT NOW() as current_time`;
+          results.tests.database = {
+            status: 'connected',
+            currentTime: dbResult[0].current_time,
+            message: 'Neon database connection successful'
+          };
+        } catch (dbError) {
+          results.tests.database = {
+            status: 'error',
+            error: dbError instanceof Error ? dbError.message : 'Unknown database error'
+          };
+        }
       }
     }
 
@@ -142,30 +144,32 @@ export async function GET(request: NextRequest) {
 
     // Test 7: Database Tables
     if (test === 'all' || test === 'tables') {
-      const client = createClient({
-        connectionString: process.env.DATABASE_URL,
-      });
-      
-      try {
-        await client.connect();
-        const tables = await client.sql`
-          SELECT table_name 
-          FROM information_schema.tables 
-          WHERE table_schema = 'public'
-          ORDER BY table_name
-        `;
-        
-        results.tests.database_tables = {
-          status: 'success',
-          tables: tables.rows.map(row => row.table_name)
-        };
-      } catch (tableError) {
-        results.tests.database_tables = {
+      if (!process.env.DATABASE_URL) {
+        results.tests.tables = {
           status: 'error',
-          error: tableError instanceof Error ? tableError.message : 'Unknown table error'
+          error: 'DATABASE_URL not configured'
         };
-      } finally {
-        await client.end();
+      } else {
+        const sql = neon(process.env.DATABASE_URL);
+        
+        try {
+          const tables = await sql`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+          `;
+        
+          results.tests.database_tables = {
+            status: 'success',
+            tables: tables.map((row: any) => row.table_name)
+          };
+        } catch (tableError) {
+          results.tests.database_tables = {
+            status: 'error',
+            error: tableError instanceof Error ? tableError.message : 'Unknown table error'
+          };
+        }
       }
     }
 

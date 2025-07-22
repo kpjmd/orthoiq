@@ -1,26 +1,31 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 import { initDatabase } from '@/lib/database';
 
 export async function GET() {
-  const client = createClient({
-    connectionString: process.env.DATABASE_URL,
-  });
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({
+      status: 'unhealthy',
+      message: 'DATABASE_URL environment variable not configured',
+      timestamp: new Date().toISOString(),
+    }, { status: 503 });
+  }
+
+  const sql = neon(process.env.DATABASE_URL);
   
   try {
     const startTime = Date.now();
-    await client.connect();
     
     // Test basic connection
-    await client.sql`SELECT 1 as connection_test`;
+    await sql`SELECT 1 as connection_test`;
     const connectionTime = Date.now() - startTime;
 
     // Check database version and connection info
-    const versionResult = await client.sql`SELECT version()`;
-    const version = versionResult.rows[0]?.version || 'Unknown';
+    const versionResult = await sql`SELECT version()`;
+    const version = versionResult[0]?.version || 'Unknown';
 
     // Check if required tables exist
-    const tablesResult = await client.sql`
+    const tablesResult = await sql`
       SELECT 
         table_name,
         column_name,
@@ -31,7 +36,7 @@ export async function GET() {
       ORDER BY table_name, ordinal_position
     `;
 
-    const tables = tablesResult.rows.reduce((acc: any, row) => {
+    const tables = tablesResult.reduce((acc: any, row) => {
       if (!acc[row.table_name]) {
         acc[row.table_name] = [];
       }
@@ -46,12 +51,12 @@ export async function GET() {
     const counts: any = {};
     try {
       if (tables.questions) {
-        const questionsCount = await client.sql`SELECT COUNT(*) as count FROM questions`;
-        counts.questions = parseInt(questionsCount.rows[0].count);
+        const questionsCount = await sql`SELECT COUNT(*) as count FROM questions`;
+        counts.questions = parseInt(questionsCount[0].count);
       }
       if (tables.rate_limits) {
-        const rateLimitsCount = await client.sql`SELECT COUNT(*) as count FROM rate_limits`;
-        counts.rate_limits = parseInt(rateLimitsCount.rows[0].count);
+        const rateLimitsCount = await sql`SELECT COUNT(*) as count FROM rate_limits`;
+        counts.rate_limits = parseInt(rateLimitsCount[0].count);
       }
     } catch (countError) {
       counts.error = 'Could not retrieve table counts';
@@ -67,7 +72,7 @@ export async function GET() {
     return NextResponse.json({
       status,
       message: missingTables.length === 0 
-        ? `Database healthy (${totalDuration}ms)` 
+        ? `Neon database healthy (${totalDuration}ms)` 
         : `Database connected but missing tables: ${missingTables.join(', ')}`,
       timestamp: new Date().toISOString(),
       details: {
@@ -88,15 +93,13 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json({
       status: 'unhealthy',
-      message: 'Database connection failed',
+      message: 'Neon database connection failed',
       timestamp: new Date().toISOString(),
       error: error instanceof Error ? error.message : 'Unknown database error',
       details: {
         databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing'
       }
     }, { status: 503 });
-  } finally {
-    await client.end();
   }
 }
 
