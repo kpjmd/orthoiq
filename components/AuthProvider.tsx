@@ -33,7 +33,7 @@ export function useAuth() {
 function AuthContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn: farcasterSignIn, isSuccess, isError, data, isLoading: farcasterLoading } = useSignIn();
+  const { signIn: farcasterSignIn, isSuccess, isError, data, isPolling: farcasterLoading } = useSignIn();
 
   // Check for existing user session on load
   useEffect(() => {
