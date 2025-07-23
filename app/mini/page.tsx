@@ -32,6 +32,21 @@ function MiniAppContent() {
   const [showArtworkModal, setShowArtworkModal] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number; resetTime?: Date; tier?: UserTier} | null>(null);
 
+  const getUserTier = useCallback((): UserTier => {
+    if (isAuthenticated && authUser) {
+      // Check if user is verified medical professional
+      // This would be enhanced with actual verification logic
+      if (authUser.verifications && authUser.verifications.length > 0) {
+        return 'medical';
+      }
+      return 'authenticated';
+    }
+    if (context?.user?.fid) {
+      return 'authenticated'; // SDK user
+    }
+    return 'anonymous';
+  }, [isAuthenticated, authUser, context?.user?.fid]);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -166,20 +181,6 @@ function MiniAppContent() {
     }
   };
 
-  const getUserTier = useCallback((): UserTier => {
-    if (isAuthenticated && authUser) {
-      // Check if user is verified medical professional
-      // This would be enhanced with actual verification logic
-      if (authUser.verifications && authUser.verifications.length > 0) {
-        return 'medical';
-      }
-      return 'authenticated';
-    }
-    if (context?.user?.fid) {
-      return 'authenticated'; // SDK user
-    }
-    return 'anonymous';
-  }, [isAuthenticated, authUser, context?.user?.fid]);
 
   const getRemainingQuestions = () => {
     return rateLimitInfo ? rateLimitInfo.remaining : 0;
