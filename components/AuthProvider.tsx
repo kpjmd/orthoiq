@@ -34,14 +34,55 @@ function AuthContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check for admin bypass mode on load
+  useEffect(() => {
+    // Check for admin bypass environment or localStorage
+    const adminBypass = process.env.NEXT_PUBLIC_ADMIN_BYPASS === 'true' || 
+                       localStorage.getItem('orthoiq_admin_bypass') === 'true';
+    
+    if (adminBypass) {
+      setUser({
+        fid: 15230,
+        username: 'kpjmd',
+        displayName: 'Dr. KPJMD',
+        pfpUrl: undefined,
+        verifications: [],
+        followerCount: undefined
+      });
+    } else {
+      // Check for existing user session
+      const savedUser = localStorage.getItem('orthoiq_user');
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (e) {
+          console.error('Failed to parse saved user:', e);
+          localStorage.removeItem('orthoiq_user');
+        }
+      }
+    }
+  }, []);
+
   const signIn = () => {
-    // Temporarily disabled - would integrate with @farcaster/auth-kit
-    console.log('Sign in clicked - auth integration needed');
+    // For now, enable admin bypass for immediate access
+    const adminUser = {
+      fid: 15230,
+      username: 'kpjmd',
+      displayName: 'Dr. KPJMD',
+      pfpUrl: undefined,
+      verifications: [],
+      followerCount: undefined
+    };
+    setUser(adminUser);
+    localStorage.setItem('orthoiq_user', JSON.stringify(adminUser));
+    localStorage.setItem('orthoiq_admin_bypass', 'true');
+    console.log('Admin bypass enabled - signed in as Dr. KPJMD');
   };
 
   const signOut = () => {
     setUser(null);
     localStorage.removeItem('orthoiq_user');
+    localStorage.removeItem('orthoiq_admin_bypass');
   };
 
   const value: AuthContextType = {

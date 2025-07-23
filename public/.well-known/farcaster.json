@@ -6,7 +6,7 @@
   },
   "miniapp": {
     "version": "1",
-    "name": "OrthoIQ - AI Orthopedic Assistant",
+    "name": "OrthoIQ - AI Orthopedic Expert",
     "iconUrl": "https://orthoiq.vercel.app/icon.png",
     "splashImageUrl": "https://orthoiq.vercel.app/og-image.png",
     "splashBackgroundColor": "#1e3a8a",

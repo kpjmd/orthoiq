@@ -16,7 +16,7 @@ export async function generateMetadata({ searchParams }: SharePageProps): Promis
   const response = resolvedSearchParams.response || 'AI Response';
   const confidence = resolvedSearchParams.confidence || '95';
   
-  const embedImageUrl = `/api/embed?${new URLSearchParams({
+  const embedImageUrl = `/api/og-image?${new URLSearchParams({
     question: question.substring(0, 200),
     response: response.substring(0, 300),
     confidence
@@ -49,17 +49,18 @@ export async function generateMetadata({ searchParams }: SharePageProps): Promis
     },
     other: {
       'fc:miniapp': JSON.stringify({
-        name: 'OrthoIQ',
-        icon: 'https://orthoiq.vercel.app/icon.png',
-        splashImage: embedImageUrl,
-        splashBackgroundColor: '#1e3a8a',
-        button: 'Ask OrthoIQ'
-      }),
-      'fc:miniapp:name': 'OrthoIQ',
-      'fc:miniapp:icon': 'https://orthoiq.vercel.app/icon.png',
-      'fc:miniapp:splash_image': embedImageUrl,
-      'fc:miniapp:splash_background_color': '#1e3a8a',
-      'fc:miniapp:button': 'Ask OrthoIQ'
+        version: '1',
+        imageUrl: embedImageUrl,
+        aspectRatio: '3:2',
+        button: {
+          title: 'Ask OrthoIQ',
+          action: {
+            type: 'launch_frame',
+            name: 'OrthoIQ',
+            url: 'https://orthoiq.vercel.app/mini'
+          }
+        }
+      })
     }
   };
 }
