@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import ResponseCard from '@/components/ResponseCard';
 import ActionMenu from '@/components/ActionMenu';
@@ -54,7 +54,7 @@ function MiniAppContent() {
     };
 
     load();
-  }, []);
+  }, [getUserTier]);
 
   const loadRateLimitStatus = async (fid: string, tier: UserTier = 'anonymous') => {
     try {
@@ -166,7 +166,7 @@ function MiniAppContent() {
     }
   };
 
-  const getUserTier = (): UserTier => {
+  const getUserTier = useCallback((): UserTier => {
     if (isAuthenticated && authUser) {
       // Check if user is verified medical professional
       // This would be enhanced with actual verification logic
@@ -179,7 +179,7 @@ function MiniAppContent() {
       return 'authenticated'; // SDK user
     }
     return 'anonymous';
-  };
+  }, [isAuthenticated, authUser, context?.user?.fid]);
 
   const getRemainingQuestions = () => {
     return rateLimitInfo ? rateLimitInfo.remaining : 0;

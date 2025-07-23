@@ -85,7 +85,7 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
           </h3>
           <p className="mt-1 text-sm text-blue-700">
             Get notified when Dr. KPJMD reviews and approves your orthopedic questions. 
-            We'll also let you know when your daily question limit resets.
+            We&apos;ll also let you know when your daily question limit resets.
           </p>
           <div className="mt-3 flex space-x-3">
             <button
