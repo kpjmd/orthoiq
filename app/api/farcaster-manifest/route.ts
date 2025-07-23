@@ -10,14 +10,13 @@ export async function GET() {
       payload: "eyJkb21haW4iOiJvcnRob2lxLnZlcmNlbC5hcHAifQ",
       signature: "MHg4YjRkMTZkY2QyODQ5YTdlY2U5MWY3ODM3OTY4OWEyYzQ3ZTAxZjJhMzQyOWRkYjJlYzE5ZWM3OWQ0MTIxMzJlMDY3ZDA5YjM3MTk2NmM3OWVjZDE5MmI2ZWUxZDkxN2U2OTAzMjJiZjYwZTk4MDgzNGRkMmE1YzYwMTc1OTYwMTFj"
     },
-    frame: {
+    miniapp: {
       version: "1",
-      name: "OrthoIQ - Orthopedic AI Assistant",
+      name: "OrthoIQ - AI Orthopedic Assistant",
       iconUrl: `${host}/icon.png`,
       splashImageUrl: `${host}/og-image.png`,
       splashBackgroundColor: "#1e3a8a",
-      homeUrl: `${host}/mini`,
-      webhookUrl: `${host}/api/webhook`
+      homeUrl: `${host}/mini`
     }
   };
   

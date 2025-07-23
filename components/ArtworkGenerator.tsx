@@ -46,6 +46,7 @@ export default function ArtworkGenerator({
   return (
     <div className={`inline-block ${className}`}>
       <svg 
+        id="ortho-artwork"
         width={size} 
         height={size} 
         viewBox="0 0 200 200"

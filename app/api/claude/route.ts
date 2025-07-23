@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { logInteraction, checkRateLimitDB } from '@/lib/database';
+import { logInteraction, checkRateLimitDB, getResponseStatus } from '@/lib/database';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
+import { validateOrthopedicContent, validateRateLimitRequest, sanitizeInput } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -49,7 +50,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[${requestId}] Processing question for FID: ${fid}, length: ${question.length}`);
+    // Sanitize input
+    const sanitizedQuestion = sanitizeInput(question);
+    
+    // Validate FID format
+    const fidValidation = validateRateLimitRequest(fid);
+    if (!fidValidation.isValid) {
+      console.warn(`[${requestId}] Invalid FID format: ${fid}`);
+      return NextResponse.json(
+        { error: fidValidation.reason },
+        { status: 400 }
+      );
+    }
+
+    // Enhanced content validation
+    const contentValidation = validateOrthopedicContent(sanitizedQuestion);
+    if (!contentValidation.isValid) {
+      console.log(`[${requestId}] Content validation failed: ${contentValidation.category}`);
+      
+      // Log filtered interaction
+      try {
+        await logInteraction(fid, sanitizedQuestion, contentValidation.reason!, true, 0);
+        console.log(`[${requestId}] Security filtered interaction logged successfully`);
+      } catch (logError) {
+        console.error(`[${requestId}] Failed to log security filtered interaction:`, logError);
+      }
+
+      return NextResponse.json({
+        response: contentValidation.reason,
+        isFiltered: true,
+        isApproved: false,
+        isPendingReview: false,
+        reviewedBy: null
+      });
+    }
+
+    console.log(`[${requestId}] Processing question for FID: ${fid}, length: ${sanitizedQuestion.length}`);
 
     // Check rate limiting (use database in production, in-memory for development)
     try {
@@ -73,39 +109,11 @@ export async function POST(request: NextRequest) {
       // Continue with request but log the error
     }
 
-    // Filter content for orthopedic relevance
-    let isRelevant = true;
-    try {
-      isRelevant = await filterContent(question);
-      console.log(`[${requestId}] Content filtering result: ${isRelevant}`);
-    } catch (filterError) {
-      console.error(`[${requestId}] Content filtering failed:`, filterError);
-      // Default to allowing the question if filtering fails
-      isRelevant = true;
-    }
-    
-    if (!isRelevant) {
-      const filteredResponse = "I specialize in orthopedic and sports medicine questions only. Please ask about topics like bone/joint injuries, muscle problems, sports injuries, physical therapy, or related medical concerns.";
-      
-      // Log filtered interaction
-      try {
-        await logInteraction(fid, question, filteredResponse, true, 0);
-        console.log(`[${requestId}] Filtered interaction logged successfully`);
-      } catch (logError) {
-        console.error(`[${requestId}] Failed to log filtered interaction:`, logError);
-      }
-
-      return NextResponse.json({
-        response: filteredResponse,
-        isFiltered: true
-      });
-    }
-
     // Get AI response
     let claudeResponse;
     try {
       console.log(`[${requestId}] Calling Claude API...`);
-      claudeResponse = await getOrthoResponse(question);
+      claudeResponse = await getOrthoResponse(sanitizedQuestion);
       console.log(`[${requestId}] Claude API response received, confidence: ${claudeResponse.confidence}`);
     } catch (claudeError) {
       console.error(`[${requestId}] Claude API call failed:`, claudeError);
@@ -119,12 +127,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Log successful interaction
+    let questionId: number | null = null;
     try {
-      await logInteraction(fid, question, claudeResponse.response, false, claudeResponse.confidence);
-      console.log(`[${requestId}] Interaction logged successfully`);
+      questionId = await logInteraction(fid, sanitizedQuestion, claudeResponse.response, false, claudeResponse.confidence);
+      console.log(`[${requestId}] Interaction logged successfully with ID: ${questionId}`);
     } catch (logError) {
       console.error(`[${requestId}] Failed to log interaction:`, logError);
       // Continue even if logging fails
+    }
+
+    // Check review status
+    let reviewStatus: { isReviewed: boolean; isApproved: boolean; reviewerName?: string } = { 
+      isReviewed: false, 
+      isApproved: false, 
+      reviewerName: undefined 
+    };
+    if (questionId) {
+      try {
+        reviewStatus = await getResponseStatus(questionId.toString());
+      } catch (statusError) {
+        console.error(`[${requestId}] Failed to get review status:`, statusError);
+      }
     }
 
     const duration = Date.now() - startTime;
@@ -137,7 +160,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       response: claudeResponse.response,
       confidence: claudeResponse.confidence,
-      isFiltered: false
+      isFiltered: false,
+      isApproved: reviewStatus.isApproved,
+      isPendingReview: !reviewStatus.isReviewed,
+      reviewedBy: reviewStatus.reviewerName
     });
 
   } catch (error) {

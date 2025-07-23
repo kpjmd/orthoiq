@@ -2,14 +2,32 @@
 
 import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
+import ResponseCard from '@/components/ResponseCard';
+import ActionMenu from '@/components/ActionMenu';
+import ArtworkModal from '@/components/ArtworkModal';
+import { AuthProvider, useAuth } from '@/components/AuthProvider';
+import SignInButton from '@/components/SignInButton';
 
-export default function MiniApp() {
+interface ResponseData {
+  response: string;
+  confidence?: number;
+  isFiltered?: boolean;
+  isPendingReview?: boolean;
+  isApproved?: boolean;
+  reviewedBy?: string;
+}
+
+function MiniAppContent() {
+  const { user: authUser, isAuthenticated } = useAuth();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [context, setContext] = useState<any>(null);
   const [question, setQuestion] = useState('');
-  const [response, setResponse] = useState('');
+  const [currentQuestion, setCurrentQuestion] = useState('');
+  const [responseData, setResponseData] = useState<ResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showArtworkModal, setShowArtworkModal] = useState(false);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number} | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -21,6 +39,11 @@ export default function MiniApp() {
         
         // Signal that the app is ready
         sdk.actions.ready();
+        
+        // Load rate limit info
+        if (context?.user?.fid) {
+          await loadRateLimitStatus(context.user.fid.toString());
+        }
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
         setError('Failed to initialize Mini App');
@@ -30,13 +53,26 @@ export default function MiniApp() {
     load();
   }, []);
 
+  const loadRateLimitStatus = async (fid: string) => {
+    try {
+      const res = await fetch(`/api/rate-limit-status?fid=${fid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRateLimitInfo(data);
+      }
+    } catch (err) {
+      console.warn('Failed to load rate limit status:', err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim() || !context?.user?.fid) return;
 
     setIsLoading(true);
     setError('');
-    setResponse('');
+    setResponseData(null);
+    setCurrentQuestion(question.trim());
 
     try {
       const res = await fetch('/api/claude', {
@@ -44,7 +80,13 @@ export default function MiniApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           question: question.trim(),
-          fid: context.user.fid.toString()
+          fid: context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous',
+          authUser: authUser ? {
+            fid: authUser.fid,
+            username: authUser.username,
+            displayName: authUser.displayName,
+            tier: getUserTier()
+          } : null
         }),
       });
 
@@ -70,14 +112,71 @@ export default function MiniApp() {
       }
 
       const data = await res.json();
-      setResponse(data.response);
-      setQuestion(''); // Clear the question after successful submission
+      setResponseData({
+        response: data.response,
+        confidence: data.confidence,
+        isFiltered: data.isFiltered,
+        isPendingReview: !data.isFiltered && !data.isApproved,
+        isApproved: data.isApproved,
+        reviewedBy: data.reviewedBy
+      });
+      
+      setQuestion('');
+      
+      // Update rate limit info
+      await loadRateLimitStatus(context.user.fid.toString());
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAskAnother = () => {
+    setResponseData(null);
+    setCurrentQuestion('');
+    setError('');
+    document.getElementById('question')?.focus();
+  };
+
+  const handleRate = async (rating: number) => {
+    if (!context?.user?.fid || !currentQuestion) return;
+
+    try {
+      await fetch('/api/rate-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fid: context.user.fid.toString(),
+          question: currentQuestion,
+          rating
+        })
+      });
+    } catch (err) {
+      console.warn('Failed to submit rating:', err);
+    }
+  };
+
+  const getUserTier = () => {
+    if (isAuthenticated && authUser) {
+      // Check if user is verified medical professional
+      // This would be enhanced with actual verification logic
+      if (authUser.verifications && authUser.verifications.length > 0) {
+        return 'medical';
+      }
+      return 'authenticated';
+    }
+    if (context?.user?.fid) {
+      return 'authenticated'; // SDK user
+    }
+    return 'anonymous';
+  };
+
+  const getRemainingQuestions = () => {
+    const tier = getUserTier();
+    const daily = tier === 'anonymous' ? 1 : tier === 'authenticated' ? 3 : 10;
+    return rateLimitInfo ? Math.max(0, daily - rateLimitInfo.remaining) : daily;
   };
 
   if (!isSDKLoaded) {
@@ -97,13 +196,31 @@ export default function MiniApp() {
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-2">🦴 OrthoIQ</h1>
-          <p className="text-lg opacity-90">Ask the Orthopedic AI</p>
-          <p className="text-sm mt-2 opacity-75">by KPJMD</p>
-          {context?.user && (
-            <p className="text-xs mt-2 opacity-60">
-              Welcome, {context.user.username || `FID: ${context.user.fid}`}
-            </p>
-          )}
+          <p className="text-lg opacity-90">Premier Medical AI on Farcaster</p>
+          <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
+          <div className="mt-3 space-y-2">
+            {/* Authentication Status */}
+            <SignInButton />
+            
+            {/* User Info */}
+            {(isAuthenticated || context?.user) && (
+              <div className="space-y-1">
+                <p className="text-xs opacity-60">
+                  Questions remaining today: {getRemainingQuestions()}
+                </p>
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
+                    {getUserTier().charAt(0).toUpperCase() + getUserTier().slice(1)} User
+                  </div>
+                  {getUserTier() === 'medical' && (
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-800 bg-opacity-50">
+                      ✅ Verified
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -121,13 +238,13 @@ export default function MiniApp() {
               placeholder="e.g., What should I do for knee pain after running?"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={3}
-              disabled={isLoading}
+              disabled={isLoading || getRemainingQuestions() === 0}
             />
           </div>
           
           <button
             type="submit"
-            disabled={isLoading || !question.trim()}
+            disabled={isLoading || !question.trim() || getRemainingQuestions() === 0}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
           >
             {isLoading ? (
@@ -138,6 +255,8 @@ export default function MiniApp() {
                 </svg>
                 Getting AI Response...
               </span>
+            ) : getRemainingQuestions() === 0 ? (
+              'Daily limit reached'
             ) : (
               'Get AI Answer'
             )}
@@ -152,19 +271,35 @@ export default function MiniApp() {
         )}
 
         {/* Response Display */}
-        {response && (
+        {responseData && (
           <div className="mb-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-                <span className="text-2xl mr-2">🔬</span>
-                OrthoIQ Response:
-              </h3>
-              <div className="prose prose-sm max-w-none">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
-              </div>
-            </div>
+            <ResponseCard
+              response={responseData.response}
+              confidence={responseData.confidence}
+              isFiltered={responseData.isFiltered}
+              isPendingReview={responseData.isPendingReview}
+              isApproved={responseData.isApproved}
+              reviewedBy={responseData.reviewedBy}
+            />
+            
+            {/* Action Menu */}
+            <ActionMenu
+              response={responseData.response}
+              question={currentQuestion}
+              onAskAnother={handleAskAnother}
+              onViewArtwork={() => setShowArtworkModal(true)}
+              onRate={handleRate}
+            />
           </div>
         )}
+
+        {/* Artwork Modal */}
+        <ArtworkModal
+          isOpen={showArtworkModal}
+          onClose={() => setShowArtworkModal(false)}
+          question={currentQuestion}
+          response={responseData?.response || ''}
+        />
 
         {/* Disclaimer */}
         <div className="text-center text-xs text-gray-500 mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -176,5 +311,13 @@ export default function MiniApp() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MiniApp() {
+  return (
+    <AuthProvider>
+      <MiniAppContent />
+    </AuthProvider>
   );
 }
