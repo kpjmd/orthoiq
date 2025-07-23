@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/components/AuthProvider';
+import SignInButton from '@/components/SignInButton';
 
 interface PendingResponse {
   id: string;
@@ -76,6 +77,11 @@ function AdminDashboardContent() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">🔐 Admin Access Required</h1>
           <p className="text-gray-600 mb-6">Please sign in with Farcaster to access the doctor review dashboard.</p>
+          <div className="flex justify-center">
+            <div className="bg-gradient-to-br from-blue-900 to-blue-600 p-1 rounded-lg">
+              <SignInButton />
+            </div>
+          </div>
         </div>
       </div>
     );
