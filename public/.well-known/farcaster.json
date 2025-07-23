@@ -8,8 +8,20 @@
     "version": "1",
     "name": "OrthoIQ - AI Orthopedic Expert",
     "iconUrl": "https://orthoiq.vercel.app/icon.png",
+    "imageUrl": "https://orthoiq.vercel.app/og-image.png",
+    "buttonTitle": "Ask OrthoIQ",
     "splashImageUrl": "https://orthoiq.vercel.app/og-image.png",
     "splashBackgroundColor": "#1e3a8a",
-    "homeUrl": "https://orthoiq.vercel.app/mini"
+    "homeUrl": "https://orthoiq.vercel.app/mini",
+    "subtitle": "AI Orthopedic Expert",
+    "description": "Get expert orthopedic advice from AI trained by Dr. KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
+    "tagline": "Premier Medical AI on Farcaster",
+    "tags": [
+      "medical",
+      "orthopedic",
+      "ai",
+      "health",
+      "doctor"
+    ]
   }
 }
