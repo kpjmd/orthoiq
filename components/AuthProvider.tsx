@@ -33,7 +33,7 @@ export function useAuth() {
 function AuthContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn: farcasterSignIn, isSuccess, isError, data, isPolling: farcasterLoading } = useSignIn();
+  const { signIn: farcasterSignIn, isSuccess, isError, data, isPolling: farcasterLoading } = useSignIn({});
 
   // Check for existing user session on load
   useEffect(() => {
@@ -73,14 +73,14 @@ function AuthContextProvider({ children }: { children: ReactNode }) {
 
   // Handle Farcaster sign-in success
   useEffect(() => {
-    if (isSuccess && data) {
+    if (isSuccess && data && data.fid) {
       const userData: User = {
         fid: data.fid,
         username: data.username,
         displayName: data.displayName,
         pfpUrl: data.pfpUrl,
         verifications: data.verifications || [],
-        followerCount: data.followerCount
+        followerCount: undefined
       };
       
       setUser(userData);
