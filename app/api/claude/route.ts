@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
-import { checkRateLimit } from '@/lib/rateLimit';
+import { checkRateLimit, UserTier } from '@/lib/rateLimit';
 import { logInteraction, checkRateLimitDB, getResponseStatus } from '@/lib/database';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question, fid } = requestBody;
+    const { question, fid, authUser } = requestBody;
 
     if (!question || !fid) {
       console.warn(`[${requestId}] Missing required fields: question=${!!question}, fid=${!!fid}`);
@@ -85,25 +85,43 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`[${requestId}] Processing question for FID: ${fid}, length: ${sanitizedQuestion.length}`);
+    // Determine user tier
+    const getUserTier = (): UserTier => {
+      if (authUser) {
+        // Check if user is verified medical professional
+        if (authUser.verifications && authUser.verifications.length > 0) {
+          return 'medical';
+        }
+        return 'authenticated';
+      }
+      if (fid && fid !== 'anonymous') {
+        return 'authenticated'; // SDK user
+      }
+      return 'anonymous';
+    };
 
-    // Check rate limiting (use database in production, in-memory for development)
+    const userTier = getUserTier();
+    console.log(`[${requestId}] Processing question for FID: ${fid}, tier: ${userTier}, length: ${sanitizedQuestion.length}`);
+
+    // Check rate limiting with tier (use in-memory for all environments for now)
     try {
-      const rateLimitResult = process.env.NODE_ENV === 'production' 
-        ? await checkRateLimitDB(fid)
-        : await checkRateLimit(fid);
+      const rateLimitResult = await checkRateLimit(fid, userTier);
         
       if (!rateLimitResult.allowed) {
-        console.warn(`[${requestId}] Rate limit exceeded for FID: ${fid}`);
+        const tierLimits = { anonymous: 1, authenticated: 3, medical: 10 };
+        const dailyLimit = tierLimits[userTier];
+        console.warn(`[${requestId}] Rate limit exceeded for FID: ${fid}, tier: ${userTier}`);
         return NextResponse.json(
           { 
-            error: 'Rate limit exceeded. You can ask 1 question per day.',
-            resetTime: rateLimitResult.resetTime
+            error: `Rate limit exceeded. You can ask ${dailyLimit} question${dailyLimit > 1 ? 's' : ''} per day as a ${userTier} user.`,
+            resetTime: rateLimitResult.resetTime,
+            tier: userTier,
+            dailyLimit
           },
           { status: 429 }
         );
       }
-      console.log(`[${requestId}] Rate limit check passed (${process.env.NODE_ENV === 'production' ? 'DB' : 'memory'})`);
+      console.log(`[${requestId}] Rate limit check passed for ${userTier} user (${rateLimitResult.remaining} remaining)`);
     } catch (rateLimitError) {
       console.error(`[${requestId}] Rate limit check failed:`, rateLimitError);
       // Continue with request but log the error

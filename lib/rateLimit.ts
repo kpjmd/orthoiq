@@ -4,23 +4,35 @@
 interface RateLimitEntry {
   count: number;
   resetTime: Date;
+  tier: UserTier;
 }
 
 // In-memory storage (will reset on server restart)
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-const QUESTIONS_PER_DAY = 1;
+export type UserTier = 'anonymous' | 'authenticated' | 'medical';
+
+// Question limits per tier per day
+const TIER_LIMITS: Record<UserTier, number> = {
+  anonymous: 1,
+  authenticated: 3,
+  medical: 10
+};
+
 const RESET_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface RateLimitResult {
   allowed: boolean;
   resetTime?: Date;
   remaining?: number;
+  total?: number;
+  tier?: UserTier;
 }
 
-export async function checkRateLimit(fid: string): Promise<RateLimitResult> {
+export async function checkRateLimit(fid: string, tier: UserTier = 'anonymous'): Promise<RateLimitResult> {
   const now = new Date();
   const key = `rate_limit:${fid}`;
+  const dailyLimit = TIER_LIMITS[tier];
   
   // Get existing entry
   let entry = rateLimitStore.get(key);
@@ -29,17 +41,24 @@ export async function checkRateLimit(fid: string): Promise<RateLimitResult> {
   if (!entry || now >= entry.resetTime) {
     entry = {
       count: 0,
-      resetTime: new Date(now.getTime() + RESET_INTERVAL_MS)
+      resetTime: new Date(now.getTime() + RESET_INTERVAL_MS),
+      tier
     };
+    rateLimitStore.set(key, entry);
+  } else if (entry.tier !== tier) {
+    // Update tier if it has changed (user signed in/out)
+    entry.tier = tier;
     rateLimitStore.set(key, entry);
   }
   
   // Check if limit exceeded
-  if (entry.count >= QUESTIONS_PER_DAY) {
+  if (entry.count >= dailyLimit) {
     return {
       allowed: false,
       resetTime: entry.resetTime,
-      remaining: 0
+      remaining: 0,
+      total: dailyLimit,
+      tier
     };
   }
   
@@ -49,27 +68,34 @@ export async function checkRateLimit(fid: string): Promise<RateLimitResult> {
   
   return {
     allowed: true,
-    remaining: QUESTIONS_PER_DAY - entry.count
+    remaining: dailyLimit - entry.count,
+    total: dailyLimit,
+    tier
   };
 }
 
-export async function getRateLimitStatus(fid: string): Promise<RateLimitResult> {
+export async function getRateLimitStatus(fid: string, tier: UserTier = 'anonymous'): Promise<RateLimitResult> {
   const now = new Date();
   const key = `rate_limit:${fid}`;
+  const dailyLimit = TIER_LIMITS[tier];
   
   const entry = rateLimitStore.get(key);
   
   if (!entry || now >= entry.resetTime) {
     return {
       allowed: true,
-      remaining: QUESTIONS_PER_DAY
+      remaining: dailyLimit,
+      total: dailyLimit,
+      tier
     };
   }
   
   return {
-    allowed: entry.count < QUESTIONS_PER_DAY,
+    allowed: entry.count < dailyLimit,
     resetTime: entry.resetTime,
-    remaining: Math.max(0, QUESTIONS_PER_DAY - entry.count)
+    remaining: Math.max(0, dailyLimit - entry.count),
+    total: dailyLimit,
+    tier: entry.tier
   };
 }
 

@@ -8,9 +8,11 @@ interface ActionMenuProps {
   onAskAnother: () => void;
   onViewArtwork: () => void;
   onRate: (rating: number) => void;
+  canAskAnother?: boolean;
+  questionsRemaining?: number;
 }
 
-export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate }: ActionMenuProps) {
+export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0 }: ActionMenuProps) {
   const [showRating, setShowRating] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [shareText, setShareText] = useState('Share Response');
@@ -63,10 +65,18 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={onAskAnother}
-          className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={!canAskAnother}
+          className={`flex items-center justify-center px-4 py-3 rounded-lg transition-colors ${
+            canAskAnother 
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
           <span className="mr-2">❓</span>
-          Ask Another
+          {canAskAnother ? 
+            `Ask Another${questionsRemaining > 0 ? ` (${questionsRemaining} left)` : ''}` : 
+            'Daily Limit Reached'
+          }
         </button>
 
         <button

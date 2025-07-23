@@ -5,8 +5,11 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import ResponseCard from '@/components/ResponseCard';
 import ActionMenu from '@/components/ActionMenu';
 import ArtworkModal from '@/components/ArtworkModal';
+import CountdownTimer from '@/components/CountdownTimer';
+import NotificationPermissions from '@/components/NotificationPermissions';
 import { AuthProvider, useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
+import { UserTier } from '@/lib/rateLimit';
 
 interface ResponseData {
   response: string;
@@ -27,7 +30,7 @@ function MiniAppContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showArtworkModal, setShowArtworkModal] = useState(false);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number} | null>(null);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number; resetTime?: Date; tier?: UserTier} | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -42,7 +45,7 @@ function MiniAppContent() {
         
         // Load rate limit info
         if (context?.user?.fid) {
-          await loadRateLimitStatus(context.user.fid.toString());
+          await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
         }
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
@@ -53,12 +56,17 @@ function MiniAppContent() {
     load();
   }, []);
 
-  const loadRateLimitStatus = async (fid: string) => {
+  const loadRateLimitStatus = async (fid: string, tier: UserTier = 'anonymous') => {
     try {
-      const res = await fetch(`/api/rate-limit-status?fid=${fid}`);
+      const res = await fetch(`/api/rate-limit-status?fid=${fid}&tier=${tier}`);
       if (res.ok) {
         const data = await res.json();
-        setRateLimitInfo(data);
+        setRateLimitInfo({
+          remaining: data.remaining,
+          total: data.dailyLimit,
+          resetTime: data.resetTime ? new Date(data.resetTime) : undefined,
+          tier: data.tier
+        });
       }
     } catch (err) {
       console.warn('Failed to load rate limit status:', err);
@@ -124,7 +132,7 @@ function MiniAppContent() {
       setQuestion('');
       
       // Update rate limit info
-      await loadRateLimitStatus(context.user.fid.toString());
+      await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -158,7 +166,7 @@ function MiniAppContent() {
     }
   };
 
-  const getUserTier = () => {
+  const getUserTier = (): UserTier => {
     if (isAuthenticated && authUser) {
       // Check if user is verified medical professional
       // This would be enhanced with actual verification logic
@@ -174,9 +182,11 @@ function MiniAppContent() {
   };
 
   const getRemainingQuestions = () => {
-    const tier = getUserTier();
-    const daily = tier === 'anonymous' ? 1 : tier === 'authenticated' ? 3 : 10;
-    return rateLimitInfo ? Math.max(0, daily - rateLimitInfo.remaining) : daily;
+    return rateLimitInfo ? rateLimitInfo.remaining : 0;
+  };
+
+  const getUsedQuestions = () => {
+    return rateLimitInfo ? rateLimitInfo.total - rateLimitInfo.remaining : 0;
   };
 
   if (!isSDKLoaded) {
@@ -203,28 +213,48 @@ function MiniAppContent() {
             <SignInButton />
             
             {/* User Info */}
-            {(isAuthenticated || context?.user) && (
-              <div className="space-y-1">
+            <div className="space-y-1">
+              <p className="text-xs opacity-60">
+                Questions remaining today: {getRemainingQuestions()}
+                {rateLimitInfo?.total && ` of ${rateLimitInfo.total}`}
+              </p>
+              {getRemainingQuestions() === 0 && rateLimitInfo?.resetTime && (
                 <p className="text-xs opacity-60">
-                  Questions remaining today: {getRemainingQuestions()}
+                  Reset in: <CountdownTimer 
+                    targetTime={rateLimitInfo.resetTime} 
+                    onComplete={() => loadRateLimitStatus(
+                      context?.user?.fid?.toString() || 'anonymous', 
+                      getUserTier()
+                    )} 
+                  />
                 </p>
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
-                    {getUserTier().charAt(0).toUpperCase() + getUserTier().slice(1)} User
-                  </div>
-                  {getUserTier() === 'medical' && (
-                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-800 bg-opacity-50">
-                      ✅ Verified
-                    </div>
-                  )}
+              )}
+              <div className="flex items-center justify-center space-x-2">
+                <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
+                  {getUserTier().charAt(0).toUpperCase() + getUserTier().slice(1)} User
                 </div>
+                {getUserTier() === 'medical' && (
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-800 bg-opacity-50">
+                    ✅ Verified
+                  </div>
+                )}
+                {(isAuthenticated && authUser) && (
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-700 bg-opacity-50">
+                    ✅ Authenticated
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="p-6 max-w-2xl mx-auto">
+        {/* Notification Permissions */}
+        <NotificationPermissions 
+          fid={context?.user?.fid?.toString() || authUser?.fid?.toString()} 
+        />
+
         {/* Question Form */}
         <form onSubmit={handleSubmit} className="mb-6">
           <div className="mb-4">
@@ -256,7 +286,9 @@ function MiniAppContent() {
                 Getting AI Response...
               </span>
             ) : getRemainingQuestions() === 0 ? (
-              'Daily limit reached'
+              rateLimitInfo?.resetTime ? 
+                `Daily limit reached - Reset in ${new Date(rateLimitInfo.resetTime).getHours() - new Date().getHours()}h` :
+                'Daily limit reached'
             ) : (
               'Get AI Answer'
             )}
@@ -267,6 +299,17 @@ function MiniAppContent() {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800">{error}</p>
+            {error.includes('Rate limit exceeded') && rateLimitInfo?.resetTime && (
+              <p className="text-red-600 text-sm mt-2">
+                You can ask your next question in: <CountdownTimer 
+                  targetTime={rateLimitInfo.resetTime} 
+                  onComplete={() => loadRateLimitStatus(
+                    context?.user?.fid?.toString() || 'anonymous', 
+                    getUserTier()
+                  )} 
+                />
+              </p>
+            )}
           </div>
         )}
 
@@ -289,6 +332,8 @@ function MiniAppContent() {
               onAskAnother={handleAskAnother}
               onViewArtwork={() => setShowArtworkModal(true)}
               onRate={handleRate}
+              canAskAnother={getRemainingQuestions() > 0}
+              questionsRemaining={getRemainingQuestions()}
             />
           </div>
         )}

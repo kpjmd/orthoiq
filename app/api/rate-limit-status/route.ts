@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRateLimitDB } from '@/lib/database';
+import { getRateLimitStatus, UserTier } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const fid = searchParams.get('fid');
+    const tier = (searchParams.get('tier') || 'anonymous') as UserTier;
 
     if (!fid) {
       return NextResponse.json(
@@ -13,26 +14,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check current rate limit status
-    const rateLimitResult = await checkRateLimitDB(fid);
+    // Check current rate limit status with tier
+    const rateLimitResult = await getRateLimitStatus(fid, tier);
     
-    // Calculate remaining questions for different tiers
-    const getUserTier = (fid: string) => {
-      // For now, everyone is authenticated if they have an FID
-      // This would be enhanced with actual auth logic
-      return 'authenticated';
-    };
-
-    const tier = getUserTier(fid);
-    const dailyLimit = tier === 'anonymous' ? 1 : tier === 'authenticated' ? 3 : 10;
-    const used = rateLimitResult.count || 0;
-    const remaining = Math.max(0, dailyLimit - used);
+    const used = rateLimitResult.total ? rateLimitResult.total - rateLimitResult.remaining! : 0;
 
     return NextResponse.json({
-      tier,
-      dailyLimit,
+      tier: rateLimitResult.tier,
+      dailyLimit: rateLimitResult.total,
       used,
-      remaining,
+      remaining: rateLimitResult.remaining,
       resetTime: rateLimitResult.resetTime,
       allowed: rateLimitResult.allowed
     });
