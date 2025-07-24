@@ -221,7 +221,9 @@ function MiniAppContent() {
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
           <div className="mt-3 space-y-2">
             {/* Authentication Status */}
-            <SignInButton />
+            <div className="flex justify-center">
+              <SignInButton />
+            </div>
             
             {/* User Info */}
             <div className="space-y-1">
@@ -249,9 +251,13 @@ function MiniAppContent() {
                     ✅ Verified
                   </div>
                 )}
-                {(isAuthenticated && authUser) && (
+                {(isAuthenticated && authUser) ? (
                   <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-700 bg-opacity-50">
                     ✅ Authenticated
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-700 bg-opacity-50">
+                    ❌ Anonymous
                   </div>
                 )}
               </div>

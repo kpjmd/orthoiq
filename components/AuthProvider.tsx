@@ -130,6 +130,12 @@ function AuthContextProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem('orthoiq_user');
     localStorage.removeItem('orthoiq_admin_bypass');
+    // Reset loading state to ensure sign-in button works again
+    setIsLoading(false);
+    // Force a small delay to ensure state is fully reset
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const value: AuthContextType = {

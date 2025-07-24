@@ -34,9 +34,14 @@ export default function ResponseCard({
   // Parse JSON response if it's still in JSON format
   let displayResponse = response;
   try {
-    const parsed = JSON.parse(response);
-    if (parsed.response) {
-      displayResponse = parsed.response;
+    // Only attempt JSON parsing if the response starts with { or [
+    if (typeof response === 'string' && (response.trim().startsWith('{') || response.trim().startsWith('['))) {
+      const parsed = JSON.parse(response);
+      if (parsed.response) {
+        displayResponse = parsed.response;
+      } else if (typeof parsed === 'string') {
+        displayResponse = parsed;
+      }
     }
   } catch {
     // Not JSON, use as-is
