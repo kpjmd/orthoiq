@@ -181,7 +181,12 @@ export async function POST(request: NextRequest) {
       isFiltered: false,
       isApproved: reviewStatus.isApproved,
       isPendingReview: !reviewStatus.isReviewed,
-      reviewedBy: reviewStatus.reviewerName
+      reviewedBy: reviewStatus.reviewerName,
+      reviewType: reviewStatus.reviewType,
+      hasAdditions: reviewStatus.hasAdditions,
+      hasCorrections: reviewStatus.hasCorrections,
+      additionsText: reviewStatus.additionsText,
+      correctionsText: reviewStatus.correctionsText
     });
 
   } catch (error) {

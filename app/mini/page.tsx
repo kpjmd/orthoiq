@@ -18,6 +18,11 @@ interface ResponseData {
   isPendingReview?: boolean;
   isApproved?: boolean;
   reviewedBy?: string;
+  reviewType?: string;
+  hasAdditions?: boolean;
+  hasCorrections?: boolean;
+  additionsText?: string;
+  correctionsText?: string;
 }
 
 function MiniAppContent() {
@@ -139,9 +144,14 @@ function MiniAppContent() {
         response: data.response,
         confidence: data.confidence,
         isFiltered: data.isFiltered,
-        isPendingReview: !data.isFiltered && !data.isApproved,
+        isPendingReview: data.isPendingReview,
         isApproved: data.isApproved,
-        reviewedBy: data.reviewedBy
+        reviewedBy: data.reviewedBy,
+        reviewType: data.reviewType,
+        hasAdditions: data.hasAdditions,
+        hasCorrections: data.hasCorrections,
+        additionsText: data.additionsText,
+        correctionsText: data.correctionsText
       });
       
       setQuestion('');
@@ -324,6 +334,11 @@ function MiniAppContent() {
               isPendingReview={responseData.isPendingReview}
               isApproved={responseData.isApproved}
               reviewedBy={responseData.reviewedBy}
+              reviewType={responseData.reviewType}
+              hasAdditions={responseData.hasAdditions}
+              hasCorrections={responseData.hasCorrections}
+              additionsText={responseData.additionsText}
+              correctionsText={responseData.correctionsText}
             />
             
             {/* Action Menu */}

@@ -9,6 +9,11 @@ interface ResponseCardProps {
   isPendingReview?: boolean;
   isApproved?: boolean;
   reviewedBy?: string;
+  reviewType?: string;
+  hasAdditions?: boolean;
+  hasCorrections?: boolean;
+  additionsText?: string;
+  correctionsText?: string;
 }
 
 export default function ResponseCard({ 
@@ -17,7 +22,12 @@ export default function ResponseCard({
   isFiltered = false,
   isPendingReview = false,
   isApproved = false,
-  reviewedBy 
+  reviewedBy,
+  reviewType,
+  hasAdditions = false,
+  hasCorrections = false,
+  additionsText,
+  correctionsText
 }: ResponseCardProps) {
   const [showConfidence, setShowConfidence] = useState(false);
 
@@ -42,6 +52,37 @@ export default function ResponseCard({
       );
     }
     
+    if (isApproved && reviewedBy && reviewType) {
+      // Enhanced review status badges
+      if (reviewType === 'approve_as_is') {
+        return (
+          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <span className="mr-1">✅</span>
+            Medically reviewed and approved
+          </div>
+        );
+      }
+      
+      if (reviewType === 'approve_with_additions') {
+        return (
+          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <span className="mr-1">✅➕</span>
+            Doctor reviewed with additions
+          </div>
+        );
+      }
+      
+      if (reviewType === 'approve_with_corrections') {
+        return (
+          <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+            <span className="mr-1">✅✏️</span>
+            Doctor reviewed with corrections
+          </div>
+        );
+      }
+    }
+    
+    // Legacy approval (fallback)
     if (isApproved && reviewedBy) {
       return (
         <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -108,9 +149,21 @@ export default function ResponseCard({
       <div className="p-6">
         <div className="prose prose-sm max-w-none">
           <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-            {displayResponse}
+            {hasCorrections && correctionsText ? correctionsText : displayResponse}
           </div>
         </div>
+        
+        {/* Doctor's Additions */}
+        {hasAdditions && additionsText && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center mb-2">
+              <span className="text-blue-600 text-sm font-medium">👨‍⚕️ Doctor's Additional Information:</span>
+            </div>
+            <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+              {additionsText}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Medical Disclaimer */}

@@ -14,11 +14,36 @@ interface PendingResponse {
   userTier: string;
 }
 
+interface ReviewDetails {
+  reviewType: string;
+  additionsText?: string;
+  correctionsText?: string;
+  teachingNotes?: string;
+  confidenceScore?: number;
+  communicationQuality?: number;
+}
+
+interface MedicalCategory {
+  specialty?: string;
+  complexity?: string;
+  responseQuality?: string;
+  commonIssues?: string[];
+}
+
 function AdminDashboardContent() {
   const { user, isAuthenticated } = useAuth();
   const [pendingResponses, setPendingResponses] = useState<PendingResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedResponse, setSelectedResponse] = useState<PendingResponse | null>(null);
+  const [reviewForm, setReviewForm] = useState<{[key: string]: ReviewDetails & MedicalCategory}>({});
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFilters, setExportFilters] = useState({
+    format: 'jsonl',
+    specialty: '',
+    complexity: '',
+    responseQuality: '',
+    reviewType: ''
+  });
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -40,7 +65,15 @@ function AdminDashboardContent() {
     }
   };
 
-  const handleApproval = async (responseId: string, approved: boolean, notes?: string) => {
+  const handleEnhancedReview = async (responseId: string) => {
+    const formData = reviewForm[responseId];
+    if (!formData?.reviewType) {
+      alert('Please select a review type');
+      return;
+    }
+
+    const approved = formData.reviewType.startsWith('approve');
+    
     try {
       const res = await fetch('/api/admin/review-response', {
         method: 'POST',
@@ -50,7 +83,21 @@ function AdminDashboardContent() {
           approved,
           reviewerFid: user?.fid,
           reviewerName: user?.displayName || user?.username || 'KPJMD',
-          notes
+          notes: formData.teachingNotes || '',
+          reviewDetails: {
+            reviewType: formData.reviewType,
+            additionsText: formData.additionsText,
+            correctionsText: formData.correctionsText,
+            teachingNotes: formData.teachingNotes,
+            confidenceScore: formData.confidenceScore,
+            communicationQuality: formData.communicationQuality
+          },
+          medicalCategory: {
+            specialty: formData.specialty,
+            complexity: formData.complexity,
+            responseQuality: formData.responseQuality,
+            commonIssues: formData.commonIssues
+          }
         })
       });
 
@@ -58,9 +105,56 @@ function AdminDashboardContent() {
         // Remove from pending list
         setPendingResponses(prev => prev.filter(r => r.id !== responseId));
         setSelectedResponse(null);
+        // Clear form data
+        setReviewForm(prev => {
+          const newForm = {...prev};
+          delete newForm[responseId];
+          return newForm;
+        });
       }
     } catch (error) {
       console.error('Failed to submit review:', error);
+    }
+  };
+
+  const updateReviewForm = (responseId: string, field: string, value: any) => {
+    setReviewForm(prev => ({
+      ...prev,
+      [responseId]: {
+        ...prev[responseId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleExportTrainingData = async () => {
+    try {
+      // Remove empty filters
+      const cleanFilters = Object.fromEntries(
+        Object.entries(exportFilters).filter(([_, value]) => value !== '')
+      );
+
+      const res = await fetch('/api/admin/export-training-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          format: exportFilters.format,
+          filters: cleanFilters,
+          exportedBy: user?.displayName || user?.username || 'KPJMD'
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        alert(`✅ Training data exported successfully!\n\nFile: ${result.file_name}\nRecords: ${result.record_count}\nFormat: ${result.format.toUpperCase()}\n\nFile saved to: ${result.file_path}`);
+        setShowExportModal(false);
+      } else {
+        const error = await res.json();
+        alert(`❌ Export failed: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('❌ Export failed: Network error');
     }
   };
 
@@ -103,9 +197,27 @@ function AdminDashboardContent() {
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2">🏥 OrthoIQ Doctor Dashboard</h1>
-          <p className="text-lg opacity-90">Medical Response Review System</p>
-          <p className="text-sm mt-2 opacity-75">Signed in as: {user?.displayName || user?.username}</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">🏥 OrthoIQ Doctor Dashboard</h1>
+              <p className="text-lg opacity-90">Medical Response Review System & AI Training Data</p>
+              <p className="text-sm mt-2 opacity-75">Signed in as: {user?.displayName || user?.username}</p>
+            </div>
+            <div className="flex space-x-3">
+              <a
+                href="/admin/analytics"
+                className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+              >
+                📈 Analytics
+              </a>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+              >
+                📊 Export Training Data
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -174,44 +286,178 @@ function AdminDashboardContent() {
             <div className="divide-y">
               {pendingResponses.map((response) => (
                 <div key={response.id} className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm font-medium text-gray-900">FID: {response.fid}</span>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {response.userTier}
-                        </span>
-                        <span className="text-xs text-gray-500">{new Date(response.timestamp).toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="mb-3">
-                        <p className="text-sm font-medium text-gray-700 mb-1">Question:</p>
-                        <p className="text-gray-900">{response.question}</p>
-                      </div>
-                      
-                      <div className="mb-3">
-                        <p className="text-sm font-medium text-gray-700 mb-1">AI Response:</p>
-                        <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{response.response}</p>
-                      </div>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
-                        <span>Confidence: {Math.round(response.confidence * 100)}%</span>
-                      </div>
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-gray-900">FID: {response.fid}</span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {response.userTier}
+                      </span>
+                      <span className="text-xs text-gray-500">{new Date(response.timestamp).toLocaleString()}</span>
+                      <span className="text-xs text-gray-500">Confidence: {Math.round(response.confidence * 100)}%</span>
                     </div>
                     
-                    <div className="ml-6 flex-shrink-0">
-                      <div className="flex space-x-2">
+                    {/* Question and Response */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">Question:</p>
+                        <p className="text-gray-900 bg-blue-50 p-3 rounded-lg">{response.question}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-2">AI Response:</p>
+                        <p className="text-gray-900 bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">{response.response}</p>
+                      </div>
+                    </div>
+
+                    {/* Enhanced Review Interface */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-gray-800 mb-3">🏥 Medical Review & AI Training Data</h3>
+                      
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {/* Review Type */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Review Decision</label>
+                          <select
+                            value={reviewForm[response.id]?.reviewType || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'reviewType', e.target.value)}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                          >
+                            <option value="">Select...</option>
+                            <option value="approve_as_is">✅ Approve as-is</option>
+                            <option value="approve_with_additions">✅➕ Approve with additions</option>
+                            <option value="approve_with_corrections">✅✏️ Approve with corrections</option>
+                            <option value="reject_medical_inaccuracy">❌🏥 Reject - medical inaccuracy</option>
+                            <option value="reject_inappropriate_scope">❌🎯 Reject - inappropriate scope</option>
+                            <option value="reject_poor_communication">❌💬 Reject - poor communication</option>
+                          </select>
+                        </div>
+
+                        {/* Medical Specialty */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Medical Specialty</label>
+                          <select
+                            value={reviewForm[response.id]?.specialty || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'specialty', e.target.value)}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                          >
+                            <option value="">Select...</option>
+                            <option value="shoulder">Shoulder</option>
+                            <option value="knee">Knee</option>
+                            <option value="spine">Spine</option>
+                            <option value="hip">Hip</option>
+                            <option value="foot_ankle">Foot & Ankle</option>
+                            <option value="hand_wrist">Hand & Wrist</option>
+                            <option value="sports_medicine">Sports Medicine</option>
+                            <option value="trauma">Trauma</option>
+                            <option value="pediatric_ortho">Pediatric Ortho</option>
+                            <option value="general">General</option>
+                          </select>
+                        </div>
+
+                        {/* Complexity */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Question Complexity</label>
+                          <select
+                            value={reviewForm[response.id]?.complexity || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'complexity', e.target.value)}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                          >
+                            <option value="">Select...</option>
+                            <option value="basic">Basic</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Text Areas for Detailed Feedback */}
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dr. KPJMD's Additions</label>
+                          <textarea
+                            value={reviewForm[response.id]?.additionsText || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'additionsText', e.target.value)}
+                            placeholder="Missing information to add..."
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 h-20"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Medical Corrections</label>
+                          <textarea
+                            value={reviewForm[response.id]?.correctionsText || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'correctionsText', e.target.value)}
+                            placeholder="Factual corrections needed..."
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 h-20"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Teaching Notes</label>
+                          <textarea
+                            value={reviewForm[response.id]?.teachingNotes || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'teachingNotes', e.target.value)}
+                            placeholder="What the AI should learn..."
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 h-20"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quality Scores */}
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Confidence Score: {reviewForm[response.id]?.confidenceScore || 5}/10
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={reviewForm[response.id]?.confidenceScore || 5}
+                            onChange={(e) => updateReviewForm(response.id, 'confidenceScore', parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Communication Quality: {reviewForm[response.id]?.communicationQuality || 5}/10
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={reviewForm[response.id]?.communicationQuality || 5}
+                            onChange={(e) => updateReviewForm(response.id, 'communicationQuality', parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Response Quality</label>
+                          <select
+                            value={reviewForm[response.id]?.responseQuality || ''}
+                            onChange={(e) => updateReviewForm(response.id, 'responseQuality', e.target.value)}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                          >
+                            <option value="">Select...</option>
+                            <option value="excellent">Excellent</option>
+                            <option value="good">Good</option>
+                            <option value="needs_work">Needs Work</option>
+                            <option value="poor">Poor</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Submit Button */}
+                      <div className="mt-4 flex justify-end">
                         <button
-                          onClick={() => handleApproval(response.id, true)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                          onClick={() => handleEnhancedReview(response.id)}
+                          disabled={!reviewForm[response.id]?.reviewType}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm font-medium"
                         >
-                          ✅ Approve
-                        </button>
-                        <button
-                          onClick={() => handleApproval(response.id, false)}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                        >
-                          ❌ Reject
+                          🚀 Submit Review & Training Data
                         </button>
                       </div>
                     </div>
@@ -221,6 +467,109 @@ function AdminDashboardContent() {
             </div>
           )}
         </div>
+
+        {/* Export Training Data Modal */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h2 className="text-xl font-bold mb-4">📊 Export AI Training Data</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Export Format</label>
+                  <select
+                    value={exportFilters.format}
+                    onChange={(e) => setExportFilters(prev => ({...prev, format: e.target.value}))}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  >
+                    <option value="jsonl">JSONL (for LoRA/PEFT training)</option>
+                    <option value="csv">CSV (for analysis)</option>
+                    <option value="json">JSON (detailed format)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Medical Specialty</label>
+                  <select
+                    value={exportFilters.specialty}
+                    onChange={(e) => setExportFilters(prev => ({...prev, specialty: e.target.value}))}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  >
+                    <option value="">All Specialties</option>
+                    <option value="shoulder">Shoulder</option>
+                    <option value="knee">Knee</option>
+                    <option value="spine">Spine</option>
+                    <option value="hip">Hip</option>
+                    <option value="foot_ankle">Foot & Ankle</option>
+                    <option value="hand_wrist">Hand & Wrist</option>
+                    <option value="sports_medicine">Sports Medicine</option>
+                    <option value="trauma">Trauma</option>
+                    <option value="pediatric_ortho">Pediatric Ortho</option>
+                    <option value="general">General</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Complexity Level</label>
+                  <select
+                    value={exportFilters.complexity}
+                    onChange={(e) => setExportFilters(prev => ({...prev, complexity: e.target.value}))}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  >
+                    <option value="">All Complexity Levels</option>
+                    <option value="basic">Basic</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Review Type</label>
+                  <select
+                    value={exportFilters.reviewType}
+                    onChange={(e) => setExportFilters(prev => ({...prev, reviewType: e.target.value}))}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  >
+                    <option value="">All Review Types</option>
+                    <option value="approve_as_is">✅ Approved as-is</option>
+                    <option value="approve_with_additions">✅➕ Approved with additions</option>
+                    <option value="approve_with_corrections">✅✏️ Approved with corrections</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Response Quality</label>
+                  <select
+                    value={exportFilters.responseQuality}
+                    onChange={(e) => setExportFilters(prev => ({...prev, responseQuality: e.target.value}))}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  >
+                    <option value="">All Quality Levels</option>
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="needs_work">Needs Work</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleExportTrainingData}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  🚀 Export Data
+                </button>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

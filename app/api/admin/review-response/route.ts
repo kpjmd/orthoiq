@@ -3,7 +3,15 @@ import { reviewResponse } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
-    const { responseId, approved, reviewerFid, reviewerName, notes } = await request.json();
+    const { 
+      responseId, 
+      approved, 
+      reviewerFid, 
+      reviewerName, 
+      notes,
+      reviewDetails,
+      medicalCategory 
+    } = await request.json();
 
     if (!responseId || approved === undefined || !reviewerFid || !reviewerName) {
       return NextResponse.json(
@@ -13,11 +21,20 @@ export async function POST(request: NextRequest) {
     }
 
     // In a real app, you'd verify the reviewer is authorized
-    await reviewResponse(responseId, approved, reviewerFid, reviewerName, notes);
+    const reviewId = await reviewResponse(
+      responseId, 
+      approved, 
+      reviewerFid, 
+      reviewerName, 
+      notes,
+      reviewDetails,
+      medicalCategory
+    );
 
     return NextResponse.json({
       success: true,
-      message: `Response ${approved ? 'approved' : 'rejected'} successfully`
+      reviewId,
+      message: `Response ${approved ? 'approved' : 'rejected'} successfully with enhanced training data`
     });
 
   } catch (error) {

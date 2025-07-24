@@ -93,6 +93,87 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_reviews_reviewer_fid ON reviews(reviewer_fid);
     `;
 
+    // Enhanced review details table for AI training
+    await sql`
+      CREATE TABLE IF NOT EXISTS review_details (
+        id SERIAL PRIMARY KEY,
+        review_id INTEGER REFERENCES reviews(id) ON DELETE CASCADE,
+        review_type VARCHAR(50) NOT NULL CHECK (review_type IN (
+          'approve_as_is', 
+          'approve_with_additions', 
+          'approve_with_corrections', 
+          'reject_medical_inaccuracy', 
+          'reject_inappropriate_scope', 
+          'reject_poor_communication'
+        )),
+        additions_text TEXT,
+        corrections_text TEXT,
+        teaching_notes TEXT,
+        confidence_score INTEGER CHECK (confidence_score >= 1 AND confidence_score <= 10),
+        communication_quality INTEGER CHECK (communication_quality >= 1 AND communication_quality <= 10),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_review_details_review_id ON review_details(review_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_review_details_type ON review_details(review_type);
+    `;
+
+    // Medical categorization table for training data organization
+    await sql`
+      CREATE TABLE IF NOT EXISTS medical_categories (
+        id SERIAL PRIMARY KEY,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        specialty VARCHAR(50) CHECK (specialty IN (
+          'shoulder', 'knee', 'spine', 'hip', 'foot_ankle', 
+          'hand_wrist', 'sports_medicine', 'trauma', 'pediatric_ortho', 'general'
+        )),
+        complexity VARCHAR(20) CHECK (complexity IN ('basic', 'intermediate', 'advanced')),
+        response_quality VARCHAR(20) CHECK (response_quality IN ('excellent', 'good', 'needs_work', 'poor')),
+        common_issues JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_medical_categories_question_id ON medical_categories(question_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_medical_categories_specialty ON medical_categories(specialty);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_medical_categories_complexity ON medical_categories(complexity);
+    `;
+
+    // Training data export tracking
+    await sql`
+      CREATE TABLE IF NOT EXISTS training_exports (
+        id SERIAL PRIMARY KEY,
+        export_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        criteria JSONB,
+        format VARCHAR(20) CHECK (format IN ('jsonl', 'csv', 'json')),
+        record_count INTEGER NOT NULL,
+        file_path TEXT,
+        exported_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_training_exports_date ON training_exports(export_date);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_training_exports_format ON training_exports(format);
+    `;
+
     console.log('Database initialized successfully with Neon');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -279,41 +360,126 @@ export async function getPendingResponses(): Promise<any[]> {
   }
 }
 
-// Review a response (approve or reject)
+// Enhanced review response with detailed feedback for AI training
 export async function reviewResponse(
   questionId: string, 
   approved: boolean, 
   reviewerFid: string, 
   reviewerName: string, 
-  notes?: string
-): Promise<void> {
+  notes?: string,
+  reviewDetails?: {
+    reviewType: string;
+    additionsText?: string;
+    correctionsText?: string;
+    teachingNotes?: string;
+    confidenceScore?: number;
+    communicationQuality?: number;
+  },
+  medicalCategory?: {
+    specialty?: string;
+    complexity?: string;
+    responseQuality?: string;
+    commonIssues?: string[];
+  }
+): Promise<number> {
   const sql = getSql();
   
   try {
-    await sql`
+    // Insert main review
+    const reviewResult = await sql`
       INSERT INTO reviews (question_id, approved, reviewer_fid, reviewer_name, notes)
       VALUES (${parseInt(questionId)}, ${approved}, ${reviewerFid}, ${reviewerName}, ${notes || ''})
+      RETURNING id
     `;
+    
+    const reviewId = reviewResult[0].id;
+
+    // Insert detailed review data for AI training
+    if (reviewDetails) {
+      await sql`
+        INSERT INTO review_details (
+          review_id, review_type, additions_text, corrections_text, 
+          teaching_notes, confidence_score, communication_quality
+        )
+        VALUES (
+          ${reviewId}, 
+          ${reviewDetails.reviewType}, 
+          ${reviewDetails.additionsText || null}, 
+          ${reviewDetails.correctionsText || null},
+          ${reviewDetails.teachingNotes || null}, 
+          ${reviewDetails.confidenceScore || null}, 
+          ${reviewDetails.communicationQuality || null}
+        )
+      `;
+    }
+
+    // Insert medical categorization
+    if (medicalCategory) {
+      // Check if category already exists
+      const existingCategory = await sql`
+        SELECT id FROM medical_categories WHERE question_id = ${parseInt(questionId)}
+      `;
+
+      if (existingCategory.length > 0) {
+        // Update existing category
+        await sql`
+          UPDATE medical_categories SET
+            specialty = ${medicalCategory.specialty || null},
+            complexity = ${medicalCategory.complexity || null},
+            response_quality = ${medicalCategory.responseQuality || null},
+            common_issues = ${JSON.stringify(medicalCategory.commonIssues || [])},
+            updated_at = CURRENT_TIMESTAMP
+          WHERE question_id = ${parseInt(questionId)}
+        `;
+      } else {
+        // Insert new category
+        await sql`
+          INSERT INTO medical_categories (
+            question_id, specialty, complexity, response_quality, common_issues
+          )
+          VALUES (
+            ${parseInt(questionId)}, 
+            ${medicalCategory.specialty || null}, 
+            ${medicalCategory.complexity || null}, 
+            ${medicalCategory.responseQuality || null},
+            ${JSON.stringify(medicalCategory.commonIssues || [])}
+          )
+        `;
+      }
+    }
+
+    return reviewId;
   } catch (error) {
     console.error('Error reviewing response:', error);
     throw error;
   }
 }
 
-// Check if a response has been reviewed and approved
+// Check if a response has been reviewed and approved with enhanced details
 export async function getResponseStatus(questionId: string): Promise<{
   isReviewed: boolean;
   isApproved: boolean;
   reviewerName?: string;
+  reviewType?: string;
+  hasAdditions?: boolean;
+  hasCorrections?: boolean;
+  additionsText?: string;
+  correctionsText?: string;
 }> {
   const sql = getSql();
   
   try {
     const result = await sql`
-      SELECT approved, reviewer_name
-      FROM reviews
-      WHERE question_id = ${parseInt(questionId)}
-      ORDER BY created_at DESC
+      SELECT 
+        r.approved, 
+        r.reviewer_name,
+        rd.review_type,
+        rd.additions_text,
+        rd.corrections_text
+      FROM reviews r
+      LEFT JOIN review_details rd ON r.id = rd.review_id
+      WHERE r.question_id = ${parseInt(questionId)}
+      ORDER BY r.created_at DESC
       LIMIT 1
     `;
 
@@ -321,14 +487,187 @@ export async function getResponseStatus(questionId: string): Promise<{
       return { isReviewed: false, isApproved: false };
     }
 
+    const review = result[0];
     return {
       isReviewed: true,
-      isApproved: result[0].approved,
-      reviewerName: result[0].reviewer_name
+      isApproved: review.approved,
+      reviewerName: review.reviewer_name,
+      reviewType: review.review_type,
+      hasAdditions: !!(review.additions_text && review.additions_text.trim()),
+      hasCorrections: !!(review.corrections_text && review.corrections_text.trim()),
+      additionsText: review.additions_text,
+      correctionsText: review.corrections_text
     };
   } catch (error) {
     console.error('Error getting response status:', error);
     return { isReviewed: false, isApproved: false };
+  }
+}
+
+// Get training data for export (approved responses with detailed feedback)
+export async function getTrainingData(filters?: {
+  specialty?: string;
+  complexity?: string;
+  responseQuality?: string;
+  reviewType?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<any[]> {
+  const sql = getSql();
+  
+  try {
+    let whereClause = 'WHERE r.approved = true';
+    const params: any[] = [];
+    
+    if (filters?.specialty) {
+      whereClause += ` AND mc.specialty = $${params.length + 1}`;
+      params.push(filters.specialty);
+    }
+    
+    if (filters?.complexity) {
+      whereClause += ` AND mc.complexity = $${params.length + 1}`;
+      params.push(filters.complexity);
+    }
+    
+    if (filters?.responseQuality) {
+      whereClause += ` AND mc.response_quality = $${params.length + 1}`;
+      params.push(filters.responseQuality);
+    }
+    
+    if (filters?.reviewType) {
+      whereClause += ` AND rd.review_type = $${params.length + 1}`;
+      params.push(filters.reviewType);
+    }
+
+    const query = `
+      SELECT 
+        q.id,
+        q.question,
+        q.response,
+        q.confidence,
+        r.approved,
+        r.notes as reviewer_notes,
+        rd.review_type,
+        rd.additions_text,
+        rd.corrections_text,
+        rd.teaching_notes,
+        rd.confidence_score,
+        rd.communication_quality,
+        mc.specialty,
+        mc.complexity,
+        mc.response_quality,
+        mc.common_issues,
+        q.created_at
+      FROM questions q
+      JOIN reviews r ON q.id = r.question_id
+      LEFT JOIN review_details rd ON r.id = rd.review_id
+      LEFT JOIN medical_categories mc ON q.id = mc.question_id
+      ${whereClause}
+      ORDER BY q.created_at DESC
+      ${filters?.limit ? `LIMIT ${filters.limit}` : ''}
+      ${filters?.offset ? `OFFSET ${filters.offset}` : ''}
+    `;
+
+    const result = await sql.unsafe(query, params);
+    return result;
+  } catch (error) {
+    console.error('Error getting training data:', error);
+    return [];
+  }
+}
+
+// Log training data export
+export async function logTrainingExport(
+  criteria: any,
+  format: string,
+  recordCount: number,
+  filePath: string,
+  exportedBy: string
+): Promise<number> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      INSERT INTO training_exports (criteria, format, record_count, file_path, exported_by)
+      VALUES (${JSON.stringify(criteria)}, ${format}, ${recordCount}, ${filePath}, ${exportedBy})
+      RETURNING id
+    `;
+    
+    return result[0].id;
+  } catch (error) {
+    console.error('Error logging training export:', error);
+    throw error;
+  }
+}
+
+// Get enhanced analytics for AI training dashboard
+export async function getEnhancedAnalytics() {
+  const sql = getSql();
+  
+  try {
+    const totalReviewed = await sql`
+      SELECT COUNT(*) as count FROM reviews
+    `;
+
+    const approvalRate = await sql`
+      SELECT 
+        COUNT(CASE WHEN approved = true THEN 1 END) as approved,
+        COUNT(*) as total
+      FROM reviews
+    `;
+
+    const reviewTypeDistribution = await sql`
+      SELECT review_type, COUNT(*) as count
+      FROM review_details
+      GROUP BY review_type
+      ORDER BY count DESC
+    `;
+
+    const specialtyDistribution = await sql`
+      SELECT specialty, COUNT(*) as count
+      FROM medical_categories
+      WHERE specialty IS NOT NULL
+      GROUP BY specialty
+      ORDER BY count DESC
+    `;
+
+    const qualityDistribution = await sql`
+      SELECT response_quality, COUNT(*) as count
+      FROM medical_categories
+      WHERE response_quality IS NOT NULL
+      GROUP BY response_quality
+      ORDER BY count DESC
+    `;
+
+    const avgScores = await sql`
+      SELECT 
+        AVG(confidence_score) as avg_confidence,
+        AVG(communication_quality) as avg_communication
+      FROM review_details
+      WHERE confidence_score IS NOT NULL OR communication_quality IS NOT NULL
+    `;
+
+    return {
+      totalReviewed: parseInt(totalReviewed[0].count),
+      approvalRate: approvalRate[0].total > 0 ? 
+        (parseInt(approvalRate[0].approved) / parseInt(approvalRate[0].total) * 100) : 0,
+      reviewTypeDistribution,
+      specialtyDistribution,
+      qualityDistribution,
+      avgConfidenceScore: parseFloat(avgScores[0].avg_confidence) || 0,
+      avgCommunicationQuality: parseFloat(avgScores[0].avg_communication) || 0
+    };
+  } catch (error) {
+    console.error('Error getting enhanced analytics:', error);
+    return {
+      totalReviewed: 0,
+      approvalRate: 0,
+      reviewTypeDistribution: [],
+      specialtyDistribution: [],
+      qualityDistribution: [],
+      avgConfidenceScore: 0,
+      avgCommunicationQuality: 0
+    };
   }
 }
 
