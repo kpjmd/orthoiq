@@ -374,7 +374,7 @@ function AdminDashboardContent() {
                       {/* Text Areas for Detailed Feedback */}
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Dr. KPJMD's Additions</label>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dr. KPJMD&apos;s Additions</label>
                           <textarea
                             value={reviewForm[response.id]?.additionsText || ''}
                             onChange={(e) => updateReviewForm(response.id, 'additionsText', e.target.value)}

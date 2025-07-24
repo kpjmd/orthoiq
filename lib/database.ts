@@ -516,59 +516,89 @@ export async function getTrainingData(filters?: {
   const sql = getSql();
   
   try {
-    let whereClause = 'WHERE r.approved = true';
-    const params: any[] = [];
+    // Build the base query with all joins
+    let result;
     
-    if (filters?.specialty) {
-      whereClause += ` AND mc.specialty = $${params.length + 1}`;
-      params.push(filters.specialty);
-    }
-    
-    if (filters?.complexity) {
-      whereClause += ` AND mc.complexity = $${params.length + 1}`;
-      params.push(filters.complexity);
-    }
-    
-    if (filters?.responseQuality) {
-      whereClause += ` AND mc.response_quality = $${params.length + 1}`;
-      params.push(filters.responseQuality);
-    }
-    
-    if (filters?.reviewType) {
-      whereClause += ` AND rd.review_type = $${params.length + 1}`;
-      params.push(filters.reviewType);
+    if (!filters || Object.keys(filters).length === 0) {
+      // No filters - get all approved training data
+      result = await sql`
+        SELECT 
+          q.id,
+          q.question,
+          q.response,
+          q.confidence,
+          r.approved,
+          r.notes as reviewer_notes,
+          rd.review_type,
+          rd.additions_text,
+          rd.corrections_text,
+          rd.teaching_notes,
+          rd.confidence_score,
+          rd.communication_quality,
+          mc.specialty,
+          mc.complexity,
+          mc.response_quality,
+          mc.common_issues,
+          q.created_at
+        FROM questions q
+        JOIN reviews r ON q.id = r.question_id
+        LEFT JOIN review_details rd ON r.id = rd.review_id
+        LEFT JOIN medical_categories mc ON q.id = mc.question_id
+        WHERE r.approved = true
+        ORDER BY q.created_at DESC
+        ${filters?.limit ? sql`LIMIT ${filters.limit}` : sql``}
+      `;
+    } else {
+      // Apply filters
+      let baseQuery = sql`
+        SELECT 
+          q.id,
+          q.question,
+          q.response,
+          q.confidence,
+          r.approved,
+          r.notes as reviewer_notes,
+          rd.review_type,
+          rd.additions_text,
+          rd.corrections_text,
+          rd.teaching_notes,
+          rd.confidence_score,
+          rd.communication_quality,
+          mc.specialty,
+          mc.complexity,
+          mc.response_quality,
+          mc.common_issues,
+          q.created_at
+        FROM questions q
+        JOIN reviews r ON q.id = r.question_id
+        LEFT JOIN review_details rd ON r.id = rd.review_id
+        LEFT JOIN medical_categories mc ON q.id = mc.question_id
+        WHERE r.approved = true
+      `;
+
+      // Add filters dynamically
+      if (filters.specialty) {
+        baseQuery = sql`${baseQuery} AND mc.specialty = ${filters.specialty}`;
+      }
+      if (filters.complexity) {
+        baseQuery = sql`${baseQuery} AND mc.complexity = ${filters.complexity}`;
+      }
+      if (filters.responseQuality) {
+        baseQuery = sql`${baseQuery} AND mc.response_quality = ${filters.responseQuality}`;
+      }
+      if (filters.reviewType) {
+        baseQuery = sql`${baseQuery} AND rd.review_type = ${filters.reviewType}`;
+      }
+
+      baseQuery = sql`${baseQuery} ORDER BY q.created_at DESC`;
+      
+      if (filters.limit) {
+        baseQuery = sql`${baseQuery} LIMIT ${filters.limit}`;
+      }
+      
+      result = await baseQuery;
     }
 
-    const query = `
-      SELECT 
-        q.id,
-        q.question,
-        q.response,
-        q.confidence,
-        r.approved,
-        r.notes as reviewer_notes,
-        rd.review_type,
-        rd.additions_text,
-        rd.corrections_text,
-        rd.teaching_notes,
-        rd.confidence_score,
-        rd.communication_quality,
-        mc.specialty,
-        mc.complexity,
-        mc.response_quality,
-        mc.common_issues,
-        q.created_at
-      FROM questions q
-      JOIN reviews r ON q.id = r.question_id
-      LEFT JOIN review_details rd ON r.id = rd.review_id
-      LEFT JOIN medical_categories mc ON q.id = mc.question_id
-      ${whereClause}
-      ORDER BY q.created_at DESC
-      ${filters?.limit ? `LIMIT ${filters.limit}` : ''}
-      ${filters?.offset ? `OFFSET ${filters.offset}` : ''}
-    `;
-
-    const result = await sql.unsafe(query, params);
     return result;
   } catch (error) {
     console.error('Error getting training data:', error);

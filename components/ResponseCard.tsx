@@ -157,7 +157,7 @@ export default function ResponseCard({
         {hasAdditions && additionsText && (
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center mb-2">
-              <span className="text-blue-600 text-sm font-medium">👨‍⚕️ Doctor's Additional Information:</span>
+              <span className="text-blue-600 text-sm font-medium">👨‍⚕️ Doctor&apos;s Additional Information:</span>
             </div>
             <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
               {additionsText}

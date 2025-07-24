@@ -155,7 +155,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Check review status
-    let reviewStatus: { isReviewed: boolean; isApproved: boolean; reviewerName?: string } = { 
+    let reviewStatus: { 
+      isReviewed: boolean; 
+      isApproved: boolean; 
+      reviewerName?: string;
+      reviewType?: string;
+      hasAdditions?: boolean;
+      hasCorrections?: boolean;
+      additionsText?: string;
+      correctionsText?: string;
+    } = { 
       isReviewed: false, 
       isApproved: false, 
       reviewerName: undefined 
