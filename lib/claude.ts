@@ -54,8 +54,23 @@ export async function getOrthoResponse(question: string): Promise<ClaudeResponse
     } catch (parseError) {
       // Fallback if JSON parsing fails
       console.warn('Failed to parse Claude JSON response, using fallback');
+      console.log('Raw response that failed parsing:', content.text);
+      
+      // Try to extract just the response content if it looks like JSON
+      let fallbackResponse = content.text;
+      try {
+        // Check if the text contains JSON structure and try to extract response field
+        const jsonMatch = content.text.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          fallbackResponse = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+        }
+      } catch {
+        // If regex extraction fails, use a generic fallback message
+        fallbackResponse = "I apologize, but I'm having trouble formatting my response properly. Please try asking your question again.";
+      }
+      
       parsedResponse = {
-        response: content.text,
+        response: fallbackResponse,
         isRelevant: true,
         confidence: 0.7
       };

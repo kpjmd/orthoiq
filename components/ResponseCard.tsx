@@ -33,18 +33,43 @@ export default function ResponseCard({
 
   // Parse JSON response if it's still in JSON format
   let displayResponse = response;
+  
+  // Log for debugging purposes
+  if (process.env.NODE_ENV === 'development' && typeof response === 'string' && response.trim().startsWith('{')) {
+    console.log('ResponseCard received potential JSON:', response);
+  }
+  
   try {
     // Only attempt JSON parsing if the response starts with { or [
     if (typeof response === 'string' && (response.trim().startsWith('{') || response.trim().startsWith('['))) {
       const parsed = JSON.parse(response);
       if (parsed.response) {
         displayResponse = parsed.response;
+        console.log('Successfully extracted response from JSON');
       } else if (typeof parsed === 'string') {
         displayResponse = parsed;
+      } else {
+        // If JSON doesn't have expected structure, try regex extraction
+        const jsonMatch = response.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          displayResponse = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+          console.log('Extracted response using regex fallback');
+        }
       }
     }
-  } catch {
-    // Not JSON, use as-is
+  } catch (parseError) {
+    // If JSON parsing fails, try regex extraction as fallback
+    if (typeof response === 'string' && response.includes('"response"')) {
+      try {
+        const jsonMatch = response.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          displayResponse = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+          console.log('Used regex fallback for malformed JSON');
+        }
+      } catch {
+        console.warn('Failed to extract response from malformed JSON');
+      }
+    }
   }
 
   const getStatusBadge = () => {
