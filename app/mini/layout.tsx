@@ -30,14 +30,16 @@ export const metadata: Metadata = {
   }
 }
 
+import { AuthProvider } from '@/components/AuthProvider';
+
 export default function MiniAppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <>
+    <AuthProvider>
       {children}
-    </>
+    </AuthProvider>
   )
 }

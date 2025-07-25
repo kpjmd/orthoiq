@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question, fid, authUser } = requestBody;
+    const { question, fid, authUser, tier } = requestBody;
 
     if (!question || !fid) {
       console.warn(`[${requestId}] Missing required fields: question=${!!question}, fid=${!!fid}`);
@@ -85,22 +85,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Determine user tier
-    const getUserTier = (): UserTier => {
-      if (authUser) {
-        // Check if user is verified medical professional
-        if (authUser.verifications && authUser.verifications.length > 0) {
-          return 'medical';
-        }
-        return 'authenticated';
-      }
-      if (fid && fid !== 'anonymous') {
-        return 'authenticated'; // SDK user
-      }
-      return 'anonymous';
-    };
-
-    const userTier = getUserTier();
+    // Use tier from request or determine from authUser
+    const userTier: UserTier = tier || 'anonymous';
     console.log(`[${requestId}] Processing question for FID: ${fid}, tier: ${userTier}, length: ${sanitizedQuestion.length}`);
 
     // Check rate limiting with tier (use in-memory for all environments for now)

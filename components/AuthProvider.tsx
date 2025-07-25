@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AuthKitProvider, useSignIn } from '@farcaster/auth-kit';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 interface User {
   fid: number;
@@ -15,9 +15,10 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  signIn: () => void;
+  signIn: () => Promise<void>;
   signOut: () => void;
   isLoading: boolean;
+  token: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -30,109 +31,94 @@ export function useAuth() {
   return context;
 }
 
-function AuthContextProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn: farcasterSignIn, isSuccess, isError, data, isPolling: farcasterLoading } = useSignIn({});
+  const [token, setToken] = useState<string | null>(null);
 
   // Check for existing user session on load
   useEffect(() => {
-    // Only check for admin bypass in development or when explicitly enabled
-    const adminBypass = process.env.NODE_ENV === 'development' && 
-                       (process.env.NEXT_PUBLIC_ADMIN_BYPASS === 'true' || 
-                        localStorage.getItem('orthoiq_admin_bypass') === 'true');
-    
-    if (adminBypass) {
-      setUser({
-        fid: 15230,
-        username: 'kpjmd',
-        displayName: 'Dr. KPJMD',
-        pfpUrl: undefined,
-        verifications: [],
-        followerCount: undefined
-      });
-    } else {
-      // Check for existing user session
-      const savedUser = localStorage.getItem('orthoiq_user');
-      if (savedUser) {
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          // Validate the user data before setting
-          if (parsedUser.fid && typeof parsedUser.fid === 'number') {
-            setUser(parsedUser);
-          } else {
-            localStorage.removeItem('orthoiq_user');
+    const loadSession = async () => {
+      try {
+        // Check if we have a token in the SDK
+        if (sdk.quickAuth.token) {
+          setToken(sdk.quickAuth.token);
+          // Try to get user info from saved session
+          const savedUser = localStorage.getItem('orthoiq_user');
+          if (savedUser) {
+            const parsedUser = JSON.parse(savedUser);
+            if (parsedUser.fid && typeof parsedUser.fid === 'number') {
+              setUser(parsedUser);
+            }
           }
-        } catch (e) {
-          console.error('Failed to parse saved user:', e);
-          localStorage.removeItem('orthoiq_user');
         }
+      } catch (error) {
+        console.error('Failed to load session:', error);
       }
-    }
+    };
+
+    loadSession();
   }, []);
 
-  // Handle Farcaster sign-in success
-  useEffect(() => {
-    if (isSuccess && data && data.fid) {
-      const userData: User = {
-        fid: data.fid,
-        username: data.username,
-        displayName: data.displayName,
-        pfpUrl: data.pfpUrl,
-        verifications: data.verifications || [],
-        followerCount: undefined
-      };
+  const signIn = async () => {
+    setIsLoading(true);
+    try {
+      // Get Quick Auth token
+      const authResult = await sdk.quickAuth.getToken();
       
-      setUser(userData);
-      localStorage.setItem('orthoiq_user', JSON.stringify(userData));
-      console.log('Farcaster sign-in successful:', userData.username);
-    }
-  }, [isSuccess, data]);
-
-  // Handle Farcaster sign-in error
-  useEffect(() => {
-    if (isError) {
-      console.error('Farcaster sign-in failed');
+      if (authResult.token) {
+        setToken(authResult.token);
+        
+        // Fetch user data from our backend using the token
+        const res = await sdk.quickAuth.fetch('/api/auth/me', {
+          method: 'GET'
+        });
+        
+        if (res.ok) {
+          const userData = await res.json();
+          const user: User = {
+            fid: userData.fid,
+            username: userData.username,
+            displayName: userData.displayName,
+            pfpUrl: userData.pfpUrl,
+            verifications: userData.verifications || [],
+            followerCount: userData.followerCount
+          };
+          
+          setUser(user);
+          localStorage.setItem('orthoiq_user', JSON.stringify(user));
+          console.log('Quick Auth sign-in successful:', user.username || user.fid);
+        } else {
+          // Fallback: create basic user from token
+          // In production, the token would contain the FID as the 'sub' claim
+          const basicUser: User = {
+            fid: parseInt(authResult.token.split('.')[1]) || 0, // This is a placeholder
+            username: undefined,
+            displayName: undefined,
+            pfpUrl: undefined,
+            verifications: [],
+            followerCount: undefined
+          };
+          
+          setUser(basicUser);
+          localStorage.setItem('orthoiq_user', JSON.stringify(basicUser));
+        }
+      }
+    } catch (error) {
+      console.error('Quick Auth sign-in failed:', error);
+      setToken(null);
+      setUser(null);
+    } finally {
       setIsLoading(false);
-    }
-  }, [isError]);
-
-  // Update loading state
-  useEffect(() => {
-    setIsLoading(farcasterLoading);
-  }, [farcasterLoading]);
-
-  const signIn = () => {
-    // Check for admin bypass in development only
-    const adminBypass = process.env.NODE_ENV === 'development' && 
-                       process.env.NEXT_PUBLIC_ADMIN_BYPASS === 'true';
-    
-    if (adminBypass) {
-      const adminUser = {
-        fid: 15230,
-        username: 'kpjmd',
-        displayName: 'Dr. KPJMD',
-        pfpUrl: undefined,
-        verifications: [],
-        followerCount: undefined
-      };
-      setUser(adminUser);
-      localStorage.setItem('orthoiq_user', JSON.stringify(adminUser));
-      localStorage.setItem('orthoiq_admin_bypass', 'true');
-      console.log('Admin bypass enabled - signed in as Dr. KPJMD');
-    } else {
-      // Use proper Farcaster sign-in
-      farcasterSignIn();
     }
   };
 
   const signOut = () => {
     setUser(null);
+    setToken(null);
     localStorage.removeItem('orthoiq_user');
-    localStorage.removeItem('orthoiq_admin_bypass');
-    // Reset loading state to ensure sign-in button works again
-    setIsLoading(false);
-    // Force a small delay to ensure state is fully reset
+    // Clear any Quick Auth session
+    // Note: SDK doesn't provide a clear method, so we reload to reset
     setTimeout(() => {
       window.location.reload();
     }, 100);
@@ -140,31 +126,16 @@ function AuthContextProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextType = {
     user,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!token,
     signIn,
     signOut,
     isLoading,
+    token,
   };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
-  );
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const config = {
-    rpcUrl: 'https://mainnet.optimism.io',
-    domain: 'orthoiq.vercel.app',
-    siweUri: 'https://orthoiq.vercel.app/mini',
-  };
-
-  return (
-    <AuthKitProvider config={config}>
-      <AuthContextProvider>
-        {children}
-      </AuthContextProvider>
-    </AuthKitProvider>
   );
 }

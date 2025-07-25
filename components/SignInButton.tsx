@@ -45,7 +45,7 @@ export default function SignInButton() {
 
   return (
     <button
-      onClick={signIn}
+      onClick={() => signIn()}
       className="flex items-center space-x-2 px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition-colors text-sm font-medium"
     >
       <span>🔐</span>

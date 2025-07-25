@@ -7,7 +7,7 @@ import ActionMenu from '@/components/ActionMenu';
 import ArtworkModal from '@/components/ArtworkModal';
 import CountdownTimer from '@/components/CountdownTimer';
 import NotificationPermissions from '@/components/NotificationPermissions';
-import { AuthProvider, useAuth } from '@/components/AuthProvider';
+import { useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
 import { UserTier } from '@/lib/rateLimit';
 
@@ -38,21 +38,24 @@ function MiniAppContent() {
   const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number; resetTime?: Date; tier?: UserTier} | null>(null);
 
   const getUserTier = useCallback((): UserTier => {
+    // Prioritize authUser from Quick Auth
     if (isAuthenticated && authUser) {
       // Check if user is verified medical professional
-      // This would be enhanced with actual verification logic
       if (authUser.verifications && authUser.verifications.length > 0) {
         return 'medical';
       }
       return 'authenticated';
     }
-    if (context?.user?.fid) {
-      return 'authenticated'; // SDK user
-    }
     return 'anonymous';
-  }, [isAuthenticated, authUser, context?.user?.fid]);
+  }, [isAuthenticated, authUser]);
 
   useEffect(() => {
+    // Preconnect to Quick Auth server for better performance
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = 'https://auth.farcaster.xyz';
+    document.head.appendChild(link);
+
     const load = async () => {
       try {
         // Initialize the SDK
@@ -63,10 +66,9 @@ function MiniAppContent() {
         // Signal that the app is ready
         sdk.actions.ready();
         
-        // Load rate limit info
-        if (context?.user?.fid) {
-          await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
-        }
+        // Load rate limit info based on authentication status
+        const fid = authUser?.fid || context?.user?.fid || 'anonymous';
+        await loadRateLimitStatus(fid.toString(), getUserTier());
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
         setError('Failed to initialize Mini App');
@@ -74,7 +76,15 @@ function MiniAppContent() {
     };
 
     load();
-  }, [getUserTier]);
+  }, [getUserTier, authUser]);
+
+  // Update rate limit info when authentication status changes
+  useEffect(() => {
+    if (isSDKLoaded) {
+      const fid = authUser?.fid || context?.user?.fid || 'anonymous';
+      loadRateLimitStatus(fid.toString(), getUserTier());
+    }
+  }, [isAuthenticated, authUser, context, getUserTier, isSDKLoaded]);
 
   const loadRateLimitStatus = async (fid: string, tier: UserTier = 'anonymous') => {
     try {
@@ -95,7 +105,10 @@ function MiniAppContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim() || !context?.user?.fid) return;
+    if (!question.trim()) return;
+    
+    // Allow anonymous users to submit questions
+    const fid = authUser?.fid || context?.user?.fid || 'anonymous';
 
     setIsLoading(true);
     setError('');
@@ -108,13 +121,14 @@ function MiniAppContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           question: question.trim(),
-          fid: context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous',
+          fid: fid.toString(),
           authUser: authUser ? {
             fid: authUser.fid,
             username: authUser.username,
             displayName: authUser.displayName,
             tier: getUserTier()
-          } : null
+          } : null,
+          tier: getUserTier()
         }),
       });
 
@@ -157,7 +171,7 @@ function MiniAppContent() {
       setQuestion('');
       
       // Update rate limit info
-      await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
+      await loadRateLimitStatus(fid.toString(), getUserTier());
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -174,14 +188,16 @@ function MiniAppContent() {
   };
 
   const handleRate = async (rating: number) => {
-    if (!context?.user?.fid || !currentQuestion) return;
+    if (!currentQuestion) return;
+    
+    const fid = authUser?.fid || context?.user?.fid || 'anonymous';
 
     try {
       await fetch('/api/rate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fid: context.user.fid.toString(),
+          fid: fid.toString(),
           question: currentQuestion,
           rating
         })
@@ -356,6 +372,7 @@ function MiniAppContent() {
               onRate={handleRate}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
+              isAuthenticated={isAuthenticated}
             />
           </div>
         )}
@@ -382,9 +399,5 @@ function MiniAppContent() {
 }
 
 export default function MiniApp() {
-  return (
-    <AuthProvider>
-      <MiniAppContent />
-    </AuthProvider>
-  );
+  return <MiniAppContent />;
 }
