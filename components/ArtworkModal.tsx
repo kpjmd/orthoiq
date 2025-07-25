@@ -75,6 +75,9 @@ export default function ArtworkModal({ isOpen, onClose, question, response }: Ar
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Choose artwork theme:
             </label>
+            <p className="text-xs text-gray-500 mb-3">
+              💡 This artwork is uniquely generated based on your medical question content, emotional tone, and complexity.
+            </p>
             <div className="flex space-x-2">
               {(['bone', 'muscle', 'joint', 'general'] as const).map((t) => (
                 <button
@@ -94,7 +97,10 @@ export default function ArtworkModal({ isOpen, onClose, question, response }: Ar
 
           {/* Artwork Display */}
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <ArtworkGenerator theme={theme} />
+            <ArtworkGenerator 
+              question={question} 
+              theme={theme} 
+            />
           </div>
 
           {/* Question Context */}

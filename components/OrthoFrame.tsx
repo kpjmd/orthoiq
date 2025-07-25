@@ -143,7 +143,12 @@ export default function OrthoFrame({ className = "" }: OrthoFrameProps) {
         {response && (
           <div className="mb-6">
             <div className="flex items-start space-x-4 mb-4">
-              <ArtworkGenerator theme={artwork} size={120} className="flex-shrink-0" />
+              <ArtworkGenerator 
+                question={question} 
+                theme={artwork} 
+                size={120} 
+                className="flex-shrink-0" 
+              />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">OrthoIQ Response:</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
