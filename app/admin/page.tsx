@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AuthProvider, useAuth } from '@/components/AuthProvider';
-import SignInButton from '@/components/SignInButton';
+import { AdminAuthProvider, useAdminAuth, AdminSignInButton } from '@/components/AdminAuthProvider';
 import AdminPasswordAuth from '@/components/AdminPasswordAuth';
 
 interface PendingResponse {
@@ -32,7 +31,7 @@ interface MedicalCategory {
 }
 
 function AdminDashboardContent() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAdminAuth();
   const [pendingResponses, setPendingResponses] = useState<PendingResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedResponse, setSelectedResponse] = useState<PendingResponse | null>(null);
@@ -194,9 +193,7 @@ function AdminDashboardContent() {
               Sign in with your Farcaster account
             </p>
             <div className="flex justify-center">
-              <div className="bg-gradient-to-br from-blue-900 to-blue-600 p-1 rounded-lg">
-                <SignInButton />
-              </div>
+              <AdminSignInButton />
             </div>
           </div>
           
@@ -621,8 +618,8 @@ function AdminDashboardContent() {
 
 export default function AdminDashboard() {
   return (
-    <AuthProvider>
+    <AdminAuthProvider>
       <AdminDashboardContent />
-    </AuthProvider>
+    </AdminAuthProvider>
   );
 }
