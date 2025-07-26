@@ -250,7 +250,7 @@ function MiniAppContent() {
               </p>
               {getRemainingQuestions() === 0 && rateLimitInfo?.resetTime && (
                 <p className="text-xs opacity-60">
-                  Reset in: <CountdownTimer 
+                  Resets at midnight UTC in: <CountdownTimer 
                     targetTime={rateLimitInfo.resetTime} 
                     onComplete={() => {
                       if (context?.user?.fid) {
@@ -321,9 +321,7 @@ function MiniAppContent() {
                 Getting AI Response...
               </span>
             ) : getRemainingQuestions() === 0 ? (
-              rateLimitInfo?.resetTime ? 
-                `Daily limit reached - Reset in ${new Date(rateLimitInfo.resetTime).getHours() - new Date().getHours()}h` :
-                'Daily limit reached'
+              'Daily limit reached - Resets at midnight UTC'
             ) : (
               'Get AI Answer'
             )}
@@ -334,9 +332,9 @@ function MiniAppContent() {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800">{error}</p>
-            {error.includes('Rate limit exceeded') && rateLimitInfo?.resetTime && (
+            {error.includes('Daily limit reached') && rateLimitInfo?.resetTime && (
               <p className="text-red-600 text-sm mt-2">
-                You can ask your next question in: <CountdownTimer 
+                Questions reset at midnight UTC in: <CountdownTimer 
                   targetTime={rateLimitInfo.resetTime} 
                   onComplete={() => {
                     if (context?.user?.fid) {

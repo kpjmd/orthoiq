@@ -315,7 +315,7 @@ export async function checkRateLimitDB(fid: string): Promise<{allowed: boolean, 
   }
 }
 
-// Enhanced database rate limiting with tier support
+// Enhanced database rate limiting with tier support (calendar day reset)
 export async function checkRateLimitDBWithTiers(fid: string, tier: 'basic' | 'authenticated' | 'medical' = 'basic'): Promise<{
   allowed: boolean;
   resetTime?: Date;
@@ -327,28 +327,32 @@ export async function checkRateLimitDBWithTiers(fid: string, tier: 'basic' | 'au
   
   try {
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
     // Define tier limits
     const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
     const dailyLimit = tierLimits[tier];
 
-    // Check recent questions count
-    const recentQuestions = await sql`
+    // Check questions count for current calendar day (UTC)
+    const todayQuestions = await sql`
       SELECT COUNT(*) as count FROM questions 
-      WHERE fid = ${fid} AND created_at > ${oneDayAgo.toISOString()}
+      WHERE fid = ${fid} AND DATE(created_at) = CURRENT_DATE
     `;
 
-    const count = parseInt(recentQuestions[0].count);
+    const count = parseInt(todayQuestions[0].count);
     const allowed = count < dailyLimit;
     const remaining = Math.max(0, dailyLimit - count);
+
+    // Calculate next midnight UTC for reset time
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0);
 
     return {
       allowed,
       remaining,
       total: dailyLimit,
       tier,
-      resetTime: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      resetTime: tomorrow
     };
   } catch (error) {
     console.error('Error checking rate limit with tiers:', error);
@@ -362,7 +366,7 @@ export async function checkRateLimitDBWithTiers(fid: string, tier: 'basic' | 'au
   }
 }
 
-// Get rate limit status without incrementing count
+// Get rate limit status without incrementing count (calendar day reset)
 export async function getRateLimitStatusDB(fid: string, tier: 'basic' | 'authenticated' | 'medical' = 'basic'): Promise<{
   allowed: boolean;
   resetTime?: Date;
@@ -374,39 +378,47 @@ export async function getRateLimitStatusDB(fid: string, tier: 'basic' | 'authent
   
   try {
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
     // Define tier limits
     const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
     const dailyLimit = tierLimits[tier];
 
-    // Check recent questions count
-    const recentQuestions = await sql`
+    // Check questions count for current calendar day (UTC)
+    const todayQuestions = await sql`
       SELECT COUNT(*) as count FROM questions 
-      WHERE fid = ${fid} AND created_at > ${oneDayAgo.toISOString()}
+      WHERE fid = ${fid} AND DATE(created_at) = CURRENT_DATE
     `;
 
-    const count = parseInt(recentQuestions[0].count);
+    const count = parseInt(todayQuestions[0].count);
     const allowed = count < dailyLimit;
     const remaining = Math.max(0, dailyLimit - count);
+
+    // Calculate next midnight UTC for reset time
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0);
 
     return {
       allowed,
       remaining,
       total: dailyLimit,
       tier,
-      resetTime: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      resetTime: tomorrow
     };
   } catch (error) {
     console.error('Error getting rate limit status:', error);
     // Default to allowing on error
     const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
     const dailyLimit = tierLimits[tier];
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0);
     return { 
       allowed: true, 
       remaining: dailyLimit, 
       total: dailyLimit, 
-      tier 
+      tier,
+      resetTime: tomorrow
     };
   }
 }

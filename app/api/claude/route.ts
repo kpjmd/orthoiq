@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           
         return NextResponse.json(
           { 
-            error: `Daily limit reached! You can ask ${dailyLimit} question${dailyLimit > 1 ? 's' : ''} per day as a ${tierMessage} Come back tomorrow for more questions! 🦴`,
+            error: `Daily limit reached! You can ask ${dailyLimit} question${dailyLimit > 1 ? 's' : ''} per day as a ${tierMessage} Questions reset at midnight UTC. Come back after midnight for more questions! 🦴`,
             resetTime: rateLimitResult.resetTime,
             tier: userTier,
             dailyLimit
