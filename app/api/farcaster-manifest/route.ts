@@ -16,7 +16,8 @@ export async function GET() {
       iconUrl: `${host}/icon.png`,
       splashImageUrl: `${host}/og-image.png`,
       splashBackgroundColor: "#1e3a8a",
-      homeUrl: `${host}/mini`
+      homeUrl: `${host}/mini`,
+      webhookUrl: `${host}/api/webhooks/farcaster`
     }
   };
   

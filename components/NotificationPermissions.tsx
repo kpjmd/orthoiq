@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 import { useAuth } from './AuthProvider';
 
 interface NotificationPermissionsProps {
@@ -36,6 +37,11 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
     setPermissionState('requesting');
     
     try {
+      // Use Farcaster SDK to prompt user to add miniapp
+      // This will trigger webhook events when notifications are enabled
+      await sdk.actions.addMiniApp();
+      
+      // Check if permissions were granted
       const response = await fetch('/api/notifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

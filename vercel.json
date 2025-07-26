@@ -14,8 +14,20 @@
     },
     "app/api/health/claude/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/webhooks/farcaster/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/notifications/reset-daily/route.ts": {
+      "maxDuration": 60
     }
   },
+  "crons": [
+    {
+      "path": "/api/notifications/reset-daily",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/.well-known/farcaster.json",

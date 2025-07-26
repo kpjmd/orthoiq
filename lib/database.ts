@@ -174,6 +174,49 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_training_exports_format ON training_exports(format);
     `;
 
+    // Notification tokens table for Farcaster Mini App notifications
+    await sql`
+      CREATE TABLE IF NOT EXISTS notification_tokens (
+        id SERIAL PRIMARY KEY,
+        fid VARCHAR(255) NOT NULL,
+        token VARCHAR(255) NOT NULL,
+        url TEXT NOT NULL,
+        enabled BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(fid, token)
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_notification_tokens_fid ON notification_tokens(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_notification_tokens_enabled ON notification_tokens(enabled);
+    `;
+
+    // Notification logs table for tracking sent notifications
+    await sql`
+      CREATE TABLE IF NOT EXISTS notification_logs (
+        id SERIAL PRIMARY KEY,
+        fid VARCHAR(255) NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        target_url TEXT,
+        delivered BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_notification_logs_fid ON notification_logs(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_notification_logs_created_at ON notification_logs(created_at);
+    `;
+
     console.log('Database initialized successfully with Neon');
   } catch (error) {
     console.error('Error initializing database:', error);
