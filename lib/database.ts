@@ -315,6 +315,102 @@ export async function checkRateLimitDB(fid: string): Promise<{allowed: boolean, 
   }
 }
 
+// Enhanced database rate limiting with tier support
+export async function checkRateLimitDBWithTiers(fid: string, tier: 'basic' | 'authenticated' | 'medical' = 'basic'): Promise<{
+  allowed: boolean;
+  resetTime?: Date;
+  remaining?: number;
+  total?: number;
+  tier?: string;
+}> {
+  const sql = getSql();
+  
+  try {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Define tier limits
+    const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
+    const dailyLimit = tierLimits[tier];
+
+    // Check recent questions count
+    const recentQuestions = await sql`
+      SELECT COUNT(*) as count FROM questions 
+      WHERE fid = ${fid} AND created_at > ${oneDayAgo.toISOString()}
+    `;
+
+    const count = parseInt(recentQuestions[0].count);
+    const allowed = count < dailyLimit;
+    const remaining = Math.max(0, dailyLimit - count);
+
+    return {
+      allowed,
+      remaining,
+      total: dailyLimit,
+      tier,
+      resetTime: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    };
+  } catch (error) {
+    console.error('Error checking rate limit with tiers:', error);
+    // Default to allowing on error
+    return { 
+      allowed: true, 
+      remaining: 1, 
+      total: 1, 
+      tier 
+    };
+  }
+}
+
+// Get rate limit status without incrementing count
+export async function getRateLimitStatusDB(fid: string, tier: 'basic' | 'authenticated' | 'medical' = 'basic'): Promise<{
+  allowed: boolean;
+  resetTime?: Date;
+  remaining?: number;
+  total?: number;
+  tier?: string;
+}> {
+  const sql = getSql();
+  
+  try {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Define tier limits
+    const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
+    const dailyLimit = tierLimits[tier];
+
+    // Check recent questions count
+    const recentQuestions = await sql`
+      SELECT COUNT(*) as count FROM questions 
+      WHERE fid = ${fid} AND created_at > ${oneDayAgo.toISOString()}
+    `;
+
+    const count = parseInt(recentQuestions[0].count);
+    const allowed = count < dailyLimit;
+    const remaining = Math.max(0, dailyLimit - count);
+
+    return {
+      allowed,
+      remaining,
+      total: dailyLimit,
+      tier,
+      resetTime: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    };
+  } catch (error) {
+    console.error('Error getting rate limit status:', error);
+    // Default to allowing on error
+    const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
+    const dailyLimit = tierLimits[tier];
+    return { 
+      allowed: true, 
+      remaining: dailyLimit, 
+      total: dailyLimit, 
+      tier 
+    };
+  }
+}
+
 // Log a user rating for a response
 export async function logRating(fid: string, question: string, rating: number): Promise<void> {
   const sql = getSql();

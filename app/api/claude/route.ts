@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { checkRateLimit, UserTier } from '@/lib/rateLimit';
-import { logInteraction, checkRateLimitDB, getResponseStatus } from '@/lib/database';
+import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus } from '@/lib/database';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
 import { validateOrthopedicContent, validateRateLimitRequest, sanitizeInput } from '@/lib/security';
@@ -89,9 +89,9 @@ export async function POST(request: NextRequest) {
     const userTier: UserTier = tier || 'basic';
     console.log(`[${requestId}] Processing question for FID: ${fid}, tier: ${userTier}, length: ${sanitizedQuestion.length}`);
 
-    // Check rate limiting with tier (use in-memory for all environments for now)
+    // Check rate limiting with database-backed tier support
     try {
-      const rateLimitResult = await checkRateLimit(fid, userTier);
+      const rateLimitResult = await checkRateLimitDBWithTiers(fid, userTier);
         
       if (!rateLimitResult.allowed) {
         const tierLimits = { basic: 1, authenticated: 3, medical: 10 };

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRateLimitStatus, UserTier } from '@/lib/rateLimit';
+import { getRateLimitStatusDB } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +15,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check current rate limit status with tier
-    const rateLimitResult = await getRateLimitStatus(fid, tier);
+    // Check current rate limit status with database-backed tier support
+    const rateLimitResult = await getRateLimitStatusDB(fid, tier);
     
     const used = rateLimitResult.total ? rateLimitResult.total - rateLimitResult.remaining! : 0;
 
