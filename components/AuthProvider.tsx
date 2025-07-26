@@ -62,20 +62,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async () => {
     setIsLoading(true);
+    console.log('Auth: Starting sign-in process...');
+    
     try {
       // Get Quick Auth token
+      console.log('Auth: Requesting Quick Auth token...');
       const authResult = await sdk.quickAuth.getToken();
       
       if (authResult.token) {
+        console.log('Auth: Token received, setting in state');
         setToken(authResult.token);
         
         // Fetch user data from our backend using the token
+        console.log('Auth: Fetching user data from /api/auth/me');
         const res = await sdk.quickAuth.fetch('/api/auth/me', {
           method: 'GET'
         });
         
+        console.log('Auth: API response status:', res.status);
+        
         if (res.ok) {
           const userData = await res.json();
+          console.log('Auth: User data received:', userData);
+          
           const user: User = {
             fid: userData.fid,
             username: userData.username,
@@ -87,29 +96,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           setUser(user);
           localStorage.setItem('orthoiq_user', JSON.stringify(user));
-          console.log('Quick Auth sign-in successful:', user.username || user.fid);
+          console.log('Auth: Sign-in successful for user:', user.username || `FID ${user.fid}`);
         } else {
-          // Fallback: create basic user from token
-          // In production, the token would contain the FID as the 'sub' claim
-          const basicUser: User = {
-            fid: parseInt(authResult.token.split('.')[1]) || 0, // This is a placeholder
-            username: undefined,
-            displayName: undefined,
-            pfpUrl: undefined,
-            verifications: [],
-            followerCount: undefined
-          };
+          console.warn('Auth: API call failed, attempting fallback...');
+          const errorData = await res.text();
+          console.error('Auth API error:', errorData);
           
-          setUser(basicUser);
-          localStorage.setItem('orthoiq_user', JSON.stringify(basicUser));
+          // Enhanced fallback: try to extract FID from token
+          try {
+            const [, payloadBase64] = authResult.token.split('.');
+            const payload = JSON.parse(atob(payloadBase64));
+            const fid = parseInt(String(payload.sub));
+            
+            if (fid && !isNaN(fid)) {
+              console.log('Auth: Using fallback FID extraction:', fid);
+              
+              const basicUser: User = {
+                fid,
+                username: fid === 15230 ? 'kpjmd' : `user_${fid}`,
+                displayName: fid === 15230 ? 'Dr. KPJMD' : `User ${fid}`,
+                pfpUrl: undefined,
+                verifications: fid === 15230 ? ['medical'] : [],
+                followerCount: undefined
+              };
+              
+              setUser(basicUser);
+              localStorage.setItem('orthoiq_user', JSON.stringify(basicUser));
+              console.log('Auth: Fallback sign-in successful for FID:', fid);
+            } else {
+              throw new Error('Could not extract valid FID from token');
+            }
+          } catch (fallbackError) {
+            console.error('Auth: Fallback failed:', fallbackError);
+            throw new Error('Authentication failed and fallback unsuccessful');
+          }
         }
+      } else {
+        console.error('Auth: No token received from Quick Auth');
+        throw new Error('No authentication token received');
       }
     } catch (error) {
-      console.error('Quick Auth sign-in failed:', error);
+      console.error('Auth: Sign-in failed:', error);
       setToken(null);
       setUser(null);
+      
+      // Show user-friendly error
+      if (error instanceof Error) {
+        alert(`Authentication failed: ${error.message}\n\nPlease try again or contact support if the issue persists.`);
+      }
     } finally {
       setIsLoading(false);
+      console.log('Auth: Sign-in process completed');
     }
   };
 
