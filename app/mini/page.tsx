@@ -46,7 +46,8 @@ function MiniAppContent() {
       }
       return 'authenticated';
     }
-    return 'anonymous';
+    // All Farcaster users start as basic tier
+    return 'basic';
   }, [isAuthenticated, authUser]);
 
   useEffect(() => {
@@ -66,9 +67,10 @@ function MiniAppContent() {
         // Signal that the app is ready
         sdk.actions.ready();
         
-        // Load rate limit info based on authentication status
-        const fid = authUser?.fid || context?.user?.fid || 'anonymous';
-        await loadRateLimitStatus(fid.toString(), getUserTier());
+        // Load rate limit info - always use Farcaster FID
+        if (context?.user?.fid) {
+          await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
+        }
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
         setError('Failed to initialize Mini App');
@@ -80,13 +82,12 @@ function MiniAppContent() {
 
   // Update rate limit info when authentication status changes
   useEffect(() => {
-    if (isSDKLoaded) {
-      const fid = authUser?.fid || context?.user?.fid || 'anonymous';
-      loadRateLimitStatus(fid.toString(), getUserTier());
+    if (isSDKLoaded && context?.user?.fid) {
+      loadRateLimitStatus(context.user.fid.toString(), getUserTier());
     }
   }, [isAuthenticated, authUser, context, getUserTier, isSDKLoaded]);
 
-  const loadRateLimitStatus = async (fid: string, tier: UserTier = 'anonymous') => {
+  const loadRateLimitStatus = async (fid: string, tier: UserTier = 'basic') => {
     try {
       const res = await fetch(`/api/rate-limit-status?fid=${fid}&tier=${tier}`);
       if (res.ok) {
@@ -105,10 +106,10 @@ function MiniAppContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim()) return;
+    if (!question.trim() || !context?.user?.fid) return;
     
-    // Allow anonymous users to submit questions
-    const fid = authUser?.fid || context?.user?.fid || 'anonymous';
+    // Use Farcaster FID for all users
+    const fid = context.user.fid;
 
     setIsLoading(true);
     setError('');
@@ -188,9 +189,9 @@ function MiniAppContent() {
   };
 
   const handleRate = async (rating: number) => {
-    if (!currentQuestion) return;
+    if (!currentQuestion || !context?.user?.fid) return;
     
-    const fid = authUser?.fid || context?.user?.fid || 'anonymous';
+    const fid = context.user.fid;
 
     try {
       await fetch('/api/rate-response', {
@@ -251,10 +252,11 @@ function MiniAppContent() {
                 <p className="text-xs opacity-60">
                   Reset in: <CountdownTimer 
                     targetTime={rateLimitInfo.resetTime} 
-                    onComplete={() => loadRateLimitStatus(
-                      context?.user?.fid?.toString() || 'anonymous', 
-                      getUserTier()
-                    )} 
+                    onComplete={() => {
+                      if (context?.user?.fid) {
+                        loadRateLimitStatus(context.user.fid.toString(), getUserTier());
+                      }
+                    }} 
                   />
                 </p>
               )}
@@ -272,8 +274,8 @@ function MiniAppContent() {
                     ✅ Authenticated
                   </div>
                 ) : (
-                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-700 bg-opacity-50">
-                    ❌ Anonymous
+                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-700 bg-opacity-50">
+                    👤 Basic User
                   </div>
                 )}
               </div>
@@ -285,7 +287,7 @@ function MiniAppContent() {
       <div className="p-6 max-w-2xl mx-auto">
         {/* Notification Permissions */}
         <NotificationPermissions 
-          fid={context?.user?.fid?.toString() || authUser?.fid?.toString()} 
+          fid={context?.user?.fid?.toString()} 
         />
 
         {/* Question Form */}
@@ -336,10 +338,11 @@ function MiniAppContent() {
               <p className="text-red-600 text-sm mt-2">
                 You can ask your next question in: <CountdownTimer 
                   targetTime={rateLimitInfo.resetTime} 
-                  onComplete={() => loadRateLimitStatus(
-                    context?.user?.fid?.toString() || 'anonymous', 
-                    getUserTier()
-                  )} 
+                  onComplete={() => {
+                    if (context?.user?.fid) {
+                      loadRateLimitStatus(context.user.fid.toString(), getUserTier());
+                    }
+                  }} 
                 />
               </p>
             )}
@@ -372,7 +375,6 @@ function MiniAppContent() {
               onRate={handleRate}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
-              isAuthenticated={isAuthenticated}
             />
           </div>
         )}

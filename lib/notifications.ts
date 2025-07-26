@@ -51,7 +51,7 @@ export async function sendResponseReviewNotification(data: ResponseReviewNotific
 }
 
 export async function sendRateLimitResetNotification(fid: string, tier: UserTier): Promise<boolean> {
-  const tierLimits = { anonymous: 1, authenticated: 3, medical: 10 };
+  const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
   const dailyLimit = tierLimits[tier];
   
   const notification: NotificationData = {

@@ -10,10 +10,9 @@ interface ActionMenuProps {
   onRate: (rating: number) => void;
   canAskAnother?: boolean;
   questionsRemaining?: number;
-  isAuthenticated?: boolean;
 }
 
-export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0, isAuthenticated = false }: ActionMenuProps) {
+export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0 }: ActionMenuProps) {
   const [showRating, setShowRating] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [shareText, setShareText] = useState('Share Response');
@@ -88,24 +87,13 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
           {shareText}
         </button>
 
-        {isAuthenticated ? (
-          <button
-            onClick={onViewArtwork}
-            className="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <span className="mr-2">🎨</span>
-            View Artwork
-          </button>
-        ) : (
-          <button
-            disabled
-            className="flex items-center justify-center px-4 py-3 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
-            title="Sign in to view artwork"
-          >
-            <span className="mr-2">🔒</span>
-            View Artwork
-          </button>
-        )}
+        <button
+          onClick={onViewArtwork}
+          className="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          <span className="mr-2">🎨</span>
+          View Artwork
+        </button>
 
         <button
           onClick={() => setShowRating(!showRating)}

@@ -10,11 +10,11 @@ interface RateLimitEntry {
 // In-memory storage (will reset on server restart)
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-export type UserTier = 'anonymous' | 'authenticated' | 'medical';
+export type UserTier = 'basic' | 'authenticated' | 'medical';
 
 // Question limits per tier per day
 const TIER_LIMITS: Record<UserTier, number> = {
-  anonymous: 1,
+  basic: 1,
   authenticated: 3,
   medical: 10
 };
@@ -29,7 +29,7 @@ export interface RateLimitResult {
   tier?: UserTier;
 }
 
-export async function checkRateLimit(fid: string, tier: UserTier = 'anonymous'): Promise<RateLimitResult> {
+export async function checkRateLimit(fid: string, tier: UserTier = 'basic'): Promise<RateLimitResult> {
   const now = new Date();
   const key = `rate_limit:${fid}`;
   const dailyLimit = TIER_LIMITS[tier];
@@ -74,7 +74,7 @@ export async function checkRateLimit(fid: string, tier: UserTier = 'anonymous'):
   };
 }
 
-export async function getRateLimitStatus(fid: string, tier: UserTier = 'anonymous'): Promise<RateLimitResult> {
+export async function getRateLimitStatus(fid: string, tier: UserTier = 'basic'): Promise<RateLimitResult> {
   const now = new Date();
   const key = `rate_limit:${fid}`;
   const dailyLimit = TIER_LIMITS[tier];

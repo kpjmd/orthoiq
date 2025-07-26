@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Use tier from request or determine from authUser
-    const userTier: UserTier = tier || 'anonymous';
+    // Use tier from request or default to basic
+    const userTier: UserTier = tier || 'basic';
     console.log(`[${requestId}] Processing question for FID: ${fid}, tier: ${userTier}, length: ${sanitizedQuestion.length}`);
 
     // Check rate limiting with tier (use in-memory for all environments for now)
@@ -94,12 +94,17 @@ export async function POST(request: NextRequest) {
       const rateLimitResult = await checkRateLimit(fid, userTier);
         
       if (!rateLimitResult.allowed) {
-        const tierLimits = { anonymous: 1, authenticated: 3, medical: 10 };
+        const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
         const dailyLimit = tierLimits[userTier];
         console.warn(`[${requestId}] Rate limit exceeded for FID: ${fid}, tier: ${userTier}`);
+        
+        const tierMessage = userTier === 'basic' 
+          ? 'basic user. Sign in with Farcaster to get 3 questions per day!'
+          : `${userTier} user`;
+          
         return NextResponse.json(
           { 
-            error: `Rate limit exceeded. You can ask ${dailyLimit} question${dailyLimit > 1 ? 's' : ''} per day as a ${userTier} user.`,
+            error: `Daily limit reached! You can ask ${dailyLimit} question${dailyLimit > 1 ? 's' : ''} per day as a ${tierMessage} Come back tomorrow for more questions! 🦴`,
             resetTime: rateLimitResult.resetTime,
             tier: userTier,
             dailyLimit

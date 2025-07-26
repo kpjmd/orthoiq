@@ -96,9 +96,9 @@ export function validateOrthopedicContent(question: string): SecurityCheck {
 
 // Rate limiting security checks
 export function validateRateLimitRequest(fid: string): SecurityCheck {
-  // Check for suspicious FID patterns
-  if (!fid || fid === 'anonymous' || fid.length < 1) {
-    return { isValid: true }; // Allow anonymous users with basic limits
+  // Check for valid FID (all Farcaster users should have numeric FIDs)
+  if (!fid || fid.length < 1) {
+    return { isValid: false, reason: 'FID is required' };
   }
   
   // Validate FID format (should be numeric for Farcaster)

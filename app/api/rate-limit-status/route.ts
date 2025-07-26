@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const fid = searchParams.get('fid');
-    const tier = (searchParams.get('tier') || 'anonymous') as UserTier;
+    const tier = (searchParams.get('tier') || 'basic') as UserTier;
 
     if (!fid) {
       return NextResponse.json(
