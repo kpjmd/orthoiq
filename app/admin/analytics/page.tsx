@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AuthProvider, useAuth } from '@/components/AuthProvider';
-import SignInButton from '@/components/SignInButton';
+import { AdminAuthProvider, useAdminAuth, AdminSignInButton } from '@/components/AdminAuthProvider';
+import AdminPasswordAuth from '@/components/AdminPasswordAuth';
 import Link from 'next/link';
 
 interface AnalyticsData {
@@ -16,15 +16,25 @@ interface AnalyticsData {
 }
 
 function AnalyticsDashboardContent() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAdminAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPasswordAuthenticated, setIsPasswordAuthenticated] = useState(false);
+  const [showPasswordAuth, setShowPasswordAuth] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Check for existing password authentication
+    const passwordAuth = localStorage.getItem('admin_authenticated');
+    if (passwordAuth === 'true') {
+      setIsPasswordAuthenticated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated || isPasswordAuthenticated) {
       loadAnalytics();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isPasswordAuthenticated]);
 
   const loadAnalytics = async () => {
     try {
@@ -40,24 +50,53 @@ function AnalyticsDashboardContent() {
     }
   };
 
-  // Check if user is authorized
-  const isAuthorized = isAuthenticated && user && (
+  // Check if user is authorized (Farcaster auth OR password auth)
+  const isAuthorized = isPasswordAuthenticated || (isAuthenticated && user && (
     user.username === 'kpjmd' || 
     user.displayName?.toLowerCase().includes('kpjmd') ||
     user.fid === 15230
-  );
+  ));
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isPasswordAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">🔐 Admin Access Required</h1>
-          <p className="text-gray-600 mb-6">Please sign in with Farcaster to access the analytics dashboard.</p>
-          <div className="flex justify-center">
-            <div className="bg-gradient-to-br from-blue-900 to-blue-600 p-1 rounded-lg">
-              <SignInButton />
+        <div className="max-w-lg mx-auto px-4">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-800 mb-4">🔐 Admin Access Required</h1>
+            <p className="text-gray-600 mb-6">Please authenticate to access the analytics dashboard.</p>
+          </div>
+          
+          {/* Farcaster Auth Option */}
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3 text-center">
+              🟣 Primary Authentication
+            </h3>
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              Sign in with your Farcaster account
+            </p>
+            <div className="flex justify-center">
+              <AdminSignInButton />
             </div>
           </div>
+          
+          {/* Password Auth Option */}
+          <div className="text-center">
+            <button
+              onClick={() => setShowPasswordAuth(!showPasswordAuth)}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              {showPasswordAuth ? 'Hide' : 'Show'} backup password access
+            </button>
+          </div>
+          
+          {showPasswordAuth && (
+            <AdminPasswordAuth 
+              onAuthSuccess={() => {
+                setIsPasswordAuthenticated(true);
+                setShowPasswordAuth(false);
+              }} 
+            />
+          )}
         </div>
       </div>
     );
@@ -83,7 +122,9 @@ function AnalyticsDashboardContent() {
             <div>
               <h1 className="text-3xl font-bold mb-2">📊 OrthoIQ Analytics Dashboard</h1>
               <p className="text-lg opacity-90">AI Performance Metrics & Training Data Insights</p>
-              <p className="text-sm mt-2 opacity-75">Signed in as: {user?.displayName || user?.username}</p>
+              <p className="text-sm mt-2 opacity-75">
+                Signed in as: {isPasswordAuthenticated ? 'Admin (Password)' : (user?.displayName || user?.username)}
+              </p>
             </div>
             <div>
               <Link 
@@ -338,8 +379,8 @@ function AnalyticsDashboardContent() {
 
 export default function AnalyticsDashboard() {
   return (
-    <AuthProvider>
+    <AdminAuthProvider>
       <AnalyticsDashboardContent />
-    </AuthProvider>
+    </AdminAuthProvider>
   );
 }

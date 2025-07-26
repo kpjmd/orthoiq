@@ -10,7 +10,7 @@
     "iconUrl": "https://orthoiq.vercel.app/icon.png",
     "imageUrl": "https://orthoiq.vercel.app/og-image.png",
     "buttonTitle": "Ask OrthoIQ",
-    "splashImageUrl": "https://orthoiq.vercel.app/og-image.png",
+    "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
     "splashBackgroundColor": "#1e3a8a",
     "homeUrl": "https://orthoiq.vercel.app/mini",
     "subtitle": "AI Orthopedic Expert",

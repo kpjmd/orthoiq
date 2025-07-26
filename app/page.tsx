@@ -24,7 +24,36 @@ export async function generateMetadata() {
   return {
     title: "OrthoIQ - Ask the Orthopedic AI",
     description: "AI assistant for orthopedic and sports medicine questions",
-    other: frameMetadata,
+    openGraph: {
+      title: "OrthoIQ - Ask the Orthopedic AI",
+      description: "AI assistant for orthopedic and sports medicine questions",
+      url: baseUrl,
+      siteName: "OrthoIQ",
+      images: [
+        {
+          url: `${baseUrl}/og-image.png`,
+          width: 1200,
+          height: 630,
+        },
+      ],
+      locale: "en_US",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "OrthoIQ - Ask the Orthopedic AI",
+      description: "AI assistant for orthopedic and sports medicine questions",
+      images: [`${baseUrl}/og-image.png`],
+    },
+    other: {
+      ...frameMetadata,
+      // Farcaster embed metadata for shareability
+      "fc:embed": "vNext",
+      "fc:embed:name": "OrthoIQ - AI Orthopedic Expert",
+      "fc:embed:url": baseUrl,
+      "fc:embed:image": `${baseUrl}/og-image.png`,
+      "fc:embed:description": "Get expert orthopedic advice from AI trained by Dr. KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
+    },
   };
 }
 
