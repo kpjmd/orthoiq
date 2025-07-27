@@ -153,9 +153,36 @@ export default function HomePage() {
         {`
           // Check if we're being loaded in a frame (like Farcaster Mini App)
           if (window !== window.top) {
+            // Debug: Log parent frame information
+            try {
+              console.log('Detected frame context');
+              console.log('Current origin:', window.location.origin);
+              console.log('Current href:', window.location.href);
+              console.log('Parent available:', window.parent !== window);
+              console.log('Top available:', window.top !== window);
+              
+              // Try to get parent origin (may be blocked by CORS)
+              try {
+                console.log('Parent origin:', window.parent.location.origin);
+              } catch (e) {
+                console.log('Parent origin blocked by CORS (expected):', e.message);
+              }
+              
+              // Try to get top origin
+              try {
+                console.log('Top origin:', window.top.location.origin);
+              } catch (e) {
+                console.log('Top origin blocked by CORS (expected):', e.message);
+              }
+            } catch (debugError) {
+              console.error('Debug error:', debugError);
+            }
+            
             // We're in a frame, redirect to the mini app
-            console.log('Detected frame context, redirecting to /mini');
+            console.log('Redirecting to /mini');
             window.location.href = '/mini';
+          } else {
+            console.log('Not in frame context, staying on root page');
           }
         `}
       </Script>

@@ -80,6 +80,26 @@ function MiniAppContent() {
   useEffect(() => {
     console.log('Mini App: Starting SDK initialization...');
     
+    // Debug frame context information
+    try {
+      console.log('Mini App Debug - Frame Context:');
+      console.log('- Current origin:', window.location.origin);
+      console.log('- In frame:', window !== window.top);
+      console.log('- Parent available:', window.parent !== window);
+      
+      // Get referrer information
+      console.log('- Document referrer:', document.referrer);
+      
+      // Try to get parent info (will likely be blocked)
+      try {
+        console.log('- Parent origin:', window.parent.location.origin);
+      } catch (e) {
+        console.log('- Parent origin blocked (expected):', e instanceof Error ? e.message : 'Unknown error');
+      }
+    } catch (debugError) {
+      console.error('Mini App Debug error:', debugError);
+    }
+    
     // Preconnect to Quick Auth server for better performance
     const link = document.createElement('link');
     link.rel = 'preconnect';
