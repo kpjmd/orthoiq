@@ -26,7 +26,7 @@ const nextConfig = {
           // Allow framing from Farcaster domains and same origin
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
+            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com https://dev.warpcast.com https://staging.warpcast.com;",
           },
         ],
       },
@@ -71,7 +71,7 @@ const nextConfig = {
           // Allow framing from Farcaster domains and same origin
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
+            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com https://dev.warpcast.com https://staging.warpcast.com;",
           },
         ],
       },

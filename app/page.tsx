@@ -151,39 +151,68 @@ export default function HomePage() {
       {/* Frame detection and redirect script */}
       <Script id="frame-redirect" strategy="afterInteractive">
         {`
-          // Check if we're being loaded in a frame (like Farcaster Mini App)
-          if (window !== window.top) {
-            // Debug: Log parent frame information
+          // Enhanced frame detection with origin validation
+          function detectAndHandleFrame() {
             try {
-              console.log('Detected frame context');
-              console.log('Current origin:', window.location.origin);
-              console.log('Current href:', window.location.href);
-              console.log('Parent available:', window.parent !== window);
-              console.log('Top available:', window.top !== window);
+              const isInFrame = window !== window.top;
+              const currentOrigin = window.location.origin;
+              const referrer = document.referrer;
               
-              // Try to get parent origin (may be blocked by CORS)
-              try {
-                console.log('Parent origin:', window.parent.location.origin);
-              } catch (e) {
-                console.log('Parent origin blocked by CORS (expected):', e.message);
+              console.log('Frame Detection Debug:');
+              console.log('- Is in frame:', isInFrame);
+              console.log('- Current origin:', currentOrigin);
+              console.log('- Current href:', window.location.href);
+              console.log('- Document referrer:', referrer);
+              console.log('- Parent available:', window.parent !== window);
+              console.log('- Top available:', window.top !== window);
+              
+              if (!isInFrame) {
+                console.log('Not in frame context, staying on root page');
+                return;
               }
               
-              // Try to get top origin
-              try {
-                console.log('Top origin:', window.top.location.origin);
-              } catch (e) {
-                console.log('Top origin blocked by CORS (expected):', e.message);
+              // Check if referrer indicates we're in a legitimate Farcaster/Warpcast frame
+              const isFarcasterFrame = referrer && (
+                referrer.includes('farcaster.xyz') ||
+                referrer.includes('warpcast.com') ||
+                referrer.includes('client.warpcast.com') ||
+                // Handle cases where referrer might be empty but we're clearly in a cross-origin frame
+                (referrer !== currentOrigin && referrer !== currentOrigin + '/')
+              );
+              
+              // Additional check: try to determine if this is a same-origin frame (avoid redirect loops)
+              const isSameOriginFrame = referrer === currentOrigin || referrer === currentOrigin + '/';
+              
+              console.log('- Is Farcaster frame:', isFarcasterFrame);
+              console.log('- Is same-origin frame:', isSameOriginFrame);
+              
+              // Only redirect if we're in a frame AND it's likely a Farcaster frame OR referrer is empty (cross-origin)
+              if (isInFrame && (isFarcasterFrame || !referrer || referrer === '')) {
+                console.log('Redirecting to /mini - detected legitimate frame context');
+                window.location.href = '/mini';
+              } else if (isInFrame && isSameOriginFrame) {
+                console.log('Same-origin frame detected - avoiding redirect loop');
+                // Don't redirect if it appears to be a same-origin frame to avoid loops
+              } else {
+                console.log('Frame context detected but not redirecting - referrer check failed');
               }
-            } catch (debugError) {
-              console.error('Debug error:', debugError);
+              
+            } catch (error) {
+              console.error('Frame detection error:', error);
+              // On error, be conservative and don't redirect
             }
-            
-            // We're in a frame, redirect to the mini app
-            console.log('Redirecting to /mini');
-            window.location.href = '/mini';
-          } else {
-            console.log('Not in frame context, staying on root page');
           }
+          
+          // Run detection immediately and with a small delay for safety
+          detectAndHandleFrame();
+          
+          // Add a fallback check after a short delay in case initial detection was too early
+          setTimeout(() => {
+            if (window.location.pathname === '/' && window !== window.top) {
+              console.log('Fallback frame check triggered');
+              detectAndHandleFrame();
+            }
+          }, 100);
         `}
       </Script>
     </main>

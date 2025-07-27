@@ -86,9 +86,8 @@ function MiniAppContent() {
       console.log('- Current origin:', window.location.origin);
       console.log('- In frame:', window !== window.top);
       console.log('- Parent available:', window.parent !== window);
-      
-      // Get referrer information
       console.log('- Document referrer:', document.referrer);
+      console.log('- User agent:', navigator.userAgent);
       
       // Try to get parent info (will likely be blocked)
       try {
@@ -106,6 +105,26 @@ function MiniAppContent() {
     link.href = 'https://auth.farcaster.xyz';
     document.head.appendChild(link);
 
+    // Set up fallback splash screen dismissal
+    let readyCalled = false;
+    const ensureReady = () => {
+      if (!readyCalled) {
+        readyCalled = true;
+        try {
+          console.log('Mini App: Calling sdk.actions.ready() - Splash screen dismissal');
+          sdk.actions.ready();
+        } catch (err) {
+          console.error('Failed to call sdk.actions.ready():', err);
+        }
+      }
+    };
+
+    // Fallback timer to ensure splash screen is dismissed even if SDK fails
+    const fallbackTimer = setTimeout(() => {
+      console.log('Mini App: Fallback timer triggered - ensuring splash screen is dismissed');
+      ensureReady();
+    }, 8000); // 8 second fallback
+
     const load = async () => {
       try {
         console.log('Mini App: Loading SDK context...');
@@ -113,18 +132,20 @@ function MiniAppContent() {
         // Add timeout to prevent infinite loading
         const contextPromise = sdk.context;
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('SDK context timeout')), 10000)
+          setTimeout(() => reject(new Error('SDK context timeout after 8 seconds')), 8000)
         );
         
         const context = await Promise.race([contextPromise, timeoutPromise]) as FarcasterContext;
-        console.log('Mini App: SDK context loaded:', context);
+        console.log('Mini App: SDK context loaded successfully:', context);
         
         setContext(context);
         setIsSDKLoaded(true);
         
+        // Clear fallback timer since we succeeded
+        clearTimeout(fallbackTimer);
+        
         // Signal that the app is ready
-        console.log('Mini App: Calling sdk.actions.ready()');
-        sdk.actions.ready();
+        ensureReady();
         
         // Load rate limit info - always use Farcaster FID
         if (context?.user?.fid) {
@@ -135,17 +156,33 @@ function MiniAppContent() {
         console.error('Error loading Farcaster SDK:', err);
         setError(`Failed to initialize Mini App: ${err instanceof Error ? err.message : 'Unknown error'}`);
         
+        // Clear fallback timer and ensure ready is called
+        clearTimeout(fallbackTimer);
+        
         // Still call ready() even on error to dismiss splash screen
-        try {
-          console.log('Mini App: Calling sdk.actions.ready() after error');
-          sdk.actions.ready();
-        } catch (readyErr) {
-          console.error('Failed to call sdk.actions.ready():', readyErr);
-        }
+        ensureReady();
+        
+        // Set SDK as loaded even on error to show the interface
+        setIsSDKLoaded(true);
+        
+        // Create a mock context for basic functionality
+        setContext({
+          user: undefined,
+          location: {
+            pathname: window.location.pathname,
+            search: window.location.search,
+            hash: window.location.hash
+          }
+        });
       }
     };
 
     load();
+
+    // Cleanup function
+    return () => {
+      clearTimeout(fallbackTimer);
+    };
   }, [getUserTier, authUser]);
 
   // Update rate limit info when authentication status changes
