@@ -99,12 +99,63 @@ export async function getRateLimitStatus(fid: string, tier: UserTier = 'basic'):
   };
 }
 
+// IP-based rate limiting for additional security
+const ipRateLimitStore = new Map<string, { count: number; resetTime: Date }>();
+const IP_RATE_LIMIT = 100; // requests per hour per IP
+const IP_RESET_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+export async function checkIPRateLimit(ip: string): Promise<RateLimitResult> {
+  const now = new Date();
+  const key = `ip_rate_limit:${ip}`;
+  
+  // Get existing entry
+  let entry = ipRateLimitStore.get(key);
+  
+  // If no entry exists or reset time has passed, create/reset entry
+  if (!entry || now >= entry.resetTime) {
+    entry = {
+      count: 0,
+      resetTime: new Date(now.getTime() + IP_RESET_INTERVAL_MS)
+    };
+    ipRateLimitStore.set(key, entry);
+  }
+  
+  // Check if limit exceeded
+  if (entry.count >= IP_RATE_LIMIT) {
+    return {
+      allowed: false,
+      resetTime: entry.resetTime,
+      remaining: 0,
+      total: IP_RATE_LIMIT
+    };
+  }
+  
+  // Increment count and allow request
+  entry.count++;
+  ipRateLimitStore.set(key, entry);
+  
+  return {
+    allowed: true,
+    remaining: IP_RATE_LIMIT - entry.count,
+    total: IP_RATE_LIMIT
+  };
+}
+
 // Clean up expired entries periodically
 setInterval(() => {
   const now = new Date();
+  
+  // Clean up user rate limits
   for (const [key, entry] of rateLimitStore.entries()) {
     if (now >= entry.resetTime) {
       rateLimitStore.delete(key);
+    }
+  }
+  
+  // Clean up IP rate limits
+  for (const [key, entry] of ipRateLimitStore.entries()) {
+    if (now >= entry.resetTime) {
+      ipRateLimitStore.delete(key);
     }
   }
 }, 60 * 60 * 1000); // Clean up every hour

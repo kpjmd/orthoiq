@@ -27,13 +27,15 @@ These occurred because we were using Prisma Postgres (which requires Prisma Clie
 
 **In Vercel Dashboard:**
 ```
-DATABASE_URL=postgres://neondb_owner:npg_ZKzSHOs3o0rM@ep-solitary-queen-aditm6fh-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=your_neon_database_connection_string_here
 ```
 
 **In Local Development (.env.local):**
 ```env
-DATABASE_URL=postgres://neondb_owner:npg_ZKzSHOs3o0rM@ep-solitary-queen-aditm6fh-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL=your_neon_database_connection_string_here
 ```
+
+> ⚠️ **Security Note**: Never commit actual database credentials to version control. Use environment variables and keep your `.env.local` file gitignored.
 
 ### Database Features
 

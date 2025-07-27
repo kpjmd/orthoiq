@@ -3,9 +3,16 @@ import { getAnalytics } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
-    // Simple auth check - in production use proper authentication
+    // Check for admin API key from environment
+    const adminApiKey = process.env.ADMIN_API_KEY;
+    if (!adminApiKey) {
+      console.error('ADMIN_API_KEY environment variable not set');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    // Validate authorization header
     const authHeader = request.headers.get('authorization');
-    if (!authHeader || authHeader !== 'Bearer admin-secret') {
+    if (!authHeader || authHeader !== `Bearer ${adminApiKey}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

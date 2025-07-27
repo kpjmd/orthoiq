@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
-import { checkRateLimit, UserTier } from '@/lib/rateLimit';
+import { checkRateLimit, UserTier, checkIPRateLimit } from '@/lib/rateLimit';
 import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus } from '@/lib/database';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
@@ -28,6 +28,25 @@ export async function POST(request: NextRequest) {
     }
 
     apiLogger.info('Claude API request started', { requestId });
+    
+    // Get client IP for rate limiting
+    const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    // Check IP-based rate limiting
+    const ipRateLimit = await checkIPRateLimit(clientIP);
+    if (!ipRateLimit.allowed) {
+      console.warn(`[${requestId}] IP rate limit exceeded for: ${clientIP}`);
+      metrics.record('claude_api_ip_rate_limit', 1);
+      return NextResponse.json(
+        { 
+          error: 'Too many requests from your IP address. Please try again later.',
+          resetTime: ipRateLimit.resetTime
+        },
+        { status: 429 }
+      );
+    }
     
     let requestBody;
     try {
