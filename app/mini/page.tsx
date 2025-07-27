@@ -51,6 +51,8 @@ function MiniAppContent() {
   }, [isAuthenticated, authUser]);
 
   useEffect(() => {
+    console.log('Mini App: Starting SDK initialization...');
+    
     // Preconnect to Quick Auth server for better performance
     const link = document.createElement('link');
     link.rel = 'preconnect';
@@ -59,21 +61,40 @@ function MiniAppContent() {
 
     const load = async () => {
       try {
-        // Initialize the SDK
-        const context = await sdk.context;
+        console.log('Mini App: Loading SDK context...');
+        
+        // Add timeout to prevent infinite loading
+        const contextPromise = sdk.context;
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('SDK context timeout')), 10000)
+        );
+        
+        const context = await Promise.race([contextPromise, timeoutPromise]);
+        console.log('Mini App: SDK context loaded:', context);
+        
         setContext(context);
         setIsSDKLoaded(true);
         
         // Signal that the app is ready
+        console.log('Mini App: Calling sdk.actions.ready()');
         sdk.actions.ready();
         
         // Load rate limit info - always use Farcaster FID
         if (context?.user?.fid) {
+          console.log('Mini App: Loading rate limit status for FID:', context.user.fid);
           await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
         }
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
-        setError('Failed to initialize Mini App');
+        setError(`Failed to initialize Mini App: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        
+        // Still call ready() even on error to dismiss splash screen
+        try {
+          console.log('Mini App: Calling sdk.actions.ready() after error');
+          sdk.actions.ready();
+        } catch (readyErr) {
+          console.error('Failed to call sdk.actions.ready():', readyErr);
+        }
       }
     };
 
@@ -220,9 +241,15 @@ function MiniAppContent() {
   if (!isSDKLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-600 flex items-center justify-center">
-        <div className="text-center text-white">
+        <div className="text-center text-white max-w-md mx-auto p-6">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading OrthoIQ...</p>
+          <p className="text-lg mb-2">Loading OrthoIQ...</p>
+          <p className="text-sm opacity-75">Initializing Farcaster Mini App SDK</p>
+          {error && (
+            <div className="mt-4 p-3 bg-red-500 bg-opacity-20 border border-red-400 rounded-lg">
+              <p className="text-sm text-red-200">{error}</p>
+            </div>
+          )}
         </div>
       </div>
     );

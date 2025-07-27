@@ -8,9 +8,32 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        // Mini App route - allow framing for Farcaster
+        source: '/mini',
         headers: [
-          // Security headers
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          // Allow framing from Farcaster domains
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+        ],
+      },
+      {
+        // All other routes - strict security
+        source: '/((?!mini).*)',
+        headers: [
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
@@ -34,7 +57,7 @@ const nextConfig = {
         ],
       },
       {
-        // Stricter headers for API routes
+        // API routes - stricter headers
         source: '/api/(.*)',
         headers: [
           {
