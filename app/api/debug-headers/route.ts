@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
     referer: request.headers.get('referer'),
   });
 
-  // Set the same CSP we want on main routes
-  const cspValue = "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
+  // Set the same CSP we want on main routes (including root domain)
+  const cspValue = "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
   
   response.headers.set('Content-Security-Policy', cspValue);
   response.headers.set('X-Debug-CSP', cspValue);
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
 export async function HEAD(request: NextRequest) {
   const response = new NextResponse(null, { status: 200 });
   
-  // Set the same CSP we want on main routes
-  const cspValue = "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
+  // Set the same CSP we want on main routes (including root domain)
+  const cspValue = "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
   
   response.headers.set('Content-Security-Policy', cspValue);
   response.headers.set('X-Debug-CSP', cspValue);

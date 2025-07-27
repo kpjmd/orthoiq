@@ -6,8 +6,8 @@ export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const pathname = request.nextUrl.pathname;
   
-  // Simplified CSP for Farcaster domains
-  const cspValue = "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
+  // Simplified CSP for Farcaster domains (including root domain)
+  const cspValue = "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
 
   // Always apply CSP for root and mini routes
   if (pathname === '/' || pathname.startsWith('/mini')) {

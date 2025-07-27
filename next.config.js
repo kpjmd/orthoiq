@@ -26,7 +26,7 @@ const nextConfig = {
           // Primary CSP header - allow framing from Farcaster domains
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
+            value: "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
           },
         ],
       },
@@ -71,7 +71,7 @@ const nextConfig = {
           // Primary CSP header - allow framing from Farcaster domains
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
+            value: "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
           },
         ],
       },
