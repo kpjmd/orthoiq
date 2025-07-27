@@ -166,6 +166,14 @@ export default function HomePage() {
               console.log('- Parent available:', window.parent !== window);
               console.log('- Top available:', window.top !== window);
               
+              // Check CSP headers for debugging
+              fetch(window.location.href, { method: 'HEAD' })
+                .then(response => {
+                  const csp = response.headers.get('Content-Security-Policy');
+                  console.log('- CSP header:', csp);
+                })
+                .catch(e => console.log('- Could not fetch CSP header:', e.message));
+              
               if (!isInFrame) {
                 console.log('Not in frame context, staying on root page');
                 return;

@@ -23,11 +23,7 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-          // Allow framing from Farcaster domains and same origin
-          {
-            key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com https://dev.warpcast.com https://staging.warpcast.com;",
-          },
+          // CSP headers now handled by middleware.ts for better reliability
         ],
       },
       {
@@ -68,11 +64,7 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-          // Allow framing from Farcaster domains and same origin
-          {
-            key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com https://dev.warpcast.com https://staging.warpcast.com;",
-          },
+          // CSP headers now handled by middleware.ts for better reliability
         ],
       },
       {
