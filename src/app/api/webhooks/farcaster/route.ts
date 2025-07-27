@@ -6,6 +6,13 @@ import {
 } from '@farcaster/miniapp-node';
 import { neon } from '@neondatabase/serverless';
 
+// Add CORS headers for webhook requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(request: NextRequest) {
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
         console.log('Unknown event type:', data.event);
     }
     
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (e: unknown) {
     const error = e as ParseWebhookEvent.ErrorType;
     
@@ -42,18 +49,23 @@ export async function POST(request: NextRequest) {
       case 'VerifyJsonFarcasterSignature.InvalidDataError':
       case 'VerifyJsonFarcasterSignature.InvalidEventDataError':
         console.error('Invalid request data:', error);
-        return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid request data' }, { status: 400, headers: corsHeaders });
       case 'VerifyJsonFarcasterSignature.InvalidAppKeyError':
         console.error('Invalid app key:', error);
-        return NextResponse.json({ error: 'Invalid app key' }, { status: 401 });
+        return NextResponse.json({ error: 'Invalid app key' }, { status: 401, headers: corsHeaders });
       case 'VerifyJsonFarcasterSignature.VerifyAppKeyError':
         console.error('Error verifying app key:', error);
-        return NextResponse.json({ error: 'Verification error' }, { status: 500 });
+        return NextResponse.json({ error: 'Verification error' }, { status: 500, headers: corsHeaders });
       default:
         console.error('Unexpected error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: corsHeaders });
     }
   }
+}
+
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
 }
 
 async function handleMiniappAdded(data: any) {

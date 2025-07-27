@@ -9,7 +9,7 @@ const nextConfig = {
     return [
       {
         // Mini App route - allow framing for Farcaster
-        source: '/mini',
+        source: '/mini/:path*',
         headers: [
           {
             key: 'X-Content-Type-Options',
@@ -23,16 +23,38 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-          // Allow framing from Farcaster domains
+          // Remove X-Frame-Options entirely to allow framing
           {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com;",
           },
         ],
       },
       {
-        // All other routes - strict security
-        source: '/((?!mini).*)',
+        // Farcaster manifest and webhooks - allow access
+        source: '/api/(farcaster-manifest|webhooks)/:path*',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
+          },
+        ],
+      },
+      {
+        // All other routes - strict security  
+        source: '/((?!mini|api/farcaster-manifest|api/webhooks).*)',
         headers: [
           {
             key: 'X-Content-Type-Options',
@@ -57,8 +79,8 @@ const nextConfig = {
         ],
       },
       {
-        // API routes - stricter headers
-        source: '/api/(.*)',
+        // API routes - stricter headers but allow CORS for needed endpoints
+        source: '/api/((?!farcaster-manifest|webhooks).*)',
         headers: [
           {
             key: 'X-Content-Type-Options',

@@ -11,6 +11,12 @@ export async function GET() {
       'ADMIN_API_KEY'
     ];
 
+    // Check Farcaster-specific environment variables
+    const farcasterEnvVars = [
+      'NEYNAR_API_KEY',
+      'FARCASTER_HUB_URL'
+    ];
+
     const missingVars: string[] = [];
     const presentVars: string[] = [];
 
@@ -19,6 +25,17 @@ export async function GET() {
         presentVars.push(varName);
       } else {
         missingVars.push(varName);
+      }
+    });
+
+    const missingFarcasterVars: string[] = [];
+    const presentFarcasterVars: string[] = [];
+
+    farcasterEnvVars.forEach(varName => {
+      if (process.env[varName]) {
+        presentFarcasterVars.push(varName);
+      } else {
+        missingFarcasterVars.push(varName);
       }
     });
 
@@ -34,18 +51,26 @@ export async function GET() {
       optionalStatus[varName] = !!process.env[varName];
     });
 
+    const isHealthy = missingVars.length === 0;
+    const hasWarnings = missingFarcasterVars.length > 0;
+
     const status = {
-      status: missingVars.length === 0 ? 'healthy' : 'missing_env_vars',
+      status: !isHealthy ? 'missing_env_vars' : hasWarnings ? 'warnings' : 'healthy',
       timestamp: new Date().toISOString(),
       environment: {
         required: {
           present: presentVars,
           missing: missingVars
         },
+        farcaster: {
+          present: presentFarcasterVars,
+          missing: missingFarcasterVars
+        },
         optional: optionalStatus
       },
       host: process.env.NEXT_PUBLIC_HOST,
-      isProduction: process.env.NODE_ENV === 'production'
+      isProduction: process.env.NODE_ENV === 'production',
+      warnings: hasWarnings ? ['Some Farcaster environment variables are missing - webhook functionality may be limited'] : []
     };
 
     return NextResponse.json(status, {
