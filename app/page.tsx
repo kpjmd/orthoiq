@@ -47,12 +47,36 @@ export async function generateMetadata() {
     },
     other: {
       ...frameMetadata,
-      // Farcaster embed metadata for shareability
-      "fc:embed": "vNext",
-      "fc:embed:name": "OrthoIQ - AI Orthopedic Expert",
-      "fc:embed:url": baseUrl,
-      "fc:embed:image": `${baseUrl}/og-image.png`,
-      "fc:embed:description": "Get expert orthopedic advice from AI trained by Dr. KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
+      // Farcaster Mini App embed metadata for shareability
+      "fc:miniapp": JSON.stringify({
+        "version": "1",
+        "imageUrl": `${baseUrl}/embed-image.png`,
+        "button": {
+          "title": "Ask OrthoIQ",
+          "action": {
+            "type": "launch_frame",
+            "name": "OrthoIQ",
+            "url": `${baseUrl}/mini`,
+            "splashImageUrl": `${baseUrl}/splash-image.png`,
+            "splashBackgroundColor": "#1e3a8a"
+          }
+        }
+      }),
+      // Backward compatibility
+      "fc:frame": JSON.stringify({
+        "version": "1",
+        "imageUrl": `${baseUrl}/embed-image.png`,
+        "button": {
+          "title": "Ask OrthoIQ",
+          "action": {
+            "type": "launch_frame",
+            "name": "OrthoIQ",
+            "url": `${baseUrl}/mini`,
+            "splashImageUrl": `${baseUrl}/splash-image.png`,
+            "splashBackgroundColor": "#1e3a8a"
+          }
+        }
+      }),
     },
   };
 }
