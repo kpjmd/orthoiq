@@ -18,33 +18,61 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
   const [shareText, setShareText] = useState('Share Response');
 
   const handleShare = async () => {
-    // Create a shareable URL with the question and response
-    const shareId = Math.random().toString(36).substring(7);
-    const shareParams = new URLSearchParams({
-      question: question.substring(0, 500),
-      response: response.substring(0, 1000),
-      confidence: '95' // This would come from actual response data
-    });
-    
-    const shareUrl = `${window.location.origin}/share/${shareId}?${shareParams.toString()}`;
-    
-    const shareData = {
-      title: 'OrthoIQ AI Response',
-      text: `Check out this AI orthopedic response from OrthoIQ by Dr. KPJMD`,
-      url: shareUrl
-    };
-
     try {
-      if (navigator.share && navigator.canShare(shareData)) {
-        await navigator.share(shareData);
-        setShareText('Shared!');
-        setTimeout(() => setShareText('Share Response'), 2000);
-      } else {
-        // Fallback to clipboard
-        await navigator.clipboard.writeText(shareUrl);
-        setShareText('Link Copied!');
-        setTimeout(() => setShareText('Share Response'), 2000);
+      setShareText('Creating Link...');
+
+      // Create share via API
+      const shareResponse = await fetch('/api/share-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          response,
+          confidence: 95 // This would come from actual response data
+        })
+      });
+
+      if (!shareResponse.ok) {
+        throw new Error('Failed to create share link');
       }
+
+      const shareData = await shareResponse.json();
+      const shareUrl = shareData.shareUrl;
+      
+      const webShareData = {
+        title: 'OrthoIQ AI Response',
+        text: `Check out this AI orthopedic response from OrthoIQ by Dr. KPJMD`,
+        url: shareUrl
+      };
+
+      // Try to use Web Share API if available and supported
+      if (navigator.share && navigator.canShare && navigator.canShare(webShareData)) {
+        try {
+          await navigator.share(webShareData);
+          setShareText('Shared!');
+        } catch (shareError) {
+          console.warn('Web Share API failed, falling back to clipboard:', shareError);
+          // If Web Share fails, fallback to clipboard
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(shareUrl);
+            setShareText('Link Copied!');
+          } else {
+            throw new Error('Neither Web Share API nor Clipboard API is available');
+          }
+        }
+      } else {
+        // Fallback: copy to clipboard
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(shareUrl);
+          setShareText('Link Copied!');
+        } else {
+          // Final fallback: show the share URL to copy manually
+          alert(`Please copy this link to share:\n\n${shareUrl}`);
+          setShareText('Link Ready!');
+        }
+      }
+
+      setTimeout(() => setShareText('Share Response'), 2000);
     } catch (error) {
       console.error('Error sharing:', error);
       setShareText('Error sharing');

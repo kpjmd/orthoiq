@@ -50,18 +50,39 @@ export default function ArtworkModal({ isOpen, onClose, question, response }: Ar
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
 
-      // Try to use Web Share API if available
-      if (navigator.share) {
-        await navigator.share({
-          title: 'OrthoIQ Medical Artwork',
-          text: shareData.farcasterData.text,
-          url: shareUrl
-        });
-        setShareStatus('success');
+      // Try to use Web Share API if available and supported
+      if (navigator.share && navigator.canShare && navigator.canShare({
+        title: 'OrthoIQ Medical Artwork',
+        text: shareData.farcasterData.text,
+        url: shareUrl
+      })) {
+        try {
+          await navigator.share({
+            title: 'OrthoIQ Medical Artwork',
+            text: shareData.farcasterData.text,
+            url: shareUrl
+          });
+          setShareStatus('success');
+        } catch (shareError) {
+          console.warn('Web Share API failed, falling back to clipboard:', shareError);
+          // If Web Share fails, fallback to clipboard
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(`${shareData.farcasterData.text}\n\n${shareUrl}`);
+            setShareStatus('success');
+          } else {
+            throw new Error('Neither Web Share API nor Clipboard API is available');
+          }
+        }
       } else {
         // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(`${shareData.farcasterData.text}\n\n${shareUrl}`);
-        setShareStatus('success');
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(`${shareData.farcasterData.text}\n\n${shareUrl}`);
+          setShareStatus('success');
+        } else {
+          // Final fallback: show the share URL to copy manually
+          alert(`Please copy this link to share:\n\n${shareUrl}`);
+          setShareStatus('success');
+        }
       }
     } catch (error) {
       console.error('Share failed:', error);
@@ -96,8 +117,16 @@ export default function ArtworkModal({ isOpen, onClose, question, response }: Ar
       }
 
       const shareData = await shareResponse.json();
-      await navigator.clipboard.writeText(shareData.shareUrl);
-      setShareStatus('success');
+      
+      // Try to copy to clipboard with fallback
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareData.shareUrl);
+        setShareStatus('success');
+      } else {
+        // Fallback for browsers without clipboard API
+        alert(`Please copy this link:\n\n${shareData.shareUrl}`);
+        setShareStatus('success');
+      }
       
       // Reset status after 2 seconds
       setTimeout(() => setShareStatus('idle'), 2000);

@@ -217,6 +217,40 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_notification_logs_created_at ON notification_logs(created_at);
     `;
 
+    // Share data table for storing shared responses and artwork
+    await sql`
+      CREATE TABLE IF NOT EXISTS shares (
+        id SERIAL PRIMARY KEY,
+        share_id VARCHAR(255) UNIQUE NOT NULL,
+        share_type VARCHAR(20) NOT NULL CHECK (share_type IN ('response', 'artwork')),
+        question TEXT NOT NULL,
+        response TEXT NOT NULL,
+        confidence REAL DEFAULT 0.0,
+        artwork_metadata JSONB DEFAULT '{}'::jsonb,
+        farcaster_data JSONB DEFAULT '{}'::jsonb,
+        view_count INTEGER DEFAULT 0,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_shares_share_id ON shares(share_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_shares_type ON shares(share_type);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_shares_created_at ON shares(created_at);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_shares_expires_at ON shares(expires_at);
+    `;
+
     console.log('Database initialized successfully with Neon');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -869,6 +903,115 @@ export async function cleanupOldData(daysToKeep: number = 30) {
     return result.length;
   } catch (error) {
     console.error('Error cleaning up old data:', error);
+    throw error;
+  }
+}
+
+// Share data functions
+export async function createShare(
+  shareType: 'response' | 'artwork',
+  question: string,
+  response: string,
+  confidence: number = 0.0,
+  artworkMetadata?: any,
+  farcasterData?: any,
+  expiresInDays?: number
+): Promise<string> {
+  const sql = getSql();
+  
+  try {
+    // Generate unique share ID
+    const shareId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    
+    // Calculate expiration date (default 30 days)
+    const expiresAt = expiresInDays ? 
+      new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : 
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await sql`
+      INSERT INTO shares (
+        share_id, share_type, question, response, confidence,
+        artwork_metadata, farcaster_data, expires_at
+      )
+      VALUES (
+        ${shareId}, ${shareType}, ${question}, ${response}, ${confidence},
+        ${JSON.stringify(artworkMetadata || {})}, 
+        ${JSON.stringify(farcasterData || {})}, 
+        ${expiresAt.toISOString()}
+      )
+    `;
+
+    return shareId;
+  } catch (error) {
+    console.error('Error creating share:', error);
+    throw error;
+  }
+}
+
+export async function getShare(shareId: string): Promise<any | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT 
+        share_id,
+        share_type,
+        question,
+        response,
+        confidence,
+        artwork_metadata,
+        farcaster_data,
+        view_count,
+        expires_at,
+        created_at
+      FROM shares 
+      WHERE share_id = ${shareId} AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+    `;
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    const share = result[0];
+    
+    // Increment view count
+    await sql`
+      UPDATE shares 
+      SET view_count = view_count + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE share_id = ${shareId}
+    `;
+
+    return {
+      shareId: share.share_id,
+      shareType: share.share_type,
+      question: share.question,
+      response: share.response,
+      confidence: share.confidence,
+      artworkMetadata: share.artwork_metadata,
+      farcasterData: share.farcaster_data,
+      viewCount: share.view_count + 1,
+      expiresAt: share.expires_at,
+      createdAt: share.created_at
+    };
+  } catch (error) {
+    console.error('Error getting share:', error);
+    return null;
+  }
+}
+
+export async function cleanupExpiredShares(): Promise<number> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      DELETE FROM shares 
+      WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP
+    `;
+
+    console.log(`Cleaned up ${result.length} expired shares`);
+    return result.length;
+  } catch (error) {
+    console.error('Error cleaning up expired shares:', error);
     throw error;
   }
 }

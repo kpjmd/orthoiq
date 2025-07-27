@@ -3,9 +3,34 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const question = searchParams.get('question') || 'Ask Your Orthopedic Question';
-    const response = searchParams.get('response') || 'Get expert AI-powered orthopedic guidance';
-    const confidence = searchParams.get('confidence') || '95';
+    const shareId = searchParams.get('shareId');
+    
+    let question = 'Ask Your Orthopedic Question';
+    let response = 'Get expert AI-powered orthopedic guidance';
+    let confidence = '95';
+    let isArtwork = false;
+
+    // If shareId is provided, try to get data from database
+    if (shareId) {
+      try {
+        const { getShare } = await import('../../../lib/database');
+        const shareData = await getShare(shareId);
+        if (shareData) {
+          question = shareData.question;
+          response = shareData.response;
+          confidence = shareData.confidence?.toString() || '95';
+          isArtwork = shareData.shareType === 'artwork';
+        }
+      } catch (error) {
+        console.error('Error getting share data for OG image:', error);
+      }
+    }
+
+    // Fallback to URL params if no shareId or database lookup fails
+    question = searchParams.get('question') || question;
+    response = searchParams.get('response') || response;
+    confidence = searchParams.get('confidence') || confidence;
+    const art = searchParams.get('art') === 'true' || isArtwork;
 
     // Create SVG string for the og-image (3:2 aspect ratio - 1200x800)
     const svgContent = `
@@ -26,7 +51,7 @@ export async function GET(request: NextRequest) {
         
         <!-- Title -->
         <text x="250" y="130" fill="white" font-size="56" font-weight="bold" font-family="system-ui, sans-serif">OrthoIQ</text>
-        <text x="250" y="180" fill="white" opacity="0.9" font-size="28" font-family="system-ui, sans-serif">AI Orthopedic Expert</text>
+        <text x="250" y="180" fill="white" opacity="0.9" font-size="28" font-family="system-ui, sans-serif">${art ? 'AI Medical Artwork' : 'AI Orthopedic Expert'}</text>
         
         <!-- Question Section -->
         <rect x="80" y="250" width="1040" height="160" rx="20" fill="white" opacity="0.15" />
