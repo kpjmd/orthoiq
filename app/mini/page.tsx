@@ -11,6 +11,33 @@ import { useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
 import { UserTier } from '@/lib/rateLimit';
 
+// Farcaster SDK Context Types
+interface FarcasterUser {
+  fid: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+  verifications?: string[];
+}
+
+interface FarcasterContext {
+  user?: FarcasterUser;
+  location?: {
+    pathname: string;
+    search: string;
+    hash: string;
+  };
+  client?: {
+    added: boolean;
+    safeAreaInsets: {
+      top: number;
+      bottom: number;
+      left: number;
+      right: number;
+    };
+  };
+}
+
 interface ResponseData {
   response: string;
   confidence?: number;
@@ -28,7 +55,7 @@ interface ResponseData {
 function MiniAppContent() {
   const { user: authUser, isAuthenticated } = useAuth();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [context, setContext] = useState<any>(null);
+  const [context, setContext] = useState<FarcasterContext | null>(null);
   const [question, setQuestion] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [responseData, setResponseData] = useState<ResponseData | null>(null);
@@ -69,7 +96,7 @@ function MiniAppContent() {
           setTimeout(() => reject(new Error('SDK context timeout')), 10000)
         );
         
-        const context = await Promise.race([contextPromise, timeoutPromise]);
+        const context = await Promise.race([contextPromise, timeoutPromise]) as FarcasterContext;
         console.log('Mini App: SDK context loaded:', context);
         
         setContext(context);
