@@ -170,9 +170,25 @@ export default function HomePage() {
               fetch(window.location.href, { method: 'HEAD' })
                 .then(response => {
                   const csp = response.headers.get('Content-Security-Policy');
-                  console.log('- CSP header:', csp);
+                  console.log('- CSP header from main page:', csp);
                 })
                 .catch(e => console.log('- Could not fetch CSP header:', e.message));
+                
+              // Also test debug endpoint
+              fetch('/api/debug-headers')
+                .then(response => {
+                  const csp = response.headers.get('Content-Security-Policy');
+                  const debugCsp = response.headers.get('X-Debug-CSP');
+                  console.log('- Debug endpoint CSP:', csp);
+                  console.log('- Debug endpoint X-Debug-CSP:', debugCsp);
+                  return response.json();
+                })
+                .then(data => console.log('- Debug endpoint data:', data))
+                .catch(e => console.log('- Debug endpoint error:', e.message));
+                
+              // Test if we can access our debug endpoint directly
+              const testUrl = window.location.origin + '/api/debug-headers';
+              console.log('- Testing debug URL:', testUrl);
               
               if (!isInFrame) {
                 console.log('Not in frame context, staying on root page');

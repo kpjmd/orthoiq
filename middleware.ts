@@ -1,47 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+  console.log(`[MIDDLEWARE DEBUG] Processing: ${request.nextUrl.pathname}`);
   
+  const response = NextResponse.next();
   const pathname = request.nextUrl.pathname;
   
-  // Define the frame-ancestors directive for Farcaster domains
-  const farcasterFrameAncestors = [
-    "'self'",
-    "https://*.farcaster.xyz",
-    "https://*.warpcast.com", 
-    "https://warpcast.com",
-    "https://client.warpcast.com",
-    "https://dev.warpcast.com",
-    "https://staging.warpcast.com"
-  ].join(' ');
+  // Simplified CSP for Farcaster domains
+  const cspValue = "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;";
 
-  // Apply frame-friendly headers for mini app routes and root
-  if (pathname.startsWith('/mini') || pathname === '/') {
-    // Set CSP headers that allow framing from Farcaster domains
-    response.headers.set(
-      'Content-Security-Policy',
-      `frame-ancestors ${farcasterFrameAncestors};`
-    );
+  // Always apply CSP for root and mini routes
+  if (pathname === '/' || pathname.startsWith('/mini')) {
+    response.headers.set('Content-Security-Policy', cspValue);
+    response.headers.delete('X-Frame-Options'); // Remove conflicting header
     
-    // Remove X-Frame-Options if present (conflicts with CSP frame-ancestors)
-    response.headers.delete('X-Frame-Options');
+    console.log(`[MIDDLEWARE DEBUG] Set CSP for ${pathname}: ${cspValue}`);
     
-    // Add other security headers
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-XSS-Protection', '1; mode=block');
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    console.log(`[Middleware] Applied frame-friendly CSP for ${pathname}: frame-ancestors ${farcasterFrameAncestors};`);
-  }
-  // For all other routes, apply strict security
-  else if (!pathname.startsWith('/api/farcaster-manifest') && !pathname.startsWith('/api/webhooks')) {
-    response.headers.set('X-Frame-Options', 'DENY');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('X-XSS-Protection', '1; mode=block');
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    console.log(`[Middleware] Applied strict security headers for ${pathname}`);
+    // Force log to ensure it appears
+    if (typeof window === 'undefined') {
+      console.error(`[MIDDLEWARE FORCE LOG] CSP SET: ${cspValue}`);
+    }
   }
 
   return response;
@@ -49,13 +27,10 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Match root and mini routes specifically
+    '/',
+    '/mini/:path*',
+    // Also match all other paths to debug
+    '/((?!_next|api|favicon.ico).*)',
   ],
 };
