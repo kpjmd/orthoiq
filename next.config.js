@@ -23,10 +23,10 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-          // Temporarily allow all frame ancestors for debugging
+          // Allow framing from Farcaster domains and same origin
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors *;",
+            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
           },
         ],
       },
@@ -68,10 +68,10 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
-          // Temporarily allow all frame ancestors for debugging
+          // Allow framing from Farcaster domains and same origin
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors *;",
+            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com;",
           },
         ],
       },
