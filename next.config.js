@@ -53,8 +53,31 @@ const nextConfig = {
         ],
       },
       {
+        // Root route - allow framing for redirect to work
+        source: '/',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          // Allow framing from Farcaster domains for redirect to work
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com;",
+          },
+        ],
+      },
+      {
         // All other routes - strict security  
-        source: '/((?!mini|api/farcaster-manifest|api/webhooks).*)',
+        source: '/((?!mini|api/farcaster-manifest|api/webhooks)(?!$).*)',
         headers: [
           {
             key: 'X-Content-Type-Options',

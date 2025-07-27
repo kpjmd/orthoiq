@@ -1,5 +1,6 @@
 import { fetchMetadata } from "frames.js/next";
 import OrthoFrame from '@/components/OrthoFrame';
+import Script from 'next/script';
 
 export const dynamic = 'force-dynamic';
 
@@ -146,6 +147,18 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      
+      {/* Frame detection and redirect script */}
+      <Script id="frame-redirect" strategy="afterInteractive">
+        {`
+          // Check if we're being loaded in a frame (like Farcaster Mini App)
+          if (window !== window.top) {
+            // We're in a frame, redirect to the mini app
+            console.log('Detected frame context, redirecting to /mini');
+            window.location.href = '/mini';
+          }
+        `}
+      </Script>
     </main>
   );
 }
