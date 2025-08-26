@@ -40,8 +40,8 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
       const shareUrl = shareData.shareUrl;
       
       const webShareData = {
-        title: 'OrthoIQ AI Response',
-        text: `Check out this AI orthopedic response from OrthoIQ by Dr. KPJMD`,
+        title: 'OrthoIQ Medical Insight',
+        text: `"${question.substring(0, 50)}${question.length > 50 ? '...' : ''}" - Get your orthopedic questions answered by AI with MD review at OrthoIQ`,
         url: shareUrl
       };
 
@@ -80,6 +80,23 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
     }
   };
 
+  const handleInstagramShare = async () => {
+    try {
+      // Create Instagram story-friendly content
+      const instagramText = `Got this MD-reviewed orthopedic tip: "${question.substring(0, 80)}${question.length > 80 ? '...' : ''}" 🦴 Ask your questions at OrthoIQ`;
+      
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(instagramText);
+        alert('Instagram caption copied! 📋\n\nPaste this into your Instagram Story and add a screenshot of this response.');
+      } else {
+        alert(`Copy this for Instagram:\n\n${instagramText}`);
+      }
+    } catch (error) {
+      console.error('Instagram share failed:', error);
+      alert('Failed to prepare Instagram content');
+    }
+  };
+
   const handleRate = (rating: number) => {
     onRate(rating);
     setHasRated(true);
@@ -90,7 +107,7 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
     <div className="bg-white rounded-lg shadow-sm border p-4 mt-4">
       <h4 className="text-sm font-medium text-gray-700 mb-3">What would you like to do next?</h4>
       
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <button
           onClick={onAskAnother}
           disabled={!canAskAnother}
@@ -108,32 +125,46 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
         </button>
 
         <button
-          onClick={handleShare}
-          className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
-          <span className="mr-2">📤</span>
-          {shareText}
-        </button>
-
-        <button
           onClick={onViewArtwork}
-          className="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          className="flex items-center justify-center px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
-          <span className="mr-2">🎨</span>
-          View Artwork
+          <span className="mr-2">🩺</span>
+          View Medical Visual
         </button>
+      </div>
+
+      {/* Enhanced Sharing Options */}
+      <div className="border-t pt-4">
+        <h5 className="text-sm font-medium text-gray-700 mb-3">Share this medical insight:</h5>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <button
+            onClick={handleShare}
+            className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+          >
+            <span className="mr-2">📤</span>
+            {shareText}
+          </button>
+
+          <button
+            onClick={handleInstagramShare}
+            className="flex items-center justify-center px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all text-sm"
+          >
+            <span className="mr-2">📸</span>
+            Instagram Story
+          </button>
+        </div>
 
         <button
           onClick={() => setShowRating(!showRating)}
           disabled={hasRated}
-          className={`flex items-center justify-center px-4 py-3 rounded-lg transition-colors ${
+          className={`w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors text-sm ${
             hasRated 
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-yellow-600 text-white hover:bg-yellow-700'
           }`}
         >
           <span className="mr-2">{hasRated ? '✅' : '⭐'}</span>
-          {hasRated ? 'Rated' : 'Rate Response'}
+          {hasRated ? 'Thanks for rating!' : 'Rate this response'}
         </button>
       </div>
 

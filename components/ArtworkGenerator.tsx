@@ -83,9 +83,9 @@ export default function ArtworkGenerator({
     }
   };
 
-  // Use new system if question provided, otherwise fallback to theme
-  const useNewSystem = Boolean(question || analysis);
-  const config = useNewSystem ? null : getThemeConfig(theme || 'general');
+  // Always use professional medical system (no more abstract art)
+  const useNewSystem = true;
+  const config = null;
 
   // Helper function to render SVG elements
   const renderSVGElement = (element: SVGElement, index: number) => {
@@ -114,6 +114,40 @@ export default function ArtworkGenerator({
     }
   };
 
+  // Generate medical visuals based on question content
+  const generateMedicalVisual = () => {
+    const questionText = (question || '').toLowerCase();
+    
+    // Determine body part/condition from question
+    const isKnee = questionText.includes('knee') || questionText.includes('patella');
+    const isShoulder = questionText.includes('shoulder') || questionText.includes('rotator');
+    const isBack = questionText.includes('back') || questionText.includes('spine') || questionText.includes('vertebra');
+    const isAnkle = questionText.includes('ankle') || questionText.includes('foot');
+    const isElbow = questionText.includes('elbow');
+    const isWrist = questionText.includes('wrist') || questionText.includes('carpal');
+    const isHip = questionText.includes('hip');
+    
+    // Determine condition type
+    const isPain = questionText.includes('pain') || questionText.includes('hurt') || questionText.includes('ache');
+    const isInjury = questionText.includes('injury') || questionText.includes('injured');
+    const isFracture = questionText.includes('fracture') || questionText.includes('break') || questionText.includes('broken');
+    const isStrain = questionText.includes('strain') || questionText.includes('pull');
+    const isSwelling = questionText.includes('swell') || questionText.includes('inflammation');
+
+    if (isKnee) return 'knee';
+    if (isShoulder) return 'shoulder';
+    if (isBack) return 'spine';
+    if (isAnkle) return 'ankle';
+    if (isElbow) return 'elbow';
+    if (isWrist) return 'wrist';
+    if (isHip) return 'hip';
+    if (isFracture) return 'bone';
+    if (isStrain) return 'muscle';
+    return 'general';
+  };
+
+  const medicalType = generateMedicalVisual();
+
   return (
     <div className={`inline-block ${className}`}>
       <svg 
@@ -121,102 +155,140 @@ export default function ArtworkGenerator({
         width={size} 
         height={size} 
         viewBox={`0 0 ${size} ${size}`}
-        className="drop-shadow-md"
+        className="drop-shadow-md border border-gray-200 rounded-lg bg-white"
       >
-        {useNewSystem ? (
-          // New question-driven artwork generation
-          <>
-            <defs>
-              <radialGradient id={`gradient-${artworkData.seed.hash.substring(0, 6)}`} cx="50%" cy="50%" r="50%">
-                {artworkData.palette.gradientStops.map((color, index) => (
-                  <stop 
-                    key={index} 
-                    offset={`${(index / (artworkData.palette.gradientStops.length - 1)) * 100}%`} 
-                    stopColor={color} 
-                  />
-                ))}
-              </radialGradient>
-            </defs>
-            
-            {/* Render layered composition */}
-            <g className="background-layer">
-              {artworkData.composition.background.map(renderSVGElement)}
-            </g>
-            
-            <g className="structural-layer">
-              {artworkData.composition.structural.map(renderSVGElement)}
-            </g>
-            
-            <g className="detail-layer">
-              {artworkData.composition.detail.map(renderSVGElement)}
-            </g>
-            
-            <g className="overlay-layer">
-              {artworkData.composition.overlay.map(renderSVGElement)}
-            </g>
-          </>
-        ) : (
-          // Fallback to original theme-based system
-          <>
-            <defs>
-              <radialGradient id={`gradient-${theme || 'general'}`} cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor={config!.colors[0]} />
-                <stop offset="50%" stopColor={config!.colors[1]} />
-                <stop offset="100%" stopColor={config!.colors[2]} />
-              </radialGradient>
-            </defs>
-            
-            <rect width={size} height={size} fill={`url(#gradient-${theme || 'general'})`} rx={size * 0.1} />
-            
-            {/* Theme-specific artwork */}
-            {theme === 'bone' && (
-              <g>
-                <ellipse cx={size/2} cy={size*0.25} rx={size*0.075} ry={size*0.125} fill="#f8f8f8" />
-                <rect x={size*0.425} y={size*0.25} width={size*0.15} height={size*0.5} fill="#f0f0f0" />
-                <ellipse cx={size/2} cy={size*0.75} rx={size*0.075} ry={size*0.125} fill="#f8f8f8" />
-                <circle cx={size/2} cy={size/2} r={size*0.04} fill="#e0e0e0" />
-              </g>
-            )}
-            
-            {theme === 'muscle' && (
-              <g>
-                <path d={`M${size*0.25} ${size*0.25} Q${size/2} ${size*0.4} ${size*0.75} ${size*0.25} Q${size/2} ${size*0.6} ${size*0.25} ${size*0.75} Q${size/2} ${size*0.6} ${size*0.75} ${size*0.75}`} 
-                      fill="none" stroke="#d32f2f" strokeWidth={size*0.03} />
-                <path d={`M${size*0.3} ${size*0.3} Q${size/2} ${size*0.45} ${size*0.7} ${size*0.3} Q${size/2} ${size*0.65} ${size*0.3} ${size*0.8}`} 
-                      fill="none" stroke="#f44336" strokeWidth={size*0.02} />
-                <path d={`M${size*0.35} ${size*0.35} Q${size/2} ${size/2} ${size*0.65} ${size*0.35} Q${size/2} ${size*0.7} ${size*0.35} ${size*0.85}`} 
-                      fill="none" stroke="#ff6b6b" strokeWidth={size*0.015} />
-              </g>
-            )}
-            
-            {theme === 'joint' && (
-              <g>
-                <circle cx={size/2} cy={size/2} r={size*0.2} fill="none" stroke="#1976d2" strokeWidth={size*0.02} />
-                <circle cx={size/2} cy={size/2} r={size*0.125} fill="#bbdefb" opacity="0.7" />
-                <path d={`M${size*0.35} ${size/2} Q${size/2} ${size*0.35} ${size*0.65} ${size/2} Q${size/2} ${size*0.65} ${size*0.35} ${size/2}`} fill="#2196f3" opacity="0.8" />
-                <circle cx={size/2} cy={size/2} r={size*0.04} fill="#0d47a1" />
-              </g>
-            )}
-            
-            {(theme === 'general' || !theme) && (
-              <g>
-                <rect x={size*0.425} y={size*0.3} width={size*0.15} height={size*0.4} fill="#2c3e50" rx={size*0.025} />
-                <rect x={size*0.3} y={size*0.425} width={size*0.4} height={size*0.15} fill="#2c3e50" rx={size*0.025} />
-                <circle cx={size/2} cy={size/2} r={size*0.175} fill="none" stroke="#3498db" strokeWidth={size*0.015} />
-                <circle cx={size/2} cy={size/2} r={size*0.25} fill="none" stroke="#3498db" strokeWidth={size*0.01} opacity="0.5" />
-              </g>
-            )}
-            
-            {/* Medical pulse line */}
-            <path 
-              d={`M${size*0.1} ${size*0.9} Q${size*0.2} ${size*0.85} ${size*0.25} ${size*0.9} T${size*0.4} ${size*0.9} Q${size*0.45} ${size*0.8} ${size/2} ${size*0.9} T${size*0.65} ${size*0.9} Q${size*0.75} ${size*0.85} ${size*0.9} ${size*0.9}`}
-              fill="none" 
-              stroke={config!.colors[1]} 
-              strokeWidth={size*0.01} 
-              opacity="0.6"
-            />
-          </>
+        <defs>
+          <linearGradient id="medical-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f8fafc" />
+            <stop offset="100%" stopColor="#e2e8f0" />
+          </linearGradient>
+          <linearGradient id="pain-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#fef2f2" />
+            <stop offset="100%" stopColor="#fee2e2" />
+          </linearGradient>
+        </defs>
+        
+        {/* Background */}
+        <rect width={size} height={size} fill="url(#medical-gradient)" />
+        
+        {/* Medical Visual Content */}
+        {medicalType === 'knee' && (
+          <g>
+            {/* Femur */}
+            <rect x={size*0.45} y={size*0.1} width={size*0.1} height={size*0.35} fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" rx={size*0.05} />
+            {/* Tibia */}
+            <rect x={size*0.45} y={size*0.55} width={size*0.1} height={size*0.35} fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" rx={size*0.05} />
+            {/* Patella (kneecap) */}
+            <circle cx={size*0.5} cy={size*0.45} r={size*0.08} fill="#cbd5e1" stroke="#64748b" strokeWidth="2" />
+            {/* Joint space */}
+            <ellipse cx={size*0.5} cy={size*0.45} rx={size*0.12} ry={size*0.06} fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="4,2" />
+            {/* Labels */}
+            <text x={size*0.65} y={size*0.25} fontSize={size*0.06} fill="#475569" fontFamily="Arial">Femur</text>
+            <text x={size*0.65} y={size*0.45} fontSize={size*0.06} fill="#475569" fontFamily="Arial">Patella</text>
+            <text x={size*0.65} y={size*0.65} fontSize={size*0.06} fill="#475569" fontFamily="Arial">Tibia</text>
+          </g>
         )}
+        
+        {medicalType === 'shoulder' && (
+          <g>
+            {/* Humerus */}
+            <rect x={size*0.4} y={size*0.45} width={size*0.35} height={size*0.08} fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" rx={size*0.04} />
+            {/* Scapula */}
+            <path d={`M${size*0.25} ${size*0.35} Q${size*0.4} ${size*0.25} ${size*0.45} ${size*0.45} L${size*0.25} ${size*0.55} Z`} fill="#cbd5e1" stroke="#64748b" strokeWidth="2" />
+            {/* Shoulder joint */}
+            <circle cx={size*0.42} cy={size*0.49} r={size*0.06} fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="3,2" />
+            {/* Rotator cuff indicator */}
+            <path d={`M${size*0.35} ${size*0.42} Q${size*0.42} ${size*0.38} ${size*0.49} ${size*0.42}`} fill="none" stroke="#ef4444" strokeWidth="2" />
+            {/* Labels */}
+            <text x={size*0.55} y={size*0.35} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Scapula</text>
+            <text x={size*0.55} y={size*0.55} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Humerus</text>
+          </g>
+        )}
+        
+        {medicalType === 'spine' && (
+          <g>
+            {/* Vertebrae */}
+            {[0.2, 0.3, 0.4, 0.5, 0.6, 0.7].map((y, index) => (
+              <ellipse key={index} cx={size*0.5} cy={size*y} rx={size*0.08} ry={size*0.04} fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5" />
+            ))}
+            {/* Spinal curve */}
+            <path d={`M${size*0.5} ${size*0.15} Q${size*0.45} ${size*0.35} ${size*0.5} ${size*0.55} Q${size*0.55} ${size*0.75} ${size*0.5} ${size*0.85}`} 
+                  fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="3,2" />
+            {/* Disc spaces */}
+            {[0.25, 0.35, 0.45, 0.55, 0.65].map((y, index) => (
+              <ellipse key={index} cx={size*0.5} cy={size*y} rx={size*0.06} ry={size*0.015} fill="#fbbf24" />
+            ))}
+            {/* Labels */}
+            <text x={size*0.65} y={size*0.3} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Cervical</text>
+            <text x={size*0.65} y={size*0.5} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Thoracic</text>
+            <text x={size*0.65} y={size*0.7} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Lumbar</text>
+          </g>
+        )}
+        
+        {medicalType === 'bone' && (
+          <g>
+            {/* Long bone structure */}
+            <rect x={size*0.4} y={size*0.15} width={size*0.2} height={size*0.7} fill="#f1f5f9" stroke="#64748b" strokeWidth="2" rx={size*0.1} />
+            {/* Bone marrow cavity */}
+            <rect x={size*0.42} y={size*0.2} width={size*0.16} height={size*0.6} fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" rx={size*0.08} />
+            {/* Fracture line */}
+            <path d={`M${size*0.35} ${size*0.5} L${size*0.65} ${size*0.52}`} stroke="#dc2626" strokeWidth="3" />
+            <path d={`M${size*0.37} ${size*0.48} L${size*0.63} ${size*0.54}`} stroke="#dc2626" strokeWidth="2" />
+            {/* Bone ends */}
+            <ellipse cx={size*0.5} cy={size*0.15} rx={size*0.12} ry={size*0.06} fill="#e2e8f0" stroke="#64748b" strokeWidth="2" />
+            <ellipse cx={size*0.5} cy={size*0.85} rx={size*0.12} ry={size*0.06} fill="#e2e8f0" stroke="#64748b" strokeWidth="2" />
+            {/* Labels */}
+            <text x={size*0.65} y={size*0.3} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Cortical</text>
+            <text x={size*0.65} y={size*0.45} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Bone</text>
+            <text x={size*0.65} y={size*0.65} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Marrow</text>
+          </g>
+        )}
+        
+        {medicalType === 'muscle' && (
+          <g>
+            {/* Muscle fibers */}
+            {[0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65].map((x, index) => (
+              <path key={index} 
+                    d={`M${size*x} ${size*0.2} Q${size*(x+0.02)} ${size*0.5} ${size*x} ${size*0.8}`} 
+                    fill="none" stroke="#dc2626" strokeWidth="3" />
+            ))}
+            {/* Muscle outline */}
+            <ellipse cx={size*0.5} cy={size*0.5} rx={size*0.2} ry={size*0.3} fill="none" stroke="#991b1b" strokeWidth="2" />
+            {/* Strain/tear indicator */}
+            <path d={`M${size*0.4} ${size*0.45} L${size*0.6} ${size*0.55}`} stroke="#fbbf24" strokeWidth="3" strokeDasharray="5,3" />
+            {/* Labels */}
+            <text x={size*0.65} y={size*0.35} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Muscle</text>
+            <text x={size*0.65} y={size*0.5} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Fibers</text>
+            <text x={size*0.65} y={size*0.65} fontSize={size*0.05} fill="#475569" fontFamily="Arial">Strain</text>
+          </g>
+        )}
+        
+        {medicalType === 'general' && (
+          <g>
+            {/* Medical cross */}
+            <rect x={size*0.45} y={size*0.25} width={size*0.1} height={size*0.5} fill="#3b82f6" />
+            <rect x={size*0.25} y={size*0.45} width={size*0.5} height={size*0.1} fill="#3b82f6" />
+            {/* Stethoscope-like curve */}
+            <path d={`M${size*0.2} ${size*0.75} Q${size*0.35} ${size*0.65} ${size*0.5} ${size*0.75} Q${size*0.65} ${size*0.85} ${size*0.8} ${size*0.75}`} 
+                  fill="none" stroke="#10b981" strokeWidth="3" />
+            <circle cx={size*0.2} cy={size*0.75} r={size*0.04} fill="#10b981" />
+            <circle cx={size*0.8} cy={size*0.75} r={size*0.04} fill="#10b981" />
+            {/* Labels */}
+            <text x={size*0.15} y={size*0.95} fontSize={size*0.06} fill="#475569" fontFamily="Arial" textAnchor="middle">OrthoIQ</text>
+          </g>
+        )}
+        
+        {/* Pain indicator for all types if pain-related */}
+        {question && (question.toLowerCase().includes('pain') || question.toLowerCase().includes('hurt')) && (
+          <g>
+            <circle cx={size*0.85} cy={size*0.15} r={size*0.08} fill="#fef2f2" stroke="#dc2626" strokeWidth="2" />
+            <text x={size*0.85} y={size*0.18} fontSize={size*0.04} fill="#dc2626" fontFamily="Arial" textAnchor="middle" fontWeight="bold">!</text>
+          </g>
+        )}
+        
+        {/* Medical disclaimer icon */}
+        <circle cx={size*0.15} cy={size*0.15} r={size*0.08} fill="#f8fafc" stroke="#64748b" strokeWidth="1" />
+        <text x={size*0.15} y={size*0.18} fontSize={size*0.05} fill="#64748b" fontFamily="Arial" textAnchor="middle" fontWeight="bold">i</text>
       </svg>
     </div>
   );
