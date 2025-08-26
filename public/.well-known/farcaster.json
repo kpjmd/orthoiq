@@ -24,5 +24,8 @@
       "doctor"
     ],
     "primaryCategory": "health-fitness"
+  },
+  "baseBuilder": {
+    "allowedAddresses": ["0x7131943E64C1FdF333b72D71eE20B284DC6468fb"]
   }
 }
