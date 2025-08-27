@@ -73,8 +73,8 @@ export default function WebHomePage() {
             🩺 Professional Medical Visuals
           </h3>
           <p className="text-gray-600">
-            Every response includes anatomical diagrams, body maps, and recovery timelines 
-            instead of abstract art - providing practical, educational value.
+            Every response includes anatomical diagrams, body maps, and recovery timelines - 
+            providing practical, educational value.
           </p>
         </div>
         <div className="bg-white rounded-lg p-6 shadow-lg">

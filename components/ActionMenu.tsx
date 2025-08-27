@@ -39,9 +39,11 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
       
+      const shareText = `Just asked OrthoIQ: "${question.substring(0, 80)}${question.length > 80 ? '...' : ''}" 🦴 Get AI-powered orthopedic insights reviewed by a board-certified surgeon!`;
+      
       const webShareData = {
         title: 'OrthoIQ Medical Insight',
-        text: `"${question.substring(0, 50)}${question.length > 50 ? '...' : ''}" - Get your orthopedic questions answered by AI with MD review at OrthoIQ`,
+        text: shareText,
         url: shareUrl
       };
 
@@ -54,21 +56,21 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
           console.warn('Web Share API failed, falling back to clipboard:', shareError);
           // If Web Share fails, fallback to clipboard
           if (navigator.clipboard) {
-            await navigator.clipboard.writeText(shareUrl);
-            setShareText('Link Copied!');
+            await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+            setShareText('Copied to Clipboard!');
           } else {
             throw new Error('Neither Web Share API nor Clipboard API is available');
           }
         }
       } else {
-        // Fallback: copy to clipboard
+        // Fallback: copy to clipboard with text
         if (navigator.clipboard) {
-          await navigator.clipboard.writeText(shareUrl);
-          setShareText('Link Copied!');
+          await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+          setShareText('Copied to Clipboard!');
         } else {
           // Final fallback: show the share URL to copy manually
-          alert(`Please copy this link to share:\n\n${shareUrl}`);
-          setShareText('Link Ready!');
+          alert(`Please copy this to share:\n\n${shareText}\n\n${shareUrl}`);
+          setShareText('Ready to Share!');
         }
       }
 
@@ -80,22 +82,6 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
     }
   };
 
-  const handleInstagramShare = async () => {
-    try {
-      // Create Instagram story-friendly content
-      const instagramText = `Got this MD-reviewed orthopedic tip: "${question.substring(0, 80)}${question.length > 80 ? '...' : ''}" 🦴 Ask your questions at OrthoIQ`;
-      
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(instagramText);
-        alert('Instagram caption copied! 📋\n\nPaste this into your Instagram Story and add a screenshot of this response.');
-      } else {
-        alert(`Copy this for Instagram:\n\n${instagramText}`);
-      }
-    } catch (error) {
-      console.error('Instagram share failed:', error);
-      alert('Failed to prepare Instagram content');
-    }
-  };
 
   const handleRate = (rating: number) => {
     onRate(rating);
@@ -136,21 +122,13 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
       {/* Enhanced Sharing Options */}
       <div className="border-t pt-4">
         <h5 className="text-sm font-medium text-gray-700 mb-3">Share this medical insight:</h5>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="mb-3">
           <button
             onClick={handleShare}
-            className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
             <span className="mr-2">📤</span>
             {shareText}
-          </button>
-
-          <button
-            onClick={handleInstagramShare}
-            className="flex items-center justify-center px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all text-sm"
-          >
-            <span className="mr-2">📸</span>
-            Instagram Story
           </button>
         </div>
 

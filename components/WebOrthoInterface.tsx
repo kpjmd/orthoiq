@@ -280,7 +280,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             Get the OrthoIQ miniapp on Farcaster or Base for more features!
           </p>
           <button
-            onClick={() => window.open('https://warpcast.com/orthoiq', '_blank')}
+            onClick={() => window.open('https://farcaster.xyz/miniapps/12zkRyhWt8Az/orthoiq---ai-orthopedic-expert', '_blank')}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             <span className="mr-2">🔗</span>

@@ -50,40 +50,12 @@ export default function ArtworkModal({ isOpen, onClose, question, response }: Ar
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
 
-      // Try to use Web Share API if available and supported
-      if (navigator.share && navigator.canShare && navigator.canShare({
-        title: 'OrthoIQ Medical Artwork',
-        text: shareData.farcasterData.text,
-        url: shareUrl
-      })) {
-        try {
-          await navigator.share({
-            title: 'OrthoIQ Medical Artwork',
-            text: shareData.farcasterData.text,
-            url: shareUrl
-          });
-          setShareStatus('success');
-        } catch (shareError) {
-          console.warn('Web Share API failed, falling back to clipboard:', shareError);
-          // If Web Share fails, fallback to clipboard
-          if (navigator.clipboard) {
-            await navigator.clipboard.writeText(`${shareData.farcasterData.text}\n\n${shareUrl}`);
-            setShareStatus('success');
-          } else {
-            throw new Error('Neither Web Share API nor Clipboard API is available');
-          }
-        }
-      } else {
-        // Fallback: copy to clipboard
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(`${shareData.farcasterData.text}\n\n${shareUrl}`);
-          setShareStatus('success');
-        } else {
-          // Final fallback: show the share URL to copy manually
-          alert(`Please copy this link to share:\n\n${shareUrl}`);
-          setShareStatus('success');
-        }
-      }
+      // Open Farcaster compose window with the share content
+      const farcasterText = encodeURIComponent(`${shareData.farcasterData.text}\n\n${shareUrl}`);
+      const farcasterComposeUrl = `https://warpcast.com/compose?text=${farcasterText}`;
+      
+      window.open(farcasterComposeUrl, '_blank');
+      setShareStatus('success');
     } catch (error) {
       console.error('Share failed:', error);
       setShareStatus('error');
