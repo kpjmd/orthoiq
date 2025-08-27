@@ -14,6 +14,7 @@ interface WebAuthContextType {
   isAuthenticated: boolean;
   signInWithEmail: (email: string) => Promise<void>;
   signInAsGuest: () => void;
+  upgradeToEmail: (email: string) => Promise<void>;
   signOut: () => void;
   isLoading: boolean;
 }
@@ -84,6 +85,37 @@ export function WebAuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('orthoiq_web_user', JSON.stringify(guestUser));
   };
 
+  const upgradeToEmail = async (email: string) => {
+    if (!user || user.authType !== 'guest') {
+      throw new Error('Can only upgrade guest accounts');
+    }
+
+    setIsLoading(true);
+    try {
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      // Upgrade existing user to email
+      const upgradedUser: WebUser = {
+        ...user,
+        email,
+        name: email.split('@')[0],
+        authType: 'email'
+      };
+
+      setUser(upgradedUser);
+      localStorage.setItem('orthoiq_web_user', JSON.stringify(upgradedUser));
+    } catch (error) {
+      console.error('Email upgrade failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signOut = () => {
     setUser(null);
     localStorage.removeItem('orthoiq_web_user');
@@ -94,6 +126,7 @@ export function WebAuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     signInWithEmail,
     signInAsGuest,
+    upgradeToEmail,
     signOut,
     isLoading,
   };

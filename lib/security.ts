@@ -101,8 +101,13 @@ export function validateRateLimitRequest(fid: string): SecurityCheck {
     return { isValid: false, reason: 'FID is required' };
   }
   
-  // Validate FID format (should be numeric for Farcaster)
-  if (!/^\d+$/.test(fid)) {
+  // Validate FID format (numeric for Farcaster, or web user prefixes)
+  const isNumeric = /^\d+$/.test(fid);
+  const isWebUser = /^(guest_|email_|web-)\d+$/.test(fid);
+  const isDemoUser = fid === 'demo-user';
+  const isWebGuest = fid === 'web-guest';
+  
+  if (!isNumeric && !isWebUser && !isDemoUser && !isWebGuest) {
     return {
       isValid: false,
       reason: 'Invalid user identifier format.',

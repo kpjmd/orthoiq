@@ -1,5 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Helper function to wrap text in SVG
+function generateWrappedText(text: string, x: number, y: number, maxWidth: number, fontSize: number, color: string, maxLines: number = 3): string {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  // Approximate character width (varies by font, but this is a reasonable estimate)
+  const charWidth = fontSize * 0.6;
+  const maxCharsPerLine = Math.floor(maxWidth / charWidth);
+  
+  for (const word of words) {
+    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+    if (testLine.length <= maxCharsPerLine) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        // Word is too long, truncate it
+        lines.push(word.substring(0, maxCharsPerLine - 3) + '...');
+      }
+    }
+    
+    if (lines.length >= maxLines - 1) {
+      if (currentLine) {
+        // Add ellipsis to last line if there's more text
+        const remainingWords = words.slice(words.indexOf(word));
+        if (remainingWords.length > 1 || (remainingWords.length === 1 && remainingWords[0] !== word)) {
+          currentLine += '...';
+        }
+        lines.push(currentLine);
+      }
+      break;
+    }
+  }
+  
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine);
+  }
+  
+  return lines.map((line, index) => 
+    `<text x="${x}" y="${y + (index * (fontSize + 4))}" fill="${color}" font-size="${fontSize}" font-family="system-ui, sans-serif" opacity="0.95">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>`
+  ).join('\n        ');
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -53,19 +99,23 @@ export async function GET(request: NextRequest) {
         <text x="250" y="130" fill="white" font-size="56" font-weight="bold" font-family="system-ui, sans-serif">OrthoIQ</text>
         <text x="250" y="180" fill="white" opacity="0.9" font-size="28" font-family="system-ui, sans-serif">${art ? 'AI Medical Artwork' : 'AI Orthopedic Expert'}</text>
         
+        ${art ? `
+        <!-- Medical Visual Indicator for Artwork -->
+        <rect x="950" y="250" width="160" height="160" rx="20" fill="white" opacity="0.2" />
+        <circle cx="1030" cy="300" r="15" fill="white" opacity="0.8" />
+        <rect x="1015" y="320" width="30" height="60" fill="white" opacity="0.6" rx="15" />
+        <text x="1030" y="405" text-anchor="middle" fill="white" font-size="14" font-weight="600" font-family="system-ui, sans-serif">Medical Visual</text>
+        ` : ''}
+        
         <!-- Question Section -->
-        <rect x="80" y="250" width="1040" height="160" rx="20" fill="white" opacity="0.15" />
+        <rect x="80" y="250" width="${art ? '840' : '1040'}" height="160" rx="20" fill="white" opacity="0.15" />
         <text x="120" y="290" fill="white" font-size="24" font-weight="600" font-family="system-ui, sans-serif">Question:</text>
-        <text x="120" y="330" fill="white" font-size="20" font-family="system-ui, sans-serif" opacity="0.95">
-          ${(question.length > 100 ? question.substring(0, 100) + '...' : question).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-        </text>
+        ${generateWrappedText(question, 120, 330, art ? 720 : 920, 20, 'white', 2)}
         
         <!-- Response Section -->
         <rect x="80" y="440" width="1040" height="200" rx="20" fill="white" opacity="0.15" />
         <text x="120" y="480" fill="white" font-size="24" font-weight="600" font-family="system-ui, sans-serif">AI Response:</text>
-        <text x="120" y="520" fill="white" font-size="18" font-family="system-ui, sans-serif" opacity="0.95">
-          ${(response.length > 150 ? response.substring(0, 150) + '...' : response).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-        </text>
+        ${generateWrappedText(response, 120, 520, 920, 18, 'white', 3)}
         
         <!-- Confidence Badge -->
         <rect x="120" y="670" width="200" height="40" rx="20" fill="white" opacity="0.2" />

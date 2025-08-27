@@ -26,7 +26,7 @@ interface ResponseData {
 }
 
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
-  const { user, isAuthenticated } = useWebAuth();
+  const { user, isAuthenticated, signOut, upgradeToEmail, isLoading: authLoading } = useWebAuth();
   const [question, setQuestion] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [responseData, setResponseData] = useState<ResponseData | null>(null);
@@ -34,6 +34,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const [error, setError] = useState('');
   const [showArtworkModal, setShowArtworkModal] = useState(false);
   const [dailyQuestions, setDailyQuestions] = useState({ used: 0, limit: 3 });
+  const [showUpgradeForm, setShowUpgradeForm] = useState(false);
+  const [upgradeEmail, setUpgradeEmail] = useState('');
+  const [upgradeError, setUpgradeError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +133,20 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     }
   };
 
+  const handleUpgradeToEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!upgradeEmail.trim()) return;
+
+    try {
+      setUpgradeError('');
+      await upgradeToEmail(upgradeEmail);
+      setShowUpgradeForm(false);
+      setUpgradeEmail('');
+    } catch (err) {
+      setUpgradeError(err instanceof Error ? err.message : 'Upgrade failed');
+    }
+  };
+
   const getRemainingQuestions = () => {
     return Math.max(0, dailyQuestions.limit - dailyQuestions.used);
   };
@@ -148,8 +165,24 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               <p className="text-xs opacity-60">
                 Welcome, {user.name}! Questions remaining today: {getRemainingQuestions()} of {dailyQuestions.limit}
               </p>
-              <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50 mt-1">
-                {user.authType === 'email' ? '✉️ Email User' : '👤 Guest User'}
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
+                  {user.authType === 'email' ? '✉️ Email User' : '👤 Guest User'}
+                </div>
+                {user.authType === 'guest' && (
+                  <button
+                    onClick={() => setShowUpgradeForm(true)}
+                    className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-full transition-colors"
+                  >
+                    Add Email
+                  </button>
+                )}
+                <button
+                  onClick={signOut}
+                  className="text-xs bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded-full transition-colors"
+                >
+                  Sign Out
+                </button>
               </div>
             </div>
           )}
@@ -254,6 +287,64 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             Open in Farcaster
           </button>
         </div>
+
+        {/* Upgrade Form Modal */}
+        {showUpgradeForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold mb-4">Add Email to Your Account</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Adding an email helps us remember your preferences and question history.
+              </p>
+              
+              <form onSubmit={handleUpgradeToEmail}>
+                <div className="mb-4">
+                  <label htmlFor="upgrade-email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    id="upgrade-email"
+                    value={upgradeEmail}
+                    onChange={(e) => setUpgradeEmail(e.target.value)}
+                    placeholder="your.email@example.com"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={authLoading}
+                    required
+                  />
+                </div>
+
+                {upgradeError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-800 text-sm">{upgradeError}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUpgradeForm(false);
+                      setUpgradeEmail('');
+                      setUpgradeError('');
+                    }}
+                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                    disabled={authLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={authLoading || !upgradeEmail.trim()}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {authLoading ? 'Adding...' : 'Add Email'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Disclaimer */}
         <div className="text-center text-xs text-gray-500 mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
