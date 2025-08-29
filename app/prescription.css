@@ -1,0 +1,228 @@
+/* Prescription Component Styles */
+
+.prescription-container {
+  position: relative;
+  overflow: visible;
+}
+
+/* Rare prescription effects */
+.prescription-rare {
+  position: relative;
+  overflow: hidden;
+}
+
+.prescription-rare::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent 30%, rgba(245, 158, 11, 0.1) 50%, transparent 70%);
+  animation: shimmer 3s infinite;
+  z-index: 1;
+}
+
+.prescription-ultra-rare {
+  position: relative;
+  overflow: hidden;
+}
+
+.prescription-ultra-rare::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(139, 92, 246, 0.1) 0%,
+    rgba(236, 72, 153, 0.1) 25%,
+    rgba(59, 130, 246, 0.1) 50%,
+    rgba(16, 185, 129, 0.1) 75%,
+    rgba(139, 92, 246, 0.1) 100%
+  );
+  animation: holographic 4s infinite;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.prescription-ultra-rare > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+@keyframes holographic {
+  0%, 100% {
+    background: linear-gradient(
+      45deg,
+      rgba(139, 92, 246, 0.1) 0%,
+      rgba(236, 72, 153, 0.1) 25%,
+      rgba(59, 130, 246, 0.1) 50%,
+      rgba(16, 185, 129, 0.1) 75%,
+      rgba(139, 92, 246, 0.1) 100%
+    );
+  }
+  25% {
+    background: linear-gradient(
+      45deg,
+      rgba(236, 72, 153, 0.1) 0%,
+      rgba(59, 130, 246, 0.1) 25%,
+      rgba(16, 185, 129, 0.1) 50%,
+      rgba(139, 92, 246, 0.1) 75%,
+      rgba(236, 72, 153, 0.1) 100%
+    );
+  }
+  50% {
+    background: linear-gradient(
+      45deg,
+      rgba(59, 130, 246, 0.1) 0%,
+      rgba(16, 185, 129, 0.1) 25%,
+      rgba(139, 92, 246, 0.1) 50%,
+      rgba(236, 72, 153, 0.1) 75%,
+      rgba(59, 130, 246, 0.1) 100%
+    );
+  }
+  75% {
+    background: linear-gradient(
+      45deg,
+      rgba(16, 185, 129, 0.1) 0%,
+      rgba(139, 92, 246, 0.1) 25%,
+      rgba(236, 72, 153, 0.1) 50%,
+      rgba(59, 130, 246, 0.1) 75%,
+      rgba(16, 185, 129, 0.1) 100%
+    );
+  }
+}
+
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Rarity badge animations */
+.rarity-common {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+}
+
+.rarity-uncommon {
+  background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+  color: #0d9488;
+}
+
+.rarity-rare {
+  background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+  color: #d97706;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.rarity-ultra-rare {
+  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+  color: #7c3aed;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  animation: pulse 2s infinite;
+}
+
+/* Export button hover effects */
+.export-button {
+  transition: all 0.3s ease;
+}
+
+.export-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Share dropdown */
+.share-dropdown {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.share-dropdown.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Prescription loading animation */
+.prescription-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .prescription-container {
+    padding: 0.5rem;
+  }
+  
+  .prescription-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  .export-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .export-buttons button {
+    width: 100%;
+  }
+}
+
+/* Print styles for prescription */
+@media print {
+  .prescription-container {
+    break-inside: avoid;
+  }
+  
+  .export-buttons,
+  .prescription-header {
+    display: none !important;
+  }
+  
+  .prescription-container svg {
+    width: 100% !important;
+    height: auto !important;
+  }
+}

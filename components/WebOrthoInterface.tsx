@@ -250,6 +250,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               hasCorrections={responseData.hasCorrections}
               additionsText={responseData.additionsText}
               correctionsText={responseData.correctionsText}
+              question={currentQuestion}
+              fid={user?.id || 'web-guest'}
+              caseId={`web-${Date.now()}`}
             />
             
             {/* Action Menu */}

@@ -5,6 +5,9 @@
 /* Farcaster Auth Kit styles */
 @import "@farcaster/auth-kit/styles.css";
 
+/* Import prescription styles */
+@import './prescription.css';
+
 @layer base {
   body {
     font-family: 'Inter', system-ui, sans-serif;

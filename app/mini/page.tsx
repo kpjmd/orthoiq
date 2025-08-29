@@ -473,6 +473,9 @@ function MiniAppContent() {
               hasCorrections={responseData.hasCorrections}
               additionsText={responseData.additionsText}
               correctionsText={responseData.correctionsText}
+              question={currentQuestion}
+              fid={context?.user?.fid.toString() || authUser?.fid.toString() || 'guest'}
+              caseId={`mini-${Date.now()}`}
             />
             
             {/* Action Menu */}

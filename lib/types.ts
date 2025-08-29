@@ -31,3 +31,44 @@ export interface ArtworkConfig {
   colors: string[];
   elements: string[];
 }
+
+export interface PrescriptionData {
+  userQuestion: string;
+  claudeResponse: string;
+  confidence: number;
+  fid: string;
+  caseId: string;
+  timestamp: string;
+}
+
+export interface PrescriptionMetadata {
+  id: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
+  theme: PrescriptionTheme;
+  generatedAt: string;
+  verificationHash: string;
+  patientId: string;
+  prescriberId: string;
+}
+
+export interface PrescriptionTheme {
+  primaryColor: string;
+  accentColor: string;
+  borderStyle: string;
+  effects: string[];
+  logoVariant: 'blue' | 'teal' | 'monochrome' | 'gold';
+}
+
+export interface ParsedResponse {
+  chiefComplaint: string;
+  assessment: string[];
+  recommendations: string[];
+  disclaimers: string[];
+}
+
+export interface RarityConfig {
+  name: 'common' | 'uncommon' | 'rare' | 'ultra-rare';
+  probability: number;
+  theme: PrescriptionTheme;
+  minConfidence?: number;
+}
