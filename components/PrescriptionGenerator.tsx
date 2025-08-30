@@ -40,8 +40,11 @@ export default function PrescriptionGenerator({
   }, [onGenerated, prescriptionMetadata]);
 
   const parsedResponse = useMemo(() => {
-    return parseClaudeResponse(data.claudeResponse);
-  }, [data.claudeResponse]);
+    return parseClaudeResponse(data.claudeResponse, { 
+      inquiry: data.inquiry, 
+      keyPoints: data.keyPoints 
+    });
+  }, [data.claudeResponse, data.inquiry, data.keyPoints]);
 
   const theme = prescriptionMetadata.theme;
   const formatDate = (timestamp: string) => {

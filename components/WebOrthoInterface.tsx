@@ -22,6 +22,8 @@ interface ResponseData {
   hasCorrections?: boolean;
   additionsText?: string;
   correctionsText?: string;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
@@ -91,7 +93,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         hasAdditions: data.hasAdditions,
         hasCorrections: data.hasCorrections,
         additionsText: data.additionsText,
-        correctionsText: data.correctionsText
+        correctionsText: data.correctionsText,
+        inquiry: data.inquiry,
+        keyPoints: data.keyPoints
       });
       
       setQuestion('');
@@ -252,6 +256,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               question={currentQuestion}
               fid={user?.id || 'web-guest'}
               caseId={`web-${Date.now()}`}
+              inquiry={responseData.inquiry}
+              keyPoints={responseData.keyPoints}
             />
             
             {/* Action Menu */}
@@ -274,6 +280,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           question={currentQuestion}
           response={responseData?.response || ''}
           fid={user?.id || 'web-guest'}
+          inquiry={responseData?.inquiry}
+          keyPoints={responseData?.keyPoints}
         />
 
         {/* Call to Action */}

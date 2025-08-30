@@ -53,7 +53,40 @@ export const RARITY_CONFIGS: RarityConfig[] = [
   }
 ];
 
-export function parseClaudeResponse(response: string): ParsedResponse {
+export function parseClaudeResponse(response: string, claudeResponse?: { inquiry?: string; keyPoints?: string[] }): ParsedResponse {
+  // Try to parse as JSON first (new structured format)
+  let parsedJSON: any = null;
+  try {
+    parsedJSON = JSON.parse(response);
+  } catch {
+    // Not JSON, continue with text parsing
+  }
+
+  // If we have structured data from Claude, use it
+  if (claudeResponse?.inquiry && claudeResponse?.keyPoints) {
+    return {
+      chiefComplaint: claudeResponse.inquiry,
+      assessment: claudeResponse.keyPoints.slice(0, 2) || ['AI-generated assessment points available'],
+      recommendations: claudeResponse.keyPoints.slice(2, 4) || ['AI-generated recommendations available'],
+      disclaimers: ['This is AI-generated information. Consult a healthcare provider.'],
+      inquiry: claudeResponse.inquiry,
+      keyPoints: claudeResponse.keyPoints
+    };
+  }
+
+  // If we have JSON with new fields, use them
+  if (parsedJSON?.inquiry && parsedJSON?.keyPoints) {
+    return {
+      chiefComplaint: parsedJSON.inquiry,
+      assessment: parsedJSON.keyPoints.slice(0, 2) || ['AI-generated assessment points available'],
+      recommendations: parsedJSON.keyPoints.slice(2, 4) || ['AI-generated recommendations available'],
+      disclaimers: ['This is AI-generated information. Consult a healthcare provider.'],
+      inquiry: parsedJSON.inquiry,
+      keyPoints: parsedJSON.keyPoints
+    };
+  }
+
+  // Fallback to legacy text parsing
   const lines = response.split('\n').filter(line => line.trim());
   
   let chiefInquiry = '';
@@ -111,9 +144,9 @@ export function parseClaudeResponse(response: string): ParsedResponse {
   }
   
   return {
-    chiefComplaint: chiefInquiry || 'Orthopedic consultation',
-    assessment: assessment.length ? assessment : ['Comprehensive orthopedic evaluation completed'],
-    recommendations: recommendations.length ? recommendations : ['Follow standard orthopedic care protocols'],
+    chiefComplaint: chiefInquiry || 'Medical consultation inquiry',
+    assessment: assessment.length ? assessment : ['Medical assessment available'],
+    recommendations: recommendations.length ? recommendations : ['Treatment recommendations available'],
     disclaimers: disclaimers.length ? disclaimers : ['This is AI-generated information. Consult a healthcare provider.']
   };
 }

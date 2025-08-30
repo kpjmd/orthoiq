@@ -20,6 +20,8 @@ interface ResponseCardProps {
   question?: string;
   fid?: string;
   caseId?: string;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
 export default function ResponseCard({ 
@@ -36,7 +38,9 @@ export default function ResponseCard({
   correctionsText,
   question,
   fid,
-  caseId
+  caseId,
+  inquiry,
+  keyPoints
 }: ResponseCardProps) {
   const [showConfidence, setShowConfidence] = useState(false);
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
@@ -161,7 +165,9 @@ export default function ResponseCard({
       confidence: confidence || 0.8,
       fid: fid,
       caseId: caseId || 'demo-case',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      inquiry: inquiry,
+      keyPoints: keyPoints
     };
 
     try {

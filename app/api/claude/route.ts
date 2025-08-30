@@ -205,7 +205,9 @@ export async function POST(request: NextRequest) {
       hasAdditions: reviewStatus.hasAdditions,
       hasCorrections: reviewStatus.hasCorrections,
       additionsText: reviewStatus.additionsText,
-      correctionsText: reviewStatus.correctionsText
+      correctionsText: reviewStatus.correctionsText,
+      inquiry: claudeResponse.inquiry,
+      keyPoints: claudeResponse.keyPoints
     });
 
   } catch (error) {

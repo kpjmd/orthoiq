@@ -11,9 +11,11 @@ interface PrescriptionModalProps {
   question: string;
   response: string;
   fid: string;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
-export default function PrescriptionModal({ isOpen, onClose, question, response, fid }: PrescriptionModalProps) {
+export default function PrescriptionModal({ isOpen, onClose, question, response, fid, inquiry, keyPoints }: PrescriptionModalProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
@@ -45,8 +47,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     confidence: 0.85, // Default confidence
     fid: fid,
     caseId: `modal-${Date.now()}`,
-    timestamp: new Date().toISOString()
-  }), [question, response, fid]);
+    timestamp: new Date().toISOString(),
+    inquiry: inquiry,
+    keyPoints: keyPoints
+  }), [question, response, fid, inquiry, keyPoints]);
 
   // Stable callback to prevent re-renders
   const handlePrescriptionGenerated = useCallback((metadata: PrescriptionMetadata) => {

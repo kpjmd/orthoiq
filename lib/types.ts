@@ -24,6 +24,8 @@ export interface ClaudeResponse {
   response: string;
   isRelevant: boolean;
   confidence: number;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
 
@@ -35,6 +37,8 @@ export interface PrescriptionData {
   caseId: string;
   timestamp: string;
   userEmail?: string;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
 export interface PrescriptionMetadata {
@@ -60,6 +64,8 @@ export interface ParsedResponse {
   assessment: string[];
   recommendations: string[];
   disclaimers: string[];
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
 export interface RarityConfig {

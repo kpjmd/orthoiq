@@ -26,7 +26,9 @@ If a question is NOT related to orthopedics or sports medicine, politely redirec
 Format your response as JSON with these fields:
 - "response": Your educational response
 - "isRelevant": true/false (whether question is orthopedic-related)
-- "confidence": 0.0-1.0 (how confident you are in your response)`;
+- "confidence": 0.0-1.0 (how confident you are in your response)
+- "inquiry": A concise 10-15 word summary of the user's main question/topic
+- "keyPoints": Array of 3-4 key medical facts or findings as brief bullet points (each 60-80 characters)`;
 
 export async function getOrthoResponse(question: string): Promise<ClaudeResponse> {
   try {
@@ -84,7 +86,9 @@ export async function getOrthoResponse(question: string): Promise<ClaudeResponse
     return {
       response: parsedResponse.response,
       isRelevant: parsedResponse.isRelevant ?? true,
-      confidence: parsedResponse.confidence ?? 0.7
+      confidence: parsedResponse.confidence ?? 0.7,
+      inquiry: parsedResponse.inquiry,
+      keyPoints: parsedResponse.keyPoints
     };
 
   } catch (error) {
