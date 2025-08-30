@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getShare } from '../../../lib/database';
-import ArtworkGenerator from '../../../components/ArtworkGenerator';
+import PrescriptionGenerator from '../../../components/PrescriptionGenerator';
 
 interface SharePageProps {
   params: Promise<{ id: string }>
@@ -21,15 +21,12 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
   let question = 'Orthopedic Question';
   let response = 'AI Response';
   let confidence = '95';
-  let isArtwork = false;
-
   try {
     const shareData = await getShare(shareId);
     if (shareData) {
       question = shareData.question;
       response = shareData.response;
       confidence = shareData.confidence?.toString() || '95';
-      isArtwork = shareData.shareType === 'artwork';
     }
   } catch (error) {
     console.error('Error getting share data for metadata:', error);
@@ -55,7 +52,7 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
           url: embedImageUrl,
           width: 1200,
           height: 800,
-          alt: isArtwork ? 'OrthoIQ Medical Artwork' : 'OrthoIQ AI Response'
+          alt: 'OrthoIQ Medical Prescription'
         }
       ],
       type: 'website',
@@ -101,8 +98,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const question = shareData?.question || resolvedSearchParams.question;
   const response = shareData?.response || resolvedSearchParams.response;
   const confidence = shareData?.confidence || resolvedSearchParams.confidence;
-  const isArtwork = shareData?.shareType === 'artwork';
-  const artworkMetadata = shareData?.artworkMetadata || {};
+  // All shares are now prescription-based
 
   if (!question || !response) {
     notFound();
@@ -115,7 +111,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-2">🦴 OrthoIQ</h1>
           <p className="text-lg opacity-90">
-            {isArtwork ? 'AI Medical Artwork' : 'AI Orthopedic Response'}
+            AI Medical Prescription
           </p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
         </div>
@@ -131,48 +127,27 @@ export default async function SharePage({ params, searchParams }: SharePageProps
           <p className="text-gray-700 leading-relaxed">{question}</p>
         </div>
 
-        {/* Artwork Display (only for artwork shares) */}
-        {isArtwork && artworkMetadata && (
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-              <span className="text-2xl mr-2">🎨</span>
-              Generated Artwork:
-            </h2>
-            <div className="flex justify-center mb-4">
-              <div className="w-full max-w-md">
-                <ArtworkGenerator 
-                  question={question}
-                  seed={artworkMetadata.generationId || 'shared'}
-                  analysis={{
-                    subspecialty: artworkMetadata.subspecialty || 'general',
-                    emotionalTone: artworkMetadata.emotionalTone || 'neutral',
-                    complexityLevel: artworkMetadata.complexityLevel || 5,
-                    bodyParts: artworkMetadata.bodyParts || [],
-                    conditions: artworkMetadata.conditions || [],
-                    treatmentContext: artworkMetadata.treatmentContext || 'general',
-                    questionLength: question.length,
-                    medicalTermCount: artworkMetadata.medicalTermCount || 0,
-                    timeContext: artworkMetadata.timeContext || 'none'
-                  }}
-                />
-              </div>
+        {/* Prescription Display */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+            <span className="text-2xl mr-2">📋</span>
+            Medical Prescription:
+          </h2>
+          <div className="flex justify-center mb-4">
+            <div className="w-full max-w-4xl">
+              <PrescriptionGenerator 
+                data={{
+                  userQuestion: question,
+                  claudeResponse: response,
+                  confidence: Number(confidence) / 100 || 0.85,
+                  fid: 'shared-user',
+                  caseId: shareId,
+                  timestamp: new Date().toISOString()
+                }}
+              />
             </div>
-            {/* Artwork Metadata */}
-            {(artworkMetadata.subspecialty || artworkMetadata.emotionalTone) && (
-              <div className="text-sm text-gray-600 space-y-1">
-                {artworkMetadata.subspecialty && (
-                  <p><strong>Subspecialty:</strong> {artworkMetadata.subspecialty}</p>
-                )}
-                {artworkMetadata.emotionalTone && (
-                  <p><strong>Emotional Tone:</strong> {artworkMetadata.emotionalTone}</p>
-                )}
-                {artworkMetadata.complexityLevel && (
-                  <p><strong>Complexity:</strong> {artworkMetadata.complexityLevel}/10</p>
-                )}
-              </div>
-            )}
           </div>
-        )}
+        </div>
 
         {/* Response */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">

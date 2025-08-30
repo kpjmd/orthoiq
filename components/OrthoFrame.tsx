@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import ArtworkGenerator from './ArtworkGenerator';
+import ResponseCard from './ResponseCard';
 import Disclaimer from './Disclaimer';
-import { ArtworkConfig } from '@/lib/types';
 
 interface OrthoFrameProps {
   className?: string;
@@ -14,7 +13,6 @@ export default function OrthoFrame({ className = "" }: OrthoFrameProps) {
   const [response, setResponse] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [artwork, setArtwork] = useState<ArtworkConfig['theme']>('general');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,18 +68,6 @@ export default function OrthoFrame({ className = "" }: OrthoFrameProps) {
       const data = await res.json();
 
       setResponse(data.response);
-      
-      // Set artwork theme based on question content
-      const lowerQuestion = question.toLowerCase();
-      if (lowerQuestion.includes('bone') || lowerQuestion.includes('fracture') || lowerQuestion.includes('break')) {
-        setArtwork('bone');
-      } else if (lowerQuestion.includes('muscle') || lowerQuestion.includes('strain') || lowerQuestion.includes('tear')) {
-        setArtwork('muscle');
-      } else if (lowerQuestion.includes('joint') || lowerQuestion.includes('knee') || lowerQuestion.includes('shoulder')) {
-        setArtwork('joint');
-      } else {
-        setArtwork('general');
-      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -142,20 +128,12 @@ export default function OrthoFrame({ className = "" }: OrthoFrameProps) {
 
         {response && (
           <div className="mb-6">
-            <div className="flex items-start space-x-4 mb-4">
-              <ArtworkGenerator 
-                question={question} 
-                theme={artwork} 
-                size={120} 
-                className="flex-shrink-0" 
-              />
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">OrthoIQ Response:</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
-                </div>
-              </div>
-            </div>
+            <ResponseCard
+              response={response}
+              question={question}
+              fid="demo-user"
+              caseId={`frame-${Date.now()}`}
+            />
           </div>
         )}
 

@@ -6,7 +6,7 @@ interface ActionMenuProps {
   response: string;
   question: string;
   onAskAnother: () => void;
-  onViewArtwork: () => void;
+  onViewArtwork: () => void; // Keep name for backward compatibility but will show "View Prescription"
   onRate: (rating: number) => void;
   canAskAnother?: boolean;
   questionsRemaining?: number;
@@ -114,8 +114,8 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
           onClick={onViewArtwork}
           className="flex items-center justify-center px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
-          <span className="mr-2">🩺</span>
-          View Medical Visual
+          <span className="mr-2">📋</span>
+          View Prescription
         </button>
       </div>
 

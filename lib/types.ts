@@ -26,11 +26,6 @@ export interface ClaudeResponse {
   confidence: number;
 }
 
-export interface ArtworkConfig {
-  theme: 'bone' | 'muscle' | 'joint' | 'general';
-  colors: string[];
-  elements: string[];
-}
 
 export interface PrescriptionData {
   userQuestion: string;

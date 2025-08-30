@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { useWebAuth } from './WebAuthProvider';
-import ArtworkGenerator from './ArtworkGenerator';
 import ResponseCard from './ResponseCard';
 import ActionMenu from './ActionMenu';
-import ArtworkModal from './ArtworkModal';
+import PrescriptionModal from './PrescriptionModal';
 
 interface WebOrthoInterfaceProps {
   className?: string;
@@ -32,7 +31,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const [responseData, setResponseData] = useState<ResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showArtworkModal, setShowArtworkModal] = useState(false);
+  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [dailyQuestions, setDailyQuestions] = useState({ used: 0, limit: 3 });
   const [showUpgradeForm, setShowUpgradeForm] = useState(false);
   const [upgradeEmail, setUpgradeEmail] = useState('');
@@ -260,7 +259,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               response={responseData.response}
               question={currentQuestion}
               onAskAnother={handleAskAnother}
-              onViewArtwork={() => setShowArtworkModal(true)}
+              onViewArtwork={() => setShowPrescriptionModal(true)}
               onRate={handleRate}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
@@ -268,12 +267,13 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           </div>
         )}
 
-        {/* Artwork Modal */}
-        <ArtworkModal
-          isOpen={showArtworkModal}
-          onClose={() => setShowArtworkModal(false)}
+        {/* Prescription Modal */}
+        <PrescriptionModal
+          isOpen={showPrescriptionModal}
+          onClose={() => setShowPrescriptionModal(false)}
           question={currentQuestion}
           response={responseData?.response || ''}
+          fid={user?.id || 'web-guest'}
         />
 
         {/* Call to Action */}

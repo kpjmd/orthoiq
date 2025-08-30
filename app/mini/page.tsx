@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import ResponseCard from '@/components/ResponseCard';
 import ActionMenu from '@/components/ActionMenu';
-import ArtworkModal from '@/components/ArtworkModal';
+import PrescriptionModal from '@/components/PrescriptionModal';
 import CountdownTimer from '@/components/CountdownTimer';
 import NotificationPermissions from '@/components/NotificationPermissions';
 import { useAuth } from '@/components/AuthProvider';
@@ -61,7 +61,7 @@ function MiniAppContent() {
   const [responseData, setResponseData] = useState<ResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showArtworkModal, setShowArtworkModal] = useState(false);
+  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number; resetTime?: Date; tier?: UserTier} | null>(null);
 
   const getUserTier = useCallback((): UserTier => {
@@ -483,7 +483,7 @@ function MiniAppContent() {
               response={responseData.response}
               question={currentQuestion}
               onAskAnother={handleAskAnother}
-              onViewArtwork={() => setShowArtworkModal(true)}
+              onViewArtwork={() => setShowPrescriptionModal(true)}
               onRate={handleRate}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
@@ -491,12 +491,13 @@ function MiniAppContent() {
           </div>
         )}
 
-        {/* Artwork Modal */}
-        <ArtworkModal
-          isOpen={showArtworkModal}
-          onClose={() => setShowArtworkModal(false)}
+        {/* Prescription Modal */}
+        <PrescriptionModal
+          isOpen={showPrescriptionModal}
+          onClose={() => setShowPrescriptionModal(false)}
           question={currentQuestion}
           response={responseData?.response || ''}
+          fid={context?.user?.fid.toString() || authUser?.fid.toString() || 'guest'}
         />
 
         {/* Disclaimer */}
