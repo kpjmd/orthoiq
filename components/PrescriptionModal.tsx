@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
@@ -27,21 +27,29 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       setIsGenerating(true);
       setGenerationError(null);
       setPrescriptionMetadata(null);
+      
+      // Fallback timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.warn('Prescription generation timed out, forcing completion');
+        setIsGenerating(false);
+      }, 5000); // 5 second timeout
+      
+      return () => clearTimeout(timeout);
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const prescriptionData: PrescriptionData = {
+  // Stable prescription data to prevent re-renders
+  const prescriptionData: PrescriptionData = useMemo(() => ({
     userQuestion: question,
     claudeResponse: response,
     confidence: 0.85, // Default confidence
     fid: fid,
     caseId: `modal-${Date.now()}`,
     timestamp: new Date().toISOString()
-  };
+  }), [question, response, fid]);
 
-  const handlePrescriptionGenerated = (metadata: PrescriptionMetadata) => {
+  // Stable callback to prevent re-renders
+  const handlePrescriptionGenerated = useCallback((metadata: PrescriptionMetadata) => {
     try {
       setPrescriptionMetadata(metadata);
       setIsGenerating(false);
@@ -51,7 +59,9 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       setGenerationError('Failed to generate prescription');
       setIsGenerating(false);
     }
-  };
+  }, []);
+
+  if (!isOpen) return null;
 
   const sharePrescription = async () => {
     setIsSharing(true);
@@ -150,9 +160,18 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         </div>
 
         {/* Prescription Content */}
-        <div className="p-6">
+        <div className="p-6 relative">
+          {/* Always render the PrescriptionGenerator */}
+          <div ref={prescriptionRef as any}>
+            <PrescriptionGenerator
+              data={prescriptionData}
+              onGenerated={handlePrescriptionGenerated}
+            />
+          </div>
+          
+          {/* Loading overlay */}
           {isGenerating && (
-            <div className="flex items-center justify-center p-12">
+            <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">Generating prescription...</p>
@@ -160,8 +179,9 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             </div>
           )}
           
+          {/* Error overlay */}
           {generationError && (
-            <div className="flex items-center justify-center p-12">
+            <div className="absolute inset-0 bg-white bg-opacity-95 flex items-center justify-center z-10">
               <div className="text-center">
                 <div className="text-red-500 text-4xl mb-4">⚠️</div>
                 <p className="text-red-600 mb-4">{generationError}</p>
@@ -172,15 +192,6 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
                   Close
                 </button>
               </div>
-            </div>
-          )}
-          
-          {!isGenerating && !generationError && (
-            <div ref={prescriptionRef as any}>
-              <PrescriptionGenerator
-                data={prescriptionData}
-                onGenerated={handlePrescriptionGenerated}
-              />
             </div>
           )}
         </div>

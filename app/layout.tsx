@@ -1,8 +1,16 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#1e3a8a',
+}
 
 export const metadata: Metadata = {
   title: 'OrthoIQ - Ask the Orthopedic AI',
@@ -10,8 +18,6 @@ export const metadata: Metadata = {
   keywords: ['orthopedic', 'sports medicine', 'AI assistant', 'medical questions'],
   authors: [{ name: 'KPJMD' }],
   manifest: '/manifest.json',
-  themeColor: '#1e3a8a',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -43,8 +49,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* PWA iOS meta tags */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/* PWA meta tags - Modern approach */}
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="OrthoIQ" />
         <link rel="apple-touch-icon" href="/icon.png" />
