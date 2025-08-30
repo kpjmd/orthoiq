@@ -34,6 +34,7 @@ export interface PrescriptionData {
   fid: string;
   caseId: string;
   timestamp: string;
+  userEmail?: string;
 }
 
 export interface PrescriptionMetadata {

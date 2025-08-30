@@ -130,11 +130,14 @@ export default function PrescriptionGenerator({
             Orthopedic Surgery / Sports Medicine
           </text>
           
-          {/* Logo - Pure SVG version */}
+          {/* Logo - Pure SVG version with better visibility */}
           <g transform={`translate(${size - 90}, 40)`}>
+            {/* Subtle shadow for depth */}
+            <circle cx="31" cy="31" r="28" fill="rgba(0,0,0,0.1)" />
             <circle cx="30" cy="30" r="28" fill={theme.primaryColor} />
             <circle cx="30" cy="30" r="20" fill="white" />
-            <line x1="15" y1="15" x2="45" y2="45" stroke="white" strokeWidth="3" />
+            {/* Change diagonal line to use theme color instead of white */}
+            <line x1="15" y1="15" x2="45" y2="45" stroke={theme.primaryColor} strokeWidth="3" opacity="0.7" />
           </g>
           
           {/* Patient Information Section */}
@@ -142,11 +145,8 @@ export default function PrescriptionGenerator({
           
           <text x="40" y="155" className="prescription-header">PATIENT INFORMATION</text>
           
-          <text x="60" y="175" className="prescription-text">
-            Name: Anonymous User
-          </text>
-          <text x="60" y="195" className="prescription-text">
-            ID: #{data.fid}
+          <text x="60" y="185" className="prescription-text">
+            Name: {data.userEmail ? data.userEmail : data.fid ? `Guest #${data.fid}` : 'Anonymous Guest'}
           </text>
           <text x={size - 300} y="175" className="prescription-text">
             Date: {formatDate(data.timestamp)}
@@ -160,56 +160,43 @@ export default function PrescriptionGenerator({
           
           <text x="60" y="270" className="prescription-rx">℞</text>
           
-          <text x="120" y="255" className="prescription-header">CHIEF COMPLAINT</text>
+          <text x="120" y="255" className="prescription-header">CHIEF INQUIRY</text>
           <text x="120" y="275" className="prescription-text">
             {parsedResponse.chiefComplaint}
           </text>
           
-          {/* Assessment */}
-          <text x="60" y="315" className="prescription-header">ASSESSMENT</text>
-          {parsedResponse.assessment.slice(0, 3).map((item, index) => (
+          {/* Synopsis - Combined Assessment and Recommendations */}
+          <text x="60" y="315" className="prescription-header">SYNOPSIS</text>
+          {[...parsedResponse.assessment.slice(0, 2), ...parsedResponse.recommendations.slice(0, 2)].map((item, index) => (
             <g key={index}>
-              <circle cx="75" cy={335 + (index * 25)} r="2" fill={theme.primaryColor} />
+              <circle cx="75" cy={335 + (index * 25)} r="2" fill={index < 2 ? theme.primaryColor : theme.accentColor} />
               <text x="85" y={340 + (index * 25)} className="prescription-text">
                 {item.length > 70 ? item.substring(0, 70) + '...' : item}
               </text>
             </g>
           ))}
           
-          {/* Recommendations */}
-          <text x="60" y={425 + (Math.min(parsedResponse.assessment.length, 3) * 25)} className="prescription-header">
-            RECOMMENDATIONS
-          </text>
-          {parsedResponse.recommendations.slice(0, 3).map((item, index) => (
-            <g key={index}>
-              <circle cx="75" cy={445 + (Math.min(parsedResponse.assessment.length, 3) * 25) + (index * 25)} r="2" fill={theme.accentColor} />
-              <text x="85" y={450 + (Math.min(parsedResponse.assessment.length, 3) * 25) + (index * 25)} className="prescription-text">
-                {item.length > 70 ? item.substring(0, 70) + '...' : item}
-              </text>
-            </g>
-          ))}
-          
-          {/* Confidence Score */}
+          {/* Confidence Score - Moved after Synopsis */}
           <rect 
             x={size - 180} 
-            y="300" 
+            y="435" 
             width="140" 
-            height="80" 
+            height="60" 
             fill="#f8fafc" 
             stroke="#e2e8f0" 
             strokeWidth="1" 
             rx="5" 
           />
-          <text x={size - 110} y="320" textAnchor="middle" className="prescription-small">
+          <text x={size - 110} y="455" textAnchor="middle" className="prescription-small">
             AI CONFIDENCE
           </text>
-          <text x={size - 110} y="340" textAnchor="middle" className="prescription-header">
+          <text x={size - 110} y="475" textAnchor="middle" className="prescription-header">
             {Math.round(data.confidence * 100)}%
           </text>
           {/* Rarity Badge - Pure SVG version */}
           <rect 
             x={size - 140} 
-            y="350" 
+            y="485" 
             width="80" 
             height="20" 
             fill={theme.primaryColor + "20"} 
@@ -217,7 +204,7 @@ export default function PrescriptionGenerator({
             strokeWidth="1" 
             rx="10" 
           />
-          <text x={size - 100} y="365" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
+          <text x={size - 100} y="500" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
             {prescriptionMetadata.rarity === 'ultra-rare' && '✨'}
             {prescriptionMetadata.rarity === 'rare' && '⭐'}
             {prescriptionMetadata.rarity === 'uncommon' && '💫'}
@@ -258,33 +245,36 @@ export default function PrescriptionGenerator({
             <rect x="39" y="45" width="3" height="3" fill="#374151"/>
           </g>
           
-          {/* Verification Info */}
-          <text x="140" y={size * 1.4 - 170} className="prescription-small">
+          {/* Verification Info - Centered alignment */}
+          <text x={size / 2} y={size * 1.4 - 170} textAnchor="middle" className="prescription-small">
             Verification Code: {prescriptionMetadata.verificationHash}
           </text>
-          <text x="140" y={size * 1.4 - 155} className="prescription-small">
+          <text x={size / 2} y={size * 1.4 - 155} textAnchor="middle" className="prescription-small">
             Generated by OrthoIQ Claude AI System
           </text>
-          <text x="140" y={size * 1.4 - 140} className="prescription-small">
+          <text x={size / 2} y={size * 1.4 - 140} textAnchor="middle" className="prescription-small">
             Reviewed under Board Certified MD supervision
           </text>
           
-          {/* Logo Seal - Pure SVG version */}
+          {/* Logo Seal - Pure SVG version with better visibility */}
           <g transform={`translate(${size - 100}, ${size * 1.4 - 160})`}>
+            {/* Subtle shadow for depth */}
+            <circle cx="41" cy="41" r="38" fill="rgba(0,0,0,0.1)" />
             <circle cx="40" cy="40" r="38" fill="white" stroke="#e5e7eb" strokeWidth="2" />
             <circle cx="40" cy="40" r="30" fill={theme.primaryColor} />
             <circle cx="40" cy="40" r="22" fill="white" />
-            <line x1="25" y1="25" x2="55" y2="55" stroke="white" strokeWidth="2" />
+            {/* Change diagonal line to use theme color for visibility */}
+            <line x1="25" y1="25" x2="55" y2="55" stroke={theme.primaryColor} strokeWidth="2" opacity="0.7" />
           </g>
           
-          {/* Medical Disclaimers */}
-          <text x="60" y={size * 1.4 - 110} className="prescription-small">
+          {/* Medical Disclaimers - Centered */}
+          <text x={size / 2} y={size * 1.4 - 110} textAnchor="middle" className="prescription-small">
             ⚠️ MEDICAL DISCLAIMER: This AI provides educational information only.
           </text>
-          <text x="60" y={size * 1.4 - 95} className="prescription-small">
+          <text x={size / 2} y={size * 1.4 - 95} textAnchor="middle" className="prescription-small">
             Always consult with a qualified healthcare provider for medical concerns.
           </text>
-          <text x="60" y={size * 1.4 - 80} className="prescription-small">
+          <text x={size / 2} y={size * 1.4 - 80} textAnchor="middle" className="prescription-small">
             Not intended to replace professional medical advice, diagnosis, or treatment.
           </text>
           

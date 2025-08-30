@@ -56,7 +56,7 @@ export const RARITY_CONFIGS: RarityConfig[] = [
 export function parseClaudeResponse(response: string): ParsedResponse {
   const lines = response.split('\n').filter(line => line.trim());
   
-  let chiefComplaint = '';
+  let chiefInquiry = '';
   const assessment: string[] = [];
   const recommendations: string[] = [];
   const disclaimers: string[] = [];
@@ -111,7 +111,7 @@ export function parseClaudeResponse(response: string): ParsedResponse {
   }
   
   return {
-    chiefComplaint: chiefComplaint || 'Orthopedic consultation',
+    chiefComplaint: chiefInquiry || 'Orthopedic consultation',
     assessment: assessment.length ? assessment : ['Comprehensive orthopedic evaluation completed'],
     recommendations: recommendations.length ? recommendations : ['Follow standard orthopedic care protocols'],
     disclaimers: disclaimers.length ? disclaimers : ['This is AI-generated information. Consult a healthcare provider.']
