@@ -83,11 +83,20 @@ export default function OrthoIQLogo({
             <stop offset="100%" stopColor="#d97706" />
           </linearGradient>
           
-          <linearGradient id="diagonal-line" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id="diagonal-line" x1="0%" y1="100%" x2="100%" y2="0%">
             <stop offset="42%" stopColor="transparent" />
             <stop offset="50%" stopColor="white" />
             <stop offset="58%" stopColor="transparent" />
           </linearGradient>
+          <mask id="main-shape-mask">
+            <rect width="100%" height="100%" fill="white" />
+            <circle 
+              cx="50%" 
+              cy="50%" 
+              r={`${(holeSize / Math.max(width, height)) * 50}%`} 
+              fill="black" 
+            />
+          </mask>
         </defs>
         
         {circular && (
@@ -119,7 +128,7 @@ export default function OrthoIQLogo({
           fill="white" 
         />
         
-        {/* 45-degree diagonal line that suggests "Q" tail */}
+        {/* 45-degree diagonal line that suggests "Q" tail - masked to avoid center hole */}
         <rect 
           x={circular ? (height - width) / 2 : 0} 
           y="0" 
@@ -127,7 +136,8 @@ export default function OrthoIQLogo({
           height={height} 
           rx={borderRadius} 
           ry={borderRadius} 
-          fill="url(#diagonal-line)" 
+          fill="url(#diagonal-line)"
+          mask="url(#main-shape-mask)"
         />
       </svg>
     </div>

@@ -41,8 +41,9 @@ const handleRequest = frames(async (ctx) => {
                 left: '0',
                 right: '0',
                 bottom: '0',
-                background: 'linear-gradient(45deg, transparent 42%, white 50%, transparent 58%)',
-                borderRadius: '24px'
+                background: 'linear-gradient(-45deg, transparent 42%, white 50%, transparent 58%)',
+                borderRadius: '24px',
+                mask: 'radial-gradient(circle 18px at center, transparent 18px, black 18px)'
               }}></div>
             </div>
             <div tw="text-6xl font-bold">OrthoIQ</div>
@@ -268,8 +269,9 @@ const handleRequest = frames(async (ctx) => {
               left: '0',
               right: '0',
               bottom: '0',
-              background: 'linear-gradient(45deg, transparent 42%, white 50%, transparent 58%)',
-              borderRadius: '24px'
+              background: 'linear-gradient(-45deg, transparent 42%, white 50%, transparent 58%)',
+              borderRadius: '24px',
+              mask: 'radial-gradient(circle 18px at center, transparent 18px, black 18px)'
             }}></div>
           </div>
           <div tw="text-6xl font-bold">OrthoIQ</div>

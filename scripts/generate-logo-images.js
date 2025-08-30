@@ -21,11 +21,15 @@ function generateLogoSVG(width, height, variant = 'blue') {
           <stop offset="50%" stop-color="${colors.mid}" />
           <stop offset="100%" stop-color="${colors.end}" />
         </linearGradient>
-        <linearGradient id="diagonal-line" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="diagonal-line" x1="0%" y1="100%" x2="100%" y2="0%">
           <stop offset="42%" stop-color="transparent" />
           <stop offset="50%" stop-color="white" />
           <stop offset="58%" stop-color="transparent" />
         </linearGradient>
+        <mask id="main-shape-mask">
+          <rect width="100%" height="100%" fill="white" />
+          <circle cx="${width / 2}" cy="${height / 2}" r="${holeSize / 2}" fill="black" />
+        </mask>
       </defs>
       
       <!-- Main shape with gradient -->
@@ -34,8 +38,8 @@ function generateLogoSVG(width, height, variant = 'blue') {
       <!-- Center hole for infinity twist effect -->
       <circle cx="${width / 2}" cy="${height / 2}" r="${holeSize / 2}" fill="white" />
       
-      <!-- 45-degree diagonal line that suggests "Q" tail -->
-      <rect x="0" y="0" width="${width}" height="${height}" rx="${borderRadius}" ry="${borderRadius}" fill="url(#diagonal-line)" />
+      <!-- 45-degree diagonal line that suggests "Q" tail - masked to avoid center hole -->
+      <rect x="0" y="0" width="${width}" height="${height}" rx="${borderRadius}" ry="${borderRadius}" fill="url(#diagonal-line)" mask="url(#main-shape-mask)" />
     </svg>
   `;
 }
