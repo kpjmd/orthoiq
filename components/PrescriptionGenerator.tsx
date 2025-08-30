@@ -133,15 +133,12 @@ export default function PrescriptionGenerator({
             Orthopedic Surgery / Sports Medicine
           </text>
           
-          {/* Logo - Pure SVG version with better visibility */}
-          <g transform={`translate(${size - 90}, 40)`}>
-            {/* Subtle shadow for depth */}
-            <circle cx="31" cy="31" r="28" fill="rgba(0,0,0,0.1)" />
-            <circle cx="30" cy="30" r="28" fill={theme.primaryColor} />
-            <circle cx="30" cy="30" r="20" fill="white" />
-            {/* Change diagonal line to use theme color instead of white */}
-            <line x1="15" y1="15" x2="45" y2="45" stroke={theme.primaryColor} strokeWidth="3" opacity="0.7" />
-          </g>
+          {/* Logo - OrthoIQ Component */}
+          <foreignObject x={size - 90} y="40" width="60" height="60">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+              <OrthoIQLogo size={60} variant={theme.primaryColor === '#3b82f6' ? 'blue' : theme.primaryColor === '#0891b2' ? 'teal' : 'blue'} />
+            </div>
+          </foreignObject>
           
           {/* Patient Information Section */}
           <line x1="40" y1="130" x2={size - 40} y2="130" stroke="#e5e7eb" strokeWidth="1" />
@@ -259,16 +256,22 @@ export default function PrescriptionGenerator({
             Reviewed under Board Certified MD supervision
           </text>
           
-          {/* Logo Seal - Pure SVG version with better visibility */}
-          <g transform={`translate(${size - 100}, ${size * 1.4 - 160})`}>
-            {/* Subtle shadow for depth */}
-            <circle cx="41" cy="41" r="38" fill="rgba(0,0,0,0.1)" />
-            <circle cx="40" cy="40" r="38" fill="white" stroke="#e5e7eb" strokeWidth="2" />
-            <circle cx="40" cy="40" r="30" fill={theme.primaryColor} />
-            <circle cx="40" cy="40" r="22" fill="white" />
-            {/* Change diagonal line to use theme color for visibility */}
-            <line x1="25" y1="25" x2="55" y2="55" stroke={theme.primaryColor} strokeWidth="2" opacity="0.7" />
-          </g>
+          {/* Logo Seal - OrthoIQ Component */}
+          <foreignObject x={size - 100} y={size * 1.4 - 160} width="80" height="80">
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              width: '100%', 
+              height: '100%',
+              background: 'white',
+              borderRadius: '50%',
+              border: '2px solid #e5e7eb',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+            }}>
+              <OrthoIQLogo size={60} variant={theme.primaryColor === '#3b82f6' ? 'blue' : theme.primaryColor === '#0891b2' ? 'teal' : 'blue'} />
+            </div>
+          </foreignObject>
           
           {/* Medical Disclaimers - Centered */}
           <text x={size / 2} y={size * 1.4 - 110} textAnchor="middle" className="prescription-small">

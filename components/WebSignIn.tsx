@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useWebAuth } from './WebAuthProvider';
+import OrthoIQLogo from './OrthoIQLogo';
 
 export default function WebSignIn() {
   const { signInWithEmail, signInAsGuest, isLoading } = useWebAuth();
@@ -28,7 +29,7 @@ export default function WebSignIn() {
       <div className="text-center mb-6">
         <div className="mb-4">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-900 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-            <span className="text-2xl">🦴</span>
+            <OrthoIQLogo size="small" variant="blue" />
           </div>
         </div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to OrthoIQ</h2>

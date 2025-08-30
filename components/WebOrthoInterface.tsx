@@ -5,6 +5,7 @@ import { useWebAuth } from './WebAuthProvider';
 import ResponseCard from './ResponseCard';
 import ActionMenu from './ActionMenu';
 import PrescriptionModal from './PrescriptionModal';
+import OrthoIQLogo from './OrthoIQLogo';
 
 interface WebOrthoInterfaceProps {
   className?: string;
@@ -159,7 +160,10 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6 rounded-t-lg">
         <div className="text-center">
-          <h2 className="text-3xl font-bold mb-2">🦴 OrthoIQ</h2>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <OrthoIQLogo size="medium" variant="blue" />
+            <h2 className="text-3xl font-bold">OrthoIQ</h2>
+          </div>
           <p className="text-lg opacity-90">Web Experience</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
           

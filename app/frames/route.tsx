@@ -16,7 +16,37 @@ const handleRequest = frames(async (ctx) => {
     return {
       image: (
         <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
-          <div tw="text-6xl font-bold mb-4">🦴 OrthoIQ</div>
+          <div tw="flex items-center mb-4">
+            <div style={{
+              width: '48px',
+              height: '96px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 50%, #1d4ed8 100%)',
+              borderRadius: '24px',
+              position: 'relative',
+              marginRight: '16px'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '36px',
+                height: '36px',
+                background: 'white',
+                borderRadius: '50%',
+                transform: 'translate(-50%, -50%)'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '0',
+                left: '0',
+                right: '0',
+                bottom: '0',
+                background: 'linear-gradient(45deg, transparent 42%, white 50%, transparent 58%)',
+                borderRadius: '24px'
+              }}></div>
+            </div>
+            <div tw="text-6xl font-bold">OrthoIQ</div>
+          </div>
           <div tw="text-3xl mb-6">Ask the Orthopedic AI</div>
           <div tw="text-xl text-center mb-8 max-w-lg">
             Get expert orthopedic and sports medicine insights powered by AI
@@ -213,7 +243,37 @@ const handleRequest = frames(async (ctx) => {
   return {
     image: (
       <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
-        <div tw="text-6xl font-bold mb-4">🦴 OrthoIQ</div>
+        <div tw="flex items-center mb-4">
+          <div style={{
+            width: '48px',
+            height: '96px',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 50%, #1d4ed8 100%)',
+            borderRadius: '24px',
+            position: 'relative',
+            marginRight: '16px'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: '36px',
+              height: '36px',
+              background: 'white',
+              borderRadius: '50%',
+              transform: 'translate(-50%, -50%)'
+            }}></div>
+            <div style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              right: '0',
+              bottom: '0',
+              background: 'linear-gradient(45deg, transparent 42%, white 50%, transparent 58%)',
+              borderRadius: '24px'
+            }}></div>
+          </div>
+          <div tw="text-6xl font-bold">OrthoIQ</div>
+        </div>
         <div tw="text-3xl mb-6">Ask the Orthopedic AI</div>
         <div tw="text-xl text-center mb-8 max-w-lg">
           Get expert orthopedic and sports medicine insights powered by AI

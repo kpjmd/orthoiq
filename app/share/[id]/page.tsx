@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getShare } from '../../../lib/database';
 import PrescriptionGenerator from '../../../components/PrescriptionGenerator';
+import OrthoIQLogo from '../../../components/OrthoIQLogo';
 
 interface SharePageProps {
   params: Promise<{ id: string }>
@@ -109,7 +110,10 @@ export default async function SharePage({ params, searchParams }: SharePageProps
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">🦴 OrthoIQ</h1>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <OrthoIQLogo size="medium" variant="blue" />
+            <h1 className="text-3xl font-bold">OrthoIQ</h1>
+          </div>
           <p className="text-lg opacity-90">
             AI Medical Prescription
           </p>
@@ -183,7 +187,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
             href="/mini"
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            <span className="mr-2">🦴</span>
+            <OrthoIQLogo size="small" variant="blue" className="mr-2" />
             Ask Your Own Question
           </a>
         </div>

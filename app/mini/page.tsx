@@ -9,6 +9,7 @@ import CountdownTimer from '@/components/CountdownTimer';
 import NotificationPermissions from '@/components/NotificationPermissions';
 import { useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
+import OrthoIQLogo from '@/components/OrthoIQLogo';
 import { UserTier } from '@/lib/rateLimit';
 
 // Farcaster SDK Context Types
@@ -344,7 +345,10 @@ function MiniAppContent() {
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">🦴 OrthoIQ</h1>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <OrthoIQLogo size="medium" variant="blue" className="text-white" />
+            <h1 className="text-3xl font-bold">OrthoIQ</h1>
+          </div>
           <p className="text-lg opacity-90">Premier Medical AI on Farcaster</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
           <div className="mt-3 space-y-2">

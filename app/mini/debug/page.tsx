@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import OrthoIQLogo from '@/components/OrthoIQLogo';
 
 export default function MiniAppDebug() {
   const [healthData, setHealthData] = useState<any>(null);
@@ -26,9 +27,10 @@ export default function MiniAppDebug() {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          🦴 OrthoIQ Mini App Debug
-        </h1>
+        <div className="flex items-center gap-3 mb-6">
+          <OrthoIQLogo size="medium" variant="blue" />
+          <h1 className="text-3xl font-bold text-gray-900">OrthoIQ Mini App Debug</h1>
+        </div>
         
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Environment Health Check</h2>

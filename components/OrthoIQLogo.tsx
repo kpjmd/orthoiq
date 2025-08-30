@@ -47,7 +47,7 @@ export default function OrthoIQLogo({
   };
 
   const { width, height } = getSizeValues();
-  const holeSize = width * 0.75;
+  const holeSize = Math.min(width * 0.75, height * 0.375); // Prominent center hole
   const borderRadius = width * 0.5;
 
   return (
@@ -111,7 +111,7 @@ export default function OrthoIQLogo({
           />
         )}
         
-        {/* Center hole */}
+        {/* Prominent center hole for infinity twist effect */}
         <circle 
           cx={circular ? height / 2 : width / 2} 
           cy={height / 2} 
@@ -119,7 +119,7 @@ export default function OrthoIQLogo({
           fill="white" 
         />
         
-        {/* 45-degree diagonal line */}
+        {/* 45-degree diagonal line that suggests "Q" tail */}
         <rect 
           x={circular ? (height - width) / 2 : 0} 
           y="0" 
