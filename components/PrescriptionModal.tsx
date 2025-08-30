@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
@@ -17,7 +17,18 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   const [isSharing, setIsSharing] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
+  const [isGenerating, setIsGenerating] = useState(true);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const prescriptionRef = useRef<SVGSVGElement>(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsGenerating(true);
+      setGenerationError(null);
+      setPrescriptionMetadata(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -28,6 +39,18 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     fid: fid,
     caseId: `modal-${Date.now()}`,
     timestamp: new Date().toISOString()
+  };
+
+  const handlePrescriptionGenerated = (metadata: PrescriptionMetadata) => {
+    try {
+      setPrescriptionMetadata(metadata);
+      setIsGenerating(false);
+      setGenerationError(null);
+    } catch (error) {
+      console.error('Error setting prescription metadata:', error);
+      setGenerationError('Failed to generate prescription');
+      setIsGenerating(false);
+    }
   };
 
   const sharePrescription = async () => {
@@ -128,12 +151,38 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
         {/* Prescription Content */}
         <div className="p-6">
-          <div ref={prescriptionRef as any}>
-            <PrescriptionGenerator
-              data={prescriptionData}
-              onGenerated={setPrescriptionMetadata}
-            />
-          </div>
+          {isGenerating && (
+            <div className="flex items-center justify-center p-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Generating prescription...</p>
+              </div>
+            </div>
+          )}
+          
+          {generationError && (
+            <div className="flex items-center justify-center p-12">
+              <div className="text-center">
+                <div className="text-red-500 text-4xl mb-4">⚠️</div>
+                <p className="text-red-600 mb-4">{generationError}</p>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {!isGenerating && !generationError && (
+            <div ref={prescriptionRef as any}>
+              <PrescriptionGenerator
+                data={prescriptionData}
+                onGenerated={handlePrescriptionGenerated}
+              />
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -143,20 +192,25 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => handleExport('png')}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm transition-colors"
+                disabled={isGenerating || generationError !== null}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
               >
                 Download PNG
               </button>
               <button
                 onClick={() => handleExport('svg')}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm transition-colors"
+                disabled={isGenerating || generationError !== null}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
               >
                 Download SVG
               </button>
               
               {/* Social Media Dropdown */}
               <div className="relative group">
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors">
+                <button 
+                  disabled={isGenerating || generationError !== null}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+                >
                   Export for Social
                 </button>
                 <div className="absolute bottom-full mb-2 left-0 w-40 bg-white rounded-lg shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
@@ -192,7 +246,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
               )}
               <button
                 onClick={sharePrescription}
-                disabled={isSharing}
+                disabled={isSharing || isGenerating || generationError !== null}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors flex items-center"
               >
                 {isSharing ? (

@@ -39,9 +39,7 @@ export default function ResponseCard({
   caseId
 }: ResponseCardProps) {
   const [showConfidence, setShowConfidence] = useState(false);
-  const [showPrescription, setShowPrescription] = useState(false);
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
-  const [isGeneratingPrescription, setIsGeneratingPrescription] = useState(false);
   const prescriptionRef = useRef<SVGSVGElement>(null);
 
   // Parse JSON response if it's still in JSON format
@@ -153,20 +151,6 @@ export default function ResponseCard({
     return 'text-red-600';
   };
 
-  const handleGeneratePrescription = async () => {
-    if (!question || !fid) return;
-    
-    setIsGeneratingPrescription(true);
-    try {
-      // Simulate a brief loading delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setShowPrescription(true);
-    } catch (error) {
-      console.error('Error generating prescription:', error);
-    } finally {
-      setIsGeneratingPrescription(false);
-    }
-  };
 
   const handleExportPrescription = async (format: 'png' | 'svg' | 'instagram' | 'linkedin' | 'twitter') => {
     if (!prescriptionRef.current || !prescriptionMetadata || !question || !fid) return;
@@ -242,99 +226,6 @@ export default function ResponseCard({
           </div>
         )}
         
-        {/* Prescription Generation Section */}
-        {question && fid && !isFiltered && (
-          <div className="mt-6 border-t pt-4">
-            {!showPrescription ? (
-              <div className="text-center">
-                <button
-                  onClick={handleGeneratePrescription}
-                  disabled={isGeneratingPrescription}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
-                >
-                  {isGeneratingPrescription ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Generating Prescription...
-                    </>
-                  ) : (
-                    <>
-                      <span className="mr-2">📋</span>
-                      Generate Medical Prescription
-                    </>
-                  )}
-                </button>
-                <p className="text-xs text-gray-500 mt-2">
-                  Create a professional medical prescription template based on this consultation
-                </p>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold text-gray-800">Medical Prescription</h4>
-                  {prescriptionMetadata && (
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleExportPrescription('png')}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md transition-colors"
-                      >
-                        PNG
-                      </button>
-                      <button
-                        onClick={() => handleExportPrescription('svg')}
-                        className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md transition-colors"
-                      >
-                        SVG
-                      </button>
-                      <div className="relative group">
-                        <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
-                          Share
-                        </button>
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                          <button
-                            onClick={() => handleExportPrescription('instagram')}
-                            className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          >
-                            Instagram
-                          </button>
-                          <button
-                            onClick={() => handleExportPrescription('linkedin')}
-                            className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          >
-                            LinkedIn
-                          </button>
-                          <button
-                            onClick={() => handleExportPrescription('twitter')}
-                            className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          >
-                            Twitter
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div ref={prescriptionRef as any}>
-                  <PrescriptionGenerator
-                    data={{
-                      userQuestion: question,
-                      claudeResponse: response,
-                      confidence: confidence || 0.8,
-                      fid: fid,
-                      caseId: caseId || 'demo-case',
-                      timestamp: new Date().toISOString()
-                    }}
-                    onGenerated={setPrescriptionMetadata}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
       
       {/* Medical Disclaimer */}

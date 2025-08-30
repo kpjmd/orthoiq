@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import OrthoIQLogo from './OrthoIQLogo';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
 import { 
@@ -29,13 +29,15 @@ export default function PrescriptionGenerator({
     const complexity = calculateQuestionComplexity(data.userQuestion);
     const rarity = calculateRarity(data.confidence, complexity);
     const metadata = generateMetadata(data, rarity);
-    
-    if (onGenerated) {
-      onGenerated(metadata);
-    }
-    
     return metadata;
-  }, [data, onGenerated]);
+  }, [data]);
+
+  // Separate effect to avoid re-renders
+  React.useEffect(() => {
+    if (onGenerated && prescriptionMetadata) {
+      onGenerated(prescriptionMetadata);
+    }
+  }, [onGenerated, prescriptionMetadata]);
 
   const parsedResponse = useMemo(() => {
     return parseClaudeResponse(data.claudeResponse);
@@ -50,68 +52,14 @@ export default function PrescriptionGenerator({
     });
   };
 
-  const getRarityBadge = () => {
-    const rarityColors = {
-      'common': 'bg-blue-100 text-blue-800 border-blue-200',
-      'uncommon': 'bg-teal-100 text-teal-800 border-teal-200',
-      'rare': 'bg-amber-100 text-amber-800 border-amber-200',
-      'ultra-rare': 'bg-purple-100 text-purple-800 border-purple-200'
-    };
 
-    return (
-      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${rarityColors[prescriptionMetadata.rarity]}`}>
-        <span className="mr-1">
-          {prescriptionMetadata.rarity === 'ultra-rare' && '✨'}
-          {prescriptionMetadata.rarity === 'rare' && '⭐'}
-          {prescriptionMetadata.rarity === 'uncommon' && '💫'}
-          {prescriptionMetadata.rarity === 'common' && '🔹'}
-        </span>
-        {prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}
-      </div>
-    );
-  };
-
-  const generateQRCode = () => {
-    // Simple QR code placeholder - in production, use a proper QR code library
-    return (
-      <svg width="60" height="60" viewBox="0 0 21 21" fill="none">
-        <rect x="0" y="0" width="21" height="21" fill="white" stroke="#374151" strokeWidth="0.5"/>
-        <rect x="1" y="1" width="3" height="3" fill="#374151"/>
-        <rect x="1" y="17" width="3" height="3" fill="#374151"/>
-        <rect x="17" y="1" width="3" height="3" fill="#374151"/>
-        <rect x="5" y="5" width="1" height="1" fill="#374151"/>
-        <rect x="7" y="5" width="1" height="1" fill="#374151"/>
-        <rect x="9" y="5" width="1" height="1" fill="#374151"/>
-        <rect x="11" y="5" width="1" height="1" fill="#374151"/>
-        <rect x="13" y="5" width="1" height="1" fill="#374151"/>
-        <rect x="15" y="5" width="1" height="1" fill="#374151"/>
-        <rect x="5" y="7" width="1" height="1" fill="#374151"/>
-        <rect x="9" y="7" width="1" height="1" fill="#374151"/>
-        <rect x="13" y="7" width="1" height="1" fill="#374151"/>
-        <rect x="5" y="9" width="1" height="1" fill="#374151"/>
-        <rect x="7" y="9" width="1" height="1" fill="#374151"/>
-        <rect x="11" y="9" width="1" height="1" fill="#374151"/>
-        <rect x="15" y="9" width="1" height="1" fill="#374151"/>
-        <rect x="5" y="11" width="1" height="1" fill="#374151"/>
-        <rect x="9" y="11" width="1" height="1" fill="#374151"/>
-        <rect x="13" y="11" width="1" height="1" fill="#374151"/>
-        <rect x="7" y="13" width="1" height="1" fill="#374151"/>
-        <rect x="11" y="13" width="1" height="1" fill="#374151"/>
-        <rect x="15" y="13" width="1" height="1" fill="#374151"/>
-        <rect x="5" y="15" width="1" height="1" fill="#374151"/>
-        <rect x="9" y="15" width="1" height="1" fill="#374151"/>
-        <rect x="11" y="15" width="1" height="1" fill="#374151"/>
-        <rect x="13" y="15" width="1" height="1" fill="#374151"/>
-      </svg>
-    );
-  };
 
   return (
     <div className={`prescription-container ${className}`}>
       <div className={`bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto ${theme.effects.join(' ')}`}>
-        {/* Rarity Effects */}
+        {/* Rarity Effects - Simplified */}
         {prescriptionMetadata.rarity === 'ultra-rare' && (
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-400/20 via-pink-400/20 to-indigo-400/20 rounded-lg animate-gradient-x"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-400/10 via-pink-400/10 to-indigo-400/10 rounded-lg"></div>
         )}
         
         <svg 
@@ -134,20 +82,12 @@ export default function PrescriptionGenerator({
               `}
             </style>
             
-            {/* Rare prescription effects */}
+            {/* Rare prescription effects - Static */}
             {prescriptionMetadata.rarity === 'rare' && (
               <linearGradient id="gold-shimmer" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="rgba(245,158,11,0.1)" />
-                <stop offset="50%" stopColor="rgba(245,158,11,0.3)" />
+                <stop offset="50%" stopColor="rgba(245,158,11,0.2)" />
                 <stop offset="100%" stopColor="rgba(245,158,11,0.1)" />
-                <animateTransform 
-                  attributeName="gradientTransform" 
-                  attributeType="XML" 
-                  values="-200 0;800 0;-200 0" 
-                  dur="3s" 
-                  repeatCount="indefinite"
-                  type="translate" 
-                />
               </linearGradient>
             )}
           </defs>
@@ -190,10 +130,12 @@ export default function PrescriptionGenerator({
             Orthopedic Surgery / Sports Medicine
           </text>
           
-          {/* Logo */}
-          <foreignObject x={size - 100} y="30" width="60" height="60">
-            <OrthoIQLogo size={60} variant={theme.logoVariant} circular />
-          </foreignObject>
+          {/* Logo - Pure SVG version */}
+          <g transform={`translate(${size - 90}, 40)`}>
+            <circle cx="30" cy="30" r="28" fill={theme.primaryColor} />
+            <circle cx="30" cy="30" r="20" fill="white" />
+            <line x1="15" y1="15" x2="45" y2="45" stroke="white" strokeWidth="3" />
+          </g>
           
           {/* Patient Information Section */}
           <line x1="40" y1="130" x2={size - 40} y2="130" stroke="#e5e7eb" strokeWidth="1" />
@@ -264,17 +206,57 @@ export default function PrescriptionGenerator({
           <text x={size - 110} y="340" textAnchor="middle" className="prescription-header">
             {Math.round(data.confidence * 100)}%
           </text>
-          <foreignObject x={size - 140} y="350" width="80" height="30">
-            {getRarityBadge()}
-          </foreignObject>
+          {/* Rarity Badge - Pure SVG version */}
+          <rect 
+            x={size - 140} 
+            y="350" 
+            width="80" 
+            height="20" 
+            fill={theme.primaryColor + "20"} 
+            stroke={theme.primaryColor} 
+            strokeWidth="1" 
+            rx="10" 
+          />
+          <text x={size - 100} y="365" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
+            {prescriptionMetadata.rarity === 'ultra-rare' && '✨'}
+            {prescriptionMetadata.rarity === 'rare' && '⭐'}
+            {prescriptionMetadata.rarity === 'uncommon' && '💫'}
+            {prescriptionMetadata.rarity === 'common' && '🔹'}
+            {' '}{prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}
+          </text>
           
           {/* Footer Section */}
           <line x1="40" y1={size * 1.4 - 200} x2={size - 40} y2={size * 1.4 - 200} stroke="#e5e7eb" strokeWidth="1" />
           
-          {/* QR Code */}
-          <foreignObject x="60" y={size * 1.4 - 180} width="60" height="60">
-            {generateQRCode()}
-          </foreignObject>
+          {/* QR Code - Inline SVG */}
+          <g transform={`translate(60, ${size * 1.4 - 180})`}>
+            <rect x="0" y="0" width="60" height="60" fill="white" stroke="#374151" strokeWidth="1" rx="3"/>
+            <rect x="5" y="5" width="8" height="8" fill="#374151"/>
+            <rect x="5" y="47" width="8" height="8" fill="#374151"/>
+            <rect x="47" y="5" width="8" height="8" fill="#374151"/>
+            <rect x="15" y="15" width="3" height="3" fill="#374151"/>
+            <rect x="21" y="15" width="3" height="3" fill="#374151"/>
+            <rect x="27" y="15" width="3" height="3" fill="#374151"/>
+            <rect x="33" y="15" width="3" height="3" fill="#374151"/>
+            <rect x="39" y="15" width="3" height="3" fill="#374151"/>
+            <rect x="15" y="21" width="3" height="3" fill="#374151"/>
+            <rect x="27" y="21" width="3" height="3" fill="#374151"/>
+            <rect x="39" y="21" width="3" height="3" fill="#374151"/>
+            <rect x="15" y="27" width="3" height="3" fill="#374151"/>
+            <rect x="21" y="27" width="3" height="3" fill="#374151"/>
+            <rect x="33" y="27" width="3" height="3" fill="#374151"/>
+            <rect x="45" y="27" width="3" height="3" fill="#374151"/>
+            <rect x="15" y="33" width="3" height="3" fill="#374151"/>
+            <rect x="27" y="33" width="3" height="3" fill="#374151"/>
+            <rect x="39" y="33" width="3" height="3" fill="#374151"/>
+            <rect x="21" y="39" width="3" height="3" fill="#374151"/>
+            <rect x="33" y="39" width="3" height="3" fill="#374151"/>
+            <rect x="45" y="39" width="3" height="3" fill="#374151"/>
+            <rect x="15" y="45" width="3" height="3" fill="#374151"/>
+            <rect x="27" y="45" width="3" height="3" fill="#374151"/>
+            <rect x="33" y="45" width="3" height="3" fill="#374151"/>
+            <rect x="39" y="45" width="3" height="3" fill="#374151"/>
+          </g>
           
           {/* Verification Info */}
           <text x="140" y={size * 1.4 - 170} className="prescription-small">
@@ -287,14 +269,13 @@ export default function PrescriptionGenerator({
             Reviewed under Board Certified MD supervision
           </text>
           
-          {/* Logo Seal */}
-          <foreignObject x={size - 120} y={size * 1.4 - 180} width="80" height="80">
-            <div className="flex items-center justify-center w-full h-full">
-              <div className="bg-white rounded-full p-2 border-2 border-gray-200">
-                <OrthoIQLogo size={50} variant={theme.logoVariant} circular />
-              </div>
-            </div>
-          </foreignObject>
+          {/* Logo Seal - Pure SVG version */}
+          <g transform={`translate(${size - 100}, ${size * 1.4 - 160})`}>
+            <circle cx="40" cy="40" r="38" fill="white" stroke="#e5e7eb" strokeWidth="2" />
+            <circle cx="40" cy="40" r="30" fill={theme.primaryColor} />
+            <circle cx="40" cy="40" r="22" fill="white" />
+            <line x1="25" y1="25" x2="55" y2="55" stroke="white" strokeWidth="2" />
+          </g>
           
           {/* Medical Disclaimers */}
           <text x="60" y={size * 1.4 - 110} className="prescription-small">
