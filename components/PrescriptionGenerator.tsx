@@ -15,13 +15,17 @@ interface PrescriptionGeneratorProps {
   size?: number;
   className?: string;
   onGenerated?: (metadata: PrescriptionMetadata) => void;
+  mdReviewed?: boolean;
+  mdReviewerName?: string;
 }
 
 export default function PrescriptionGenerator({ 
   data, 
   size = 600, 
   className = "",
-  onGenerated 
+  onGenerated,
+  mdReviewed = false,
+  mdReviewerName
 }: PrescriptionGeneratorProps) {
   const prescriptionRef = useRef<SVGSVGElement>(null);
 
@@ -85,13 +89,50 @@ export default function PrescriptionGenerator({
               `}
             </style>
             
-            {/* Rare prescription effects - Static */}
+            {/* Watermark patterns based on rarity */}
+            {prescriptionMetadata.rarity === 'uncommon' && (
+              <pattern id="medical-pattern" patternUnits="userSpaceOnUse" width="40" height="40" patternTransform="rotate(45)">
+                <rect width="40" height="40" fill="rgba(14,116,144,0.03)" />
+                <text x="20" y="25" textAnchor="middle" fontSize="20" fill="rgba(14,116,144,0.08)">⚕</text>
+              </pattern>
+            )}
+            
             {prescriptionMetadata.rarity === 'rare' && (
-              <linearGradient id="gold-shimmer" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="rgba(245,158,11,0.1)" />
-                <stop offset="50%" stopColor="rgba(245,158,11,0.2)" />
-                <stop offset="100%" stopColor="rgba(245,158,11,0.1)" />
-              </linearGradient>
+              <>
+                <linearGradient id="gold-shimmer" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="rgba(245,158,11,0.1)" />
+                  <stop offset="50%" stopColor="rgba(245,158,11,0.2)" />
+                  <stop offset="100%" stopColor="rgba(245,158,11,0.1)" />
+                </linearGradient>
+                <pattern id="caduceus-pattern" patternUnits="userSpaceOnUse" width="60" height="60" patternTransform="rotate(30)">
+                  <rect width="60" height="60" fill="rgba(245,158,11,0.05)" />
+                  <text x="30" y="35" textAnchor="middle" fontSize="24" fill="rgba(245,158,11,0.15)">⚕</text>
+                </pattern>
+              </>
+            )}
+            
+            {prescriptionMetadata.rarity === 'ultra-rare' && (
+              <>
+                <linearGradient id="holographic-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(139,92,246,0.1)" />
+                  <stop offset="25%" stopColor="rgba(236,72,153,0.1)" />
+                  <stop offset="50%" stopColor="rgba(59,130,246,0.1)" />
+                  <stop offset="75%" stopColor="rgba(16,185,129,0.1)" />
+                  <stop offset="100%" stopColor="rgba(139,92,246,0.1)" />
+                </linearGradient>
+                <pattern id="holographic-pattern" patternUnits="userSpaceOnUse" width="80" height="80">
+                  <rect width="80" height="80" fill="url(#holographic-bg)" />
+                  <circle cx="40" cy="40" r="15" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="2" />
+                  <text x="40" y="48" textAnchor="middle" fontSize="20" fill="rgba(139,92,246,0.3)">✨</text>
+                </pattern>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                  <feMerge> 
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </>
             )}
           </defs>
           
@@ -108,16 +149,62 @@ export default function PrescriptionGenerator({
             rx="10" 
           />
           
-          {/* Rare effects overlay */}
-          {prescriptionMetadata.rarity === 'rare' && (
+          {/* Watermark overlays based on rarity */}
+          {prescriptionMetadata.rarity === 'uncommon' && (
             <rect 
               x="20" 
               y="20" 
               width={size - 40} 
               height={size * 1.4 - 40} 
-              fill="url(#gold-shimmer)" 
+              fill="url(#medical-pattern)" 
               rx="10" 
             />
+          )}
+          
+          {prescriptionMetadata.rarity === 'rare' && (
+            <>
+              <rect 
+                x="20" 
+                y="20" 
+                width={size - 40} 
+                height={size * 1.4 - 40} 
+                fill="url(#gold-shimmer)" 
+                rx="10" 
+              />
+              <rect 
+                x="20" 
+                y="20" 
+                width={size - 40} 
+                height={size * 1.4 - 40} 
+                fill="url(#caduceus-pattern)" 
+                rx="10" 
+              />
+            </>
+          )}
+          
+          {prescriptionMetadata.rarity === 'ultra-rare' && (
+            <>
+              <rect 
+                x="20" 
+                y="20" 
+                width={size - 40} 
+                height={size * 1.4 - 40} 
+                fill="url(#holographic-pattern)" 
+                rx="10" 
+              />
+              <g filter="url(#glow)">
+                <rect 
+                  x="20" 
+                  y="20" 
+                  width={size - 40} 
+                  height={size * 1.4 - 40} 
+                  fill="none" 
+                  stroke="rgba(139,92,246,0.4)" 
+                  strokeWidth="3" 
+                  rx="10" 
+                />
+              </g>
+            </>
           )}
           
           {/* Header */}
@@ -126,7 +213,7 @@ export default function PrescriptionGenerator({
           </text>
           
           <text x={size / 2} y="85" textAnchor="middle" className="prescription-subtitle">
-            Board Certified MD Supervised
+            {mdReviewed ? `MD Reviewed by ${mdReviewerName || 'Dr. KPJMD'}` : 'Board Certified MD Supervised'}
           </text>
           
           <text x={size / 2} y="105" textAnchor="middle" className="prescription-small">
@@ -193,6 +280,26 @@ export default function PrescriptionGenerator({
           <text x={size - 110} y="475" textAnchor="middle" className="prescription-header">
             {Math.round(data.confidence * 100)}%
           </text>
+          {/* MD Review Stamp */}
+          {mdReviewed && (
+            <g>
+              <circle 
+                cx={size - 80} 
+                cy="420" 
+                r="35" 
+                fill="rgba(16,185,129,0.1)" 
+                stroke="#10b981" 
+                strokeWidth="2" 
+              />
+              <text x={size - 80} y="415" textAnchor="middle" className="prescription-small" fill="#10b981" fontWeight="bold">
+                MD
+              </text>
+              <text x={size - 80} y="430" textAnchor="middle" className="prescription-small" fill="#10b981" fontWeight="bold">
+                REVIEWED
+              </text>
+            </g>
+          )}
+
           {/* Rarity Badge - Pure SVG version */}
           <rect 
             x={size - 140} 

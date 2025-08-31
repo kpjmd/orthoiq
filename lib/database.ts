@@ -217,6 +217,46 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_notification_logs_created_at ON notification_logs(created_at);
     `;
 
+    // Prescriptions table for storing prescription metadata and NFT data
+    await sql`
+      CREATE TABLE IF NOT EXISTS prescriptions (
+        id SERIAL PRIMARY KEY,
+        prescription_id VARCHAR(255) UNIQUE NOT NULL,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        rarity_type VARCHAR(20) NOT NULL CHECK (rarity_type IN ('common', 'uncommon', 'rare', 'ultra-rare')),
+        theme_config JSONB NOT NULL,
+        watermark_type VARCHAR(20) DEFAULT 'none',
+        nft_metadata JSONB NOT NULL,
+        verification_hash VARCHAR(255) NOT NULL,
+        share_count INTEGER DEFAULT 0,
+        mint_status VARCHAR(20) DEFAULT 'not_minted' CHECK (mint_status IN ('not_minted', 'ready_to_mint', 'minted')),
+        owner_fid VARCHAR(255),
+        md_reviewed BOOLEAN DEFAULT FALSE,
+        md_reviewer_name VARCHAR(255),
+        md_review_notes TEXT,
+        md_reviewed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescriptions_prescription_id ON prescriptions(prescription_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescriptions_fid ON prescriptions(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescriptions_rarity ON prescriptions(rarity_type);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescriptions_mint_status ON prescriptions(mint_status);
+    `;
+
     // Share data table for storing shared responses and artwork
     await sql`
       CREATE TABLE IF NOT EXISTS shares (
@@ -1012,6 +1052,110 @@ export async function cleanupExpiredShares(): Promise<number> {
     return result.length;
   } catch (error) {
     console.error('Error cleaning up expired shares:', error);
+    throw error;
+  }
+}
+
+// Prescription functions
+export async function storePrescription(
+  prescriptionId: string,
+  questionId: number,
+  fid: string,
+  rarityType: string,
+  themeConfig: any,
+  watermarkType: string,
+  nftMetadata: any,
+  verificationHash: string
+): Promise<number> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      INSERT INTO prescriptions (
+        prescription_id, question_id, fid, rarity_type, 
+        theme_config, watermark_type, nft_metadata, verification_hash
+      )
+      VALUES (
+        ${prescriptionId}, ${questionId}, ${fid}, ${rarityType},
+        ${JSON.stringify(themeConfig)}, ${watermarkType}, 
+        ${JSON.stringify(nftMetadata)}, ${verificationHash}
+      )
+      RETURNING id
+    `;
+    
+    return result[0].id;
+  } catch (error) {
+    console.error('Error storing prescription:', error);
+    throw error;
+  }
+}
+
+export async function getPrescription(prescriptionId: string): Promise<any | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT 
+        p.*,
+        q.question,
+        q.response,
+        q.confidence
+      FROM prescriptions p
+      JOIN questions q ON p.question_id = q.id
+      WHERE p.prescription_id = ${prescriptionId}
+    `;
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return {
+      ...result[0],
+      themeConfig: result[0].theme_config,
+      nftMetadata: result[0].nft_metadata
+    };
+  } catch (error) {
+    console.error('Error getting prescription:', error);
+    return null;
+  }
+}
+
+export async function markPrescriptionShared(prescriptionId: string): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    await sql`
+      UPDATE prescriptions 
+      SET share_count = share_count + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE prescription_id = ${prescriptionId}
+    `;
+  } catch (error) {
+    console.error('Error marking prescription as shared:', error);
+    throw error;
+  }
+}
+
+export async function markMDReviewed(
+  prescriptionId: string,
+  reviewerName: string,
+  reviewNotes?: string
+): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    await sql`
+      UPDATE prescriptions 
+      SET 
+        md_reviewed = TRUE,
+        md_reviewer_name = ${reviewerName},
+        md_review_notes = ${reviewNotes || null},
+        md_reviewed_at = CURRENT_TIMESTAMP,
+        mint_status = 'ready_to_mint',
+        updated_at = CURRENT_TIMESTAMP
+      WHERE prescription_id = ${prescriptionId}
+    `;
+  } catch (error) {
+    console.error('Error marking prescription as MD reviewed:', error);
     throw error;
   }
 }

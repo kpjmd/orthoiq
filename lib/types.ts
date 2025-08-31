@@ -49,6 +49,8 @@ export interface PrescriptionMetadata {
   verificationHash: string;
   patientId: string;
   prescriberId: string;
+  watermarkType?: 'none' | 'medical_pattern' | 'gold_caduceus' | 'holographic';
+  nftMetadata?: object;
 }
 
 export interface PrescriptionTheme {

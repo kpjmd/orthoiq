@@ -233,6 +233,10 @@ export function calculateQuestionComplexity(question: string): number {
 }
 
 export function generateMetadata(prescriptionData: PrescriptionData, rarity: RarityConfig): PrescriptionMetadata {
+  const watermarkType = rarity.name === 'common' ? 'none' : 
+                       rarity.name === 'uncommon' ? 'medical_pattern' :
+                       rarity.name === 'rare' ? 'gold_caduceus' : 'holographic';
+
   return {
     id: generatePrescriptionId(),
     rarity: rarity.name,
@@ -240,6 +244,7 @@ export function generateMetadata(prescriptionData: PrescriptionData, rarity: Rar
     generatedAt: new Date().toISOString(),
     verificationHash: generateVerificationHash(prescriptionData),
     patientId: `ANON-${prescriptionData.fid}`,
-    prescriberId: 'ORTHOIQ-AI-001'
+    prescriberId: 'ORTHOIQ-AI-001',
+    watermarkType
   };
 }

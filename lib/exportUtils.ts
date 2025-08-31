@@ -1,7 +1,7 @@
 import { PrescriptionData, PrescriptionMetadata } from './types';
 
 export interface ExportOptions {
-  format: 'png' | 'svg' | 'instagram' | 'linkedin' | 'twitter';
+  format: 'png' | 'svg' | 'instagram' | 'linkedin' | 'twitter' | 'farcaster';
   quality?: number;
   width?: number;
   height?: number;
@@ -266,20 +266,113 @@ export function generateTwitterCard(
   `;
 }
 
-export function generateMetadata(
+export function generateFarcasterFrame(
   prescriptionData: PrescriptionData,
   metadata: PrescriptionMetadata
+): string {
+  // Generate Farcaster frame format (1.91:1 aspect ratio)
+  return `
+    <svg width="1200" height="628" viewBox="0 0 1200 628" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="fc-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${metadata.theme.primaryColor}25" />
+          <stop offset="50%" stop-color="#ffffff" />
+          <stop offset="100%" stop-color="${metadata.theme.accentColor}25" />
+        </linearGradient>
+      </defs>
+      
+      <!-- Background -->
+      <rect width="1200" height="628" fill="url(#fc-bg)" />
+      
+      <!-- Main Card -->
+      <rect x="40" y="40" width="1120" height="548" fill="white" rx="25" stroke="#e5e7eb" stroke-width="2" />
+      
+      <!-- Header with Farcaster purple accent -->
+      <rect x="60" y="60" width="1080" height="120" fill="linear-gradient(45deg, #8A63D2, #472A91)" rx="15" />
+      <text x="600" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white">
+        🩺 OrthoIQ Prescription Generated
+      </text>
+      <text x="600" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.9)">
+        AI-Powered Medical Intelligence on Farcaster
+      </text>
+      
+      <!-- Content Preview -->
+      <text x="100" y="230" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#374151">
+        Medical Inquiry:
+      </text>
+      <text x="100" y="260" font-family="Arial, sans-serif" font-size="16" fill="#6b7280">
+        ${prescriptionData.userQuestion.substring(0, 100)}...
+      </text>
+      
+      <!-- Stats Row -->
+      <rect x="100" y="300" width="150" height="70" fill="${metadata.theme.primaryColor}15" rx="10" />
+      <text x="175" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${metadata.theme.primaryColor}">
+        ${Math.round(prescriptionData.confidence * 100)}%
+      </text>
+      <text x="175" y="345" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6b7280">
+        AI Confidence
+      </text>
+      
+      <rect x="280" y="300" width="200" height="70" fill="${metadata.theme.accentColor}15" rx="10" />
+      <text x="380" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${metadata.theme.accentColor}">
+        ${metadata.rarity.replace('-', ' ').toUpperCase()}
+      </text>
+      <text x="380" y="345" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6b7280">
+        Rarity Level
+      </text>
+      
+      <rect x="510" y="300" width="180" height="70" fill="#10b98115" rx="10" />
+      <text x="600" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#10b981">
+        ID: ${metadata.id.substring(0, 12)}...
+      </text>
+      <text x="600" y="345" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6b7280">
+        Prescription ID
+      </text>
+      
+      <!-- CTA -->
+      <rect x="200" y="420" width="800" height="80" fill="#8A63D2" rx="40" />
+      <text x="600" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white">
+        🚀 Ask Your Own Question on OrthoIQ
+      </text>
+      
+      <!-- Footer -->
+      <text x="600" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#9ca3af">
+        Powered by Claude AI • Reviewed by Board Certified MDs
+      </text>
+    </svg>
+  `;
+}
+
+export function generateNFTMetadata(
+  prescriptionData: PrescriptionData,
+  metadata: PrescriptionMetadata,
+  mdReviewed: boolean = false,
+  mdReviewerName?: string
 ): object {
-  // Generate NFT-compatible metadata
+  // Calculate rarity percentage
+  const rarityPercentages = {
+    'common': 70,
+    'uncommon': 20,
+    'rare': 8,
+    'ultra-rare': 2
+  };
+  
+  // Generate NFT-compatible metadata following ERC-721 standard
   return {
     name: `OrthoIQ Prescription #${metadata.id}`,
-    description: `AI-generated orthopedic prescription for: "${prescriptionData.userQuestion.substring(0, 100)}..." Generated with ${Math.round(prescriptionData.confidence * 100)}% AI confidence.`,
+    description: `${mdReviewed ? 'MD-Reviewed ' : ''}AI-generated orthopedic prescription: "${prescriptionData.userQuestion.substring(0, 150)}..." Generated with ${Math.round(prescriptionData.confidence * 100)}% AI confidence${mdReviewed ? ` and reviewed by ${mdReviewerName || 'Dr. KPJMD'}` : ''}.`,
     image: `https://orthoiq.com/api/prescription-image/${metadata.id}`,
     external_url: `https://orthoiq.com/prescription/${metadata.id}`,
+    animation_url: metadata.rarity === 'ultra-rare' ? `https://orthoiq.com/api/prescription-animation/${metadata.id}` : undefined,
     attributes: [
       {
         trait_type: "Rarity",
         value: metadata.rarity.replace('-', ' ').toUpperCase()
+      },
+      {
+        trait_type: "Rarity Percentage",
+        value: rarityPercentages[metadata.rarity as keyof typeof rarityPercentages],
+        max_value: 100
       },
       {
         trait_type: "AI Confidence",
@@ -287,8 +380,22 @@ export function generateMetadata(
         max_value: 100
       },
       {
-        trait_type: "Theme",
+        trait_type: "Theme Color",
         value: metadata.theme.logoVariant.toUpperCase()
+      },
+      {
+        trait_type: "MD Reviewed",
+        value: mdReviewed ? "Yes" : "No"
+      },
+      ...(mdReviewed ? [{
+        trait_type: "Reviewing Physician",
+        value: mdReviewerName || "Dr. KPJMD"
+      }] : []),
+      {
+        trait_type: "Watermark Type",
+        value: metadata.rarity === 'common' ? 'None' : 
+               metadata.rarity === 'uncommon' ? 'Medical Pattern' :
+               metadata.rarity === 'rare' ? 'Gold Caduceus' : 'Holographic'
       },
       {
         trait_type: "Generation Date",
@@ -301,13 +408,21 @@ export function generateMetadata(
       {
         trait_type: "Verification Hash",
         value: metadata.verificationHash
+      },
+      {
+        trait_type: "Specialty Focus",
+        value: "Orthopedic Surgery"
       }
     ],
     properties: {
       category: "Medical AI",
       collection: "OrthoIQ Prescriptions",
       creator: "OrthoIQ AI System",
-      medical_disclaimer: "This is AI-generated information for educational purposes only. Always consult with a healthcare provider."
+      medical_disclaimer: "This is AI-generated information for educational purposes only. Always consult with a healthcare provider.",
+      mint_status: mdReviewed ? "ready_to_mint" : "not_minted",
+      blockchain: "Base",
+      royalty_percentage: 5,
+      utility: mdReviewed ? "Premium medical analysis with physician review" : "AI-powered medical analysis"
     }
   };
 }
@@ -358,6 +473,17 @@ export async function exportPrescription(
       twLink.download = `orthoiq-twitter-${metadata.id}.svg`;
       twLink.click();
       URL.revokeObjectURL(twUrl);
+      break;
+      
+    case 'farcaster':
+      const fcContent = generateFarcasterFrame(prescriptionData, metadata);
+      const fcBlob = new Blob([fcContent], { type: 'image/svg+xml' });
+      const fcUrl = URL.createObjectURL(fcBlob);
+      const fcLink = document.createElement('a');
+      fcLink.href = fcUrl;
+      fcLink.download = `orthoiq-farcaster-${metadata.id}.svg`;
+      fcLink.click();
+      URL.revokeObjectURL(fcUrl);
       break;
       
     default:

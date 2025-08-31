@@ -67,6 +67,74 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
   if (!isOpen) return null;
 
+  const shareToSocial = async (platform: 'instagram' | 'facebook' | 'twitter' | 'farcaster') => {
+    if (!prescriptionMetadata) return;
+
+    try {
+      // Create prescription share first
+      const shareResponse = await fetch('/api/share-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          response,
+          confidence: Math.round(prescriptionData.confidence * 100),
+          metadata: {
+            prescriptionId: prescriptionMetadata.id,
+            rarity: prescriptionMetadata.rarity,
+            theme: prescriptionMetadata.theme,
+            verificationHash: prescriptionMetadata.verificationHash
+          }
+        })
+      });
+
+      if (!shareResponse.ok) {
+        throw new Error('Failed to create share link');
+      }
+
+      const shareData = await shareResponse.json();
+      const shareUrl = shareData.shareUrl;
+      
+      const baseText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.`;
+      
+      let shareText = baseText;
+      let platformUrl = shareUrl;
+      
+      switch (platform) {
+        case 'instagram':
+          shareText = `${baseText}\n\n#OrthoIQ #AIHealthcare #OrthopedicCare #MedicalAI`;
+          break;
+        case 'facebook':
+          shareText = `${baseText}\n\nRarity: ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}\nConfidence: ${Math.round(prescriptionData.confidence * 100)}%`;
+          break;
+        case 'twitter':
+          shareText = `${baseText}\n\n🔬 Rarity: ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}\n📊 Confidence: ${Math.round(prescriptionData.confidence * 100)}%\n\n#OrthoIQ #AIHealthcare`;
+          break;
+        case 'farcaster':
+          shareText = `${baseText}\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
+          break;
+      }
+
+      // Try to use Web Share API first
+      if (navigator.share && navigator.canShare({ text: shareText, url: platformUrl })) {
+        await navigator.share({
+          title: 'OrthoIQ Medical Prescription',
+          text: shareText,
+          url: platformUrl
+        });
+      } else {
+        // Fallback to clipboard
+        await navigator.clipboard.writeText(`${shareText}\n\n${platformUrl}`);
+        setShareStatus('success');
+        setTimeout(() => setShareStatus('idle'), 3000);
+      }
+    } catch (error) {
+      console.error(`Error sharing to ${platform}:`, error);
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    }
+  };
+
   const sharePrescription = async () => {
     setIsSharing(true);
     setShareStatus('idle');
@@ -139,15 +207,6 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     }
   };
 
-  const handleExport = async (format: 'png' | 'svg' | 'instagram' | 'linkedin' | 'twitter') => {
-    if (!prescriptionRef.current || !prescriptionMetadata) return;
-
-    try {
-      await exportPrescription(prescriptionRef.current, prescriptionData, prescriptionMetadata, { format });
-    } catch (error) {
-      console.error(`Error exporting ${format}:`, error);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -203,58 +262,42 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         {/* Action Buttons */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t rounded-b-xl">
           <div className="flex flex-wrap gap-3 justify-between items-center">
-            {/* Export Buttons */}
+            {/* Social Media Sharing */}
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={() => handleExport('png')}
-                disabled={isGenerating || generationError !== null}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+                onClick={() => shareToSocial('instagram')}
+                disabled={isGenerating || generationError !== null || isSharing}
+                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
               >
-                Download PNG
+                📷 Instagram
               </button>
               <button
-                onClick={() => handleExport('svg')}
-                disabled={isGenerating || generationError !== null}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+                onClick={() => shareToSocial('facebook')}
+                disabled={isGenerating || generationError !== null || isSharing}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
               >
-                Download SVG
+                📘 Facebook
               </button>
-              
-              {/* Social Media Dropdown */}
-              <div className="relative group">
-                <button 
-                  disabled={isGenerating || generationError !== null}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
-                >
-                  Export for Social
-                </button>
-                <div className="absolute bottom-full mb-2 left-0 w-40 bg-white rounded-lg shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                  <button
-                    onClick={() => handleExport('instagram')}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg"
-                  >
-                    Instagram Story
-                  </button>
-                  <button
-                    onClick={() => handleExport('linkedin')}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    LinkedIn Post
-                  </button>
-                  <button
-                    onClick={() => handleExport('twitter')}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg"
-                  >
-                    Twitter Card
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={() => shareToSocial('twitter')}
+                disabled={isGenerating || generationError !== null || isSharing}
+                className="px-4 py-2 bg-gray-900 hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
+              >
+                𝕏 Twitter
+              </button>
+              <button
+                onClick={() => shareToSocial('farcaster')}
+                disabled={isGenerating || generationError !== null || isSharing}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
+              >
+                🟣 Farcaster
+              </button>
             </div>
 
-            {/* Share Button */}
+            {/* Main Share Button */}
             <div className="flex items-center gap-3">
               {shareStatus === 'success' && (
-                <span className="text-green-600 text-sm">✓ Shared successfully!</span>
+                <span className="text-green-600 text-sm">✓ Link copied!</span>
               )}
               {shareStatus === 'error' && (
                 <span className="text-red-600 text-sm">✗ Share failed</span>
@@ -262,7 +305,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
               <button
                 onClick={sharePrescription}
                 disabled={isSharing || isGenerating || generationError !== null}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors flex items-center"
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium transition-colors flex items-center"
               >
                 {isSharing ? (
                   <>
@@ -275,7 +318,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
                 ) : (
                   <>
                     <span className="mr-2">🔗</span>
-                    Share Prescription
+                    Copy Share Link
                   </>
                 )}
               </button>
