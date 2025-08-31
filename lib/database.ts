@@ -230,6 +230,12 @@ export async function initDatabase() {
         nft_metadata JSONB NOT NULL,
         verification_hash VARCHAR(255) NOT NULL,
         share_count INTEGER DEFAULT 0,
+        download_count INTEGER DEFAULT 0,
+        share_platforms JSONB DEFAULT '[]'::jsonb,
+        payment_status VARCHAR(20) DEFAULT 'none' CHECK (payment_status IN ('none', 'pending', 'completed')),
+        payment_amount DECIMAL(10,2),
+        payment_tx_hash VARCHAR(255),
+        collection_position INTEGER,
         mint_status VARCHAR(20) DEFAULT 'not_minted' CHECK (mint_status IN ('not_minted', 'ready_to_mint', 'minted')),
         owner_fid VARCHAR(255),
         md_reviewed BOOLEAN DEFAULT FALSE,
@@ -255,6 +261,102 @@ export async function initDatabase() {
 
     await sql`
       CREATE INDEX IF NOT EXISTS idx_prescriptions_mint_status ON prescriptions(mint_status);
+    `;
+
+    // Add new columns to existing prescriptions table if they don't exist
+    try {
+      await sql`
+        ALTER TABLE prescriptions 
+        ADD COLUMN IF NOT EXISTS download_count INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS share_platforms JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'none' CHECK (payment_status IN ('none', 'pending', 'completed')),
+        ADD COLUMN IF NOT EXISTS payment_amount DECIMAL(10,2),
+        ADD COLUMN IF NOT EXISTS payment_tx_hash VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS collection_position INTEGER
+      `;
+    } catch (error) {
+      console.log('Note: Some prescription table columns may already exist');
+    }
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescriptions_payment_status ON prescriptions(payment_status);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescriptions_collection_position ON prescriptions(collection_position);
+    `;
+
+    // Prescription downloads tracking table
+    await sql`
+      CREATE TABLE IF NOT EXISTS prescription_downloads (
+        id SERIAL PRIMARY KEY,
+        prescription_id VARCHAR(255) REFERENCES prescriptions(prescription_id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        download_type VARCHAR(20) DEFAULT 'image' CHECK (download_type IN ('image', 'pdf', 'nft_metadata')),
+        user_agent TEXT,
+        ip_hash VARCHAR(255),
+        downloaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_downloads_prescription_id ON prescription_downloads(prescription_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_downloads_fid ON prescription_downloads(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_downloads_downloaded_at ON prescription_downloads(downloaded_at);
+    `;
+
+    // Prescription shares tracking table
+    await sql`
+      CREATE TABLE IF NOT EXISTS prescription_shares (
+        id SERIAL PRIMARY KEY,
+        prescription_id VARCHAR(255) REFERENCES prescriptions(prescription_id) ON DELETE CASCADE,
+        platform VARCHAR(50) NOT NULL CHECK (platform IN ('farcaster', 'twitter', 'facebook', 'telegram', 'email', 'copy_link')),
+        share_url TEXT,
+        clicks INTEGER DEFAULT 0,
+        fid VARCHAR(255) NOT NULL,
+        shared_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_shares_prescription_id ON prescription_shares(prescription_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_shares_platform ON prescription_shares(platform);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_shares_fid ON prescription_shares(fid);
+    `;
+
+    // Prescription collections summary table
+    await sql`
+      CREATE TABLE IF NOT EXISTS prescription_collections (
+        id SERIAL PRIMARY KEY,
+        fid VARCHAR(255) UNIQUE NOT NULL,
+        total_prescriptions INTEGER DEFAULT 0,
+        rarity_counts JSONB DEFAULT '{"common": 0, "uncommon": 0, "rare": 0, "ultra-rare": 0}'::jsonb,
+        total_downloads INTEGER DEFAULT 0,
+        total_shares INTEGER DEFAULT 0,
+        last_prescription_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_collections_fid ON prescription_collections(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_prescription_collections_total_prescriptions ON prescription_collections(total_prescriptions);
     `;
 
     // Share data table for storing shared responses and artwork
@@ -1083,6 +1185,9 @@ export async function storePrescription(
       RETURNING id
     `;
     
+    // Update user collection stats
+    await updateUserCollection(fid, rarityType);
+    
     return result[0].id;
   } catch (error) {
     console.error('Error storing prescription:', error);
@@ -1157,5 +1262,327 @@ export async function markMDReviewed(
   } catch (error) {
     console.error('Error marking prescription as MD reviewed:', error);
     throw error;
+  }
+}
+
+// Get user's prescription collection
+export async function getUserPrescriptions(fid: string): Promise<any[]> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT 
+        p.*,
+        q.question,
+        q.response,
+        q.confidence
+      FROM prescriptions p
+      JOIN questions q ON p.question_id = q.id
+      WHERE p.fid = ${fid}
+      ORDER BY p.created_at DESC
+    `;
+
+    return result.map((row: any) => ({
+      id: row.prescription_id,
+      questionId: row.question_id,
+      question: row.question,
+      response: row.response,
+      confidence: row.confidence,
+      rarity: row.rarity_type,
+      theme: row.theme_config,
+      watermarkType: row.watermark_type,
+      nftMetadata: row.nft_metadata,
+      verificationHash: row.verification_hash,
+      shareCount: row.share_count,
+      downloadCount: row.download_count,
+      sharePlatforms: row.share_platforms,
+      paymentStatus: row.payment_status,
+      paymentAmount: row.payment_amount,
+      paymentTxHash: row.payment_tx_hash,
+      collectionPosition: row.collection_position,
+      mintStatus: row.mint_status,
+      mdReviewed: row.md_reviewed,
+      mdReviewerName: row.md_reviewer_name,
+      mdReviewNotes: row.md_review_notes,
+      mdReviewedAt: row.md_reviewed_at,
+      createdAt: row.created_at
+    }));
+  } catch (error) {
+    console.error('Error getting user prescriptions:', error);
+    return [];
+  }
+}
+
+// Track prescription download
+export async function trackPrescriptionDownload(
+  prescriptionId: string,
+  fid: string,
+  downloadType: 'image' | 'pdf' | 'nft_metadata' = 'image',
+  userAgent?: string,
+  ipHash?: string
+): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    // Insert download record
+    await sql`
+      INSERT INTO prescription_downloads (
+        prescription_id, fid, download_type, user_agent, ip_hash
+      )
+      VALUES (${prescriptionId}, ${fid}, ${downloadType}, ${userAgent || null}, ${ipHash || null})
+    `;
+
+    // Update prescription download count
+    await sql`
+      UPDATE prescriptions 
+      SET download_count = download_count + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE prescription_id = ${prescriptionId}
+    `;
+
+    // Update user collection stats
+    await sql`
+      INSERT INTO prescription_collections (fid, total_downloads)
+      VALUES (${fid}, 1)
+      ON CONFLICT (fid) 
+      DO UPDATE SET 
+        total_downloads = prescription_collections.total_downloads + 1,
+        updated_at = CURRENT_TIMESTAMP
+    `;
+  } catch (error) {
+    console.error('Error tracking prescription download:', error);
+    throw error;
+  }
+}
+
+// Track prescription share
+export async function trackPrescriptionShare(
+  prescriptionId: string,
+  fid: string,
+  platform: 'farcaster' | 'twitter' | 'facebook' | 'telegram' | 'email' | 'copy_link',
+  shareUrl?: string
+): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    // Insert share record
+    await sql`
+      INSERT INTO prescription_shares (
+        prescription_id, fid, platform, share_url
+      )
+      VALUES (${prescriptionId}, ${fid}, ${platform}, ${shareUrl || null})
+    `;
+
+    // Update prescription share count and platforms
+    await sql`
+      UPDATE prescriptions 
+      SET 
+        share_count = share_count + 1,
+        share_platforms = CASE 
+          WHEN share_platforms @> ${JSON.stringify([platform])}::jsonb 
+          THEN share_platforms
+          ELSE share_platforms || ${JSON.stringify([platform])}::jsonb
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE prescription_id = ${prescriptionId}
+    `;
+
+    // Update user collection stats
+    await sql`
+      INSERT INTO prescription_collections (fid, total_shares)
+      VALUES (${fid}, 1)
+      ON CONFLICT (fid) 
+      DO UPDATE SET 
+        total_shares = prescription_collections.total_shares + 1,
+        updated_at = CURRENT_TIMESTAMP
+    `;
+  } catch (error) {
+    console.error('Error tracking prescription share:', error);
+    throw error;
+  }
+}
+
+// Update user collection stats when new prescription is created
+export async function updateUserCollection(fid: string, rarityType: string): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    await sql`
+      INSERT INTO prescription_collections (
+        fid, total_prescriptions, rarity_counts, last_prescription_at
+      )
+      VALUES (
+        ${fid}, 
+        1, 
+        ${JSON.stringify({[rarityType]: 1, common: 0, uncommon: 0, rare: 0, 'ultra-rare': 0})},
+        CURRENT_TIMESTAMP
+      )
+      ON CONFLICT (fid) 
+      DO UPDATE SET 
+        total_prescriptions = prescription_collections.total_prescriptions + 1,
+        rarity_counts = jsonb_set(
+          prescription_collections.rarity_counts,
+          ARRAY[${rarityType}],
+          (COALESCE(prescription_collections.rarity_counts->${rarityType}, '0'::jsonb)::int + 1)::text::jsonb
+        ),
+        last_prescription_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    `;
+  } catch (error) {
+    console.error('Error updating user collection:', error);
+    throw error;
+  }
+}
+
+// Get prescription analytics for admin dashboard
+export async function getPrescriptionAnalytics(): Promise<any> {
+  const sql = getSql();
+  
+  try {
+    const totalPrescriptions = await sql`
+      SELECT COUNT(*) as count FROM prescriptions
+    `;
+
+    const rarityDistribution = await sql`
+      SELECT rarity_type, COUNT(*) as count
+      FROM prescriptions
+      GROUP BY rarity_type
+      ORDER BY 
+        CASE rarity_type 
+          WHEN 'common' THEN 1
+          WHEN 'uncommon' THEN 2
+          WHEN 'rare' THEN 3
+          WHEN 'ultra-rare' THEN 4
+        END
+    `;
+
+    const totalDownloads = await sql`
+      SELECT SUM(download_count) as total_downloads FROM prescriptions
+    `;
+
+    const totalShares = await sql`
+      SELECT SUM(share_count) as total_shares FROM prescriptions
+    `;
+
+    const platformDistribution = await sql`
+      SELECT platform, COUNT(*) as count
+      FROM prescription_shares
+      GROUP BY platform
+      ORDER BY count DESC
+    `;
+
+    const mdReviewStats = await sql`
+      SELECT 
+        COUNT(CASE WHEN md_reviewed = true THEN 1 END) as reviewed_count,
+        COUNT(*) as total_count
+      FROM prescriptions
+    `;
+
+    const paymentStats = await sql`
+      SELECT 
+        payment_status,
+        COUNT(*) as count,
+        COALESCE(SUM(payment_amount), 0) as total_amount
+      FROM prescriptions
+      GROUP BY payment_status
+    `;
+
+    const topCollectors = await sql`
+      SELECT 
+        pc.fid,
+        pc.total_prescriptions,
+        pc.rarity_counts,
+        pc.total_downloads,
+        pc.total_shares
+      FROM prescription_collections pc
+      ORDER BY pc.total_prescriptions DESC
+      LIMIT 10
+    `;
+
+    const recentActivity = await sql`
+      SELECT 
+        p.prescription_id,
+        p.fid,
+        p.rarity_type,
+        p.created_at,
+        q.question
+      FROM prescriptions p
+      JOIN questions q ON p.question_id = q.id
+      ORDER BY p.created_at DESC
+      LIMIT 20
+    `;
+
+    return {
+      totalPrescriptions: parseInt(totalPrescriptions[0].count),
+      rarityDistribution,
+      totalDownloads: parseInt(totalDownloads[0].total_downloads) || 0,
+      totalShares: parseInt(totalShares[0].total_shares) || 0,
+      platformDistribution,
+      mdReviewStats: {
+        reviewedCount: parseInt(mdReviewStats[0].reviewed_count),
+        totalCount: parseInt(mdReviewStats[0].total_count),
+        reviewRate: mdReviewStats[0].total_count > 0 ? 
+          (parseInt(mdReviewStats[0].reviewed_count) / parseInt(mdReviewStats[0].total_count) * 100) : 0
+      },
+      paymentStats,
+      topCollectors,
+      recentActivity
+    };
+  } catch (error) {
+    console.error('Error getting prescription analytics:', error);
+    return {
+      totalPrescriptions: 0,
+      rarityDistribution: [],
+      totalDownloads: 0,
+      totalShares: 0,
+      platformDistribution: [],
+      mdReviewStats: { reviewedCount: 0, totalCount: 0, reviewRate: 0 },
+      paymentStats: [],
+      topCollectors: [],
+      recentActivity: []
+    };
+  }
+}
+
+// Get user collection summary
+export async function getUserCollectionSummary(fid: string): Promise<any> {
+  const sql = getSql();
+  
+  try {
+    const collection = await sql`
+      SELECT * FROM prescription_collections
+      WHERE fid = ${fid}
+    `;
+
+    if (collection.length === 0) {
+      return {
+        fid,
+        totalPrescriptions: 0,
+        rarityCounts: { common: 0, uncommon: 0, rare: 0, 'ultra-rare': 0 },
+        totalDownloads: 0,
+        totalShares: 0,
+        lastPrescriptionAt: null
+      };
+    }
+
+    const data = collection[0];
+    return {
+      fid: data.fid,
+      totalPrescriptions: data.total_prescriptions,
+      rarityCounts: data.rarity_counts,
+      totalDownloads: data.total_downloads,
+      totalShares: data.total_shares,
+      lastPrescriptionAt: data.last_prescription_at,
+      createdAt: data.created_at
+    };
+  } catch (error) {
+    console.error('Error getting user collection summary:', error);
+    return {
+      fid,
+      totalPrescriptions: 0,
+      rarityCounts: { common: 0, uncommon: 0, rare: 0, 'ultra-rare': 0 },
+      totalDownloads: 0,
+      totalShares: 0,
+      lastPrescriptionAt: null
+    };
   }
 }
