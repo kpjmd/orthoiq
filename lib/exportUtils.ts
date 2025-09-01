@@ -427,6 +427,77 @@ export function generateNFTMetadata(
   };
 }
 
+export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promise<void> {
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      throw new Error('Cannot create canvas context');
+    }
+
+    // Get SVG dimensions
+    const svgRect = svgElement.getBoundingClientRect();
+    const scaleFactor = 2; // For high DPI
+    
+    canvas.width = svgRect.width * scaleFactor;
+    canvas.height = svgRect.height * scaleFactor;
+    
+    // Scale context for high DPI
+    ctx.scale(scaleFactor, scaleFactor);
+    
+    // Convert SVG to data URL
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    // Create image and copy to clipboard
+    const img = new Image();
+    
+    return new Promise((resolve, reject) => {
+      img.onload = async () => {
+        try {
+          ctx.drawImage(img, 0, 0);
+          
+          // Convert canvas to blob
+          canvas.toBlob(async (blob) => {
+            if (blob && navigator.clipboard && navigator.clipboard.write) {
+              try {
+                await navigator.clipboard.write([
+                  new ClipboardItem({ 'image/png': blob })
+                ]);
+                resolve();
+              } catch (clipboardError) {
+                // Fallback to data URL in clipboard
+                const dataUrl = canvas.toDataURL('image/png');
+                await navigator.clipboard.writeText(dataUrl);
+                resolve();
+              }
+            } else {
+              reject(new Error('Clipboard API not available'));
+            }
+          }, 'image/png', 0.95);
+          
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          URL.revokeObjectURL(url);
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load SVG image'));
+      };
+      
+      img.src = url;
+    });
+  } catch (error) {
+    console.error('Error copying prescription as image:', error);
+    throw error;
+  }
+}
+
 export async function exportPrescription(
   svgElement: SVGSVGElement,
   prescriptionData: PrescriptionData,

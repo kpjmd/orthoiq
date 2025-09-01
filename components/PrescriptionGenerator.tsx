@@ -41,7 +41,8 @@ export default function PrescriptionGenerator({
     if (onGenerated && prescriptionMetadata) {
       onGenerated(prescriptionMetadata);
     }
-  }, [onGenerated, prescriptionMetadata]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prescriptionMetadata]); // Remove onGenerated from dependencies to prevent re-renders
 
   const parsedResponse = useMemo(() => {
     return parseClaudeResponse(data.claudeResponse, { 

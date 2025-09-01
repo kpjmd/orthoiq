@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
-import { exportPrescription } from '@/lib/exportUtils';
+import { exportPrescription, copyPrescriptionAsImage } from '@/lib/exportUtils';
 
 interface PrescriptionModalProps {
   isOpen: boolean;
@@ -186,7 +186,29 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     }
   };
 
+  const shareAsImage = async () => {
+    if (!prescriptionMetadata || !prescriptionRef.current) {
+      console.error('No prescription available for image sharing');
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+      return;
+    }
 
+    setIsSharing(true);
+    setShareStatus('idle');
+
+    try {
+      await copyPrescriptionAsImage(prescriptionRef.current);
+      setShareStatus('success');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    } catch (error) {
+      console.error('Error sharing prescription as image:', error);
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -251,20 +273,40 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             <button
               onClick={shareToSocial}
               disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
-              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center text-lg"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center"
             >
               {isSharing ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Sharing Prescription...
+                  Sharing...
                 </>
               ) : (
                 <>
-                  <span className="mr-2">📤</span>
-                  Share Prescription
+                  <span className="mr-2">🔗</span>
+                  Share Link
+                </>
+              )}
+            </button>
+            <button
+              onClick={shareAsImage}
+              disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
+              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center"
+            >
+              {isSharing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Copying...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">🖼️</span>
+                  Copy Image
                 </>
               )}
             </button>

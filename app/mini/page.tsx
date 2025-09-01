@@ -51,6 +51,8 @@ interface ResponseData {
   hasCorrections?: boolean;
   additionsText?: string;
   correctionsText?: string;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
 function MiniAppContent() {
@@ -272,7 +274,9 @@ function MiniAppContent() {
         hasAdditions: data.hasAdditions,
         hasCorrections: data.hasCorrections,
         additionsText: data.additionsText,
-        correctionsText: data.correctionsText
+        correctionsText: data.correctionsText,
+        inquiry: data.inquiry,
+        keyPoints: data.keyPoints
       });
       
       setQuestion('');
@@ -491,6 +495,8 @@ function MiniAppContent() {
               onRate={handleRate}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
+              inquiry={responseData.inquiry}
+              keyPoints={responseData.keyPoints}
             />
           </div>
         )}
@@ -502,6 +508,8 @@ function MiniAppContent() {
           question={currentQuestion}
           response={responseData?.response || ''}
           fid={context?.user?.fid.toString() || authUser?.fid.toString() || 'guest'}
+          inquiry={responseData?.inquiry}
+          keyPoints={responseData?.keyPoints}
         />
 
         {/* Disclaimer */}
