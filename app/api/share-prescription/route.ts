@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
         keyPoints: keyPoints || null,
         prescriptionId: prescriptionMetadata?.id || null,
         rarity: prescriptionMetadata?.rarity || null,
-        theme: prescriptionMetadata?.theme || null,
+        theme: prescriptionMetadata?.theme ? JSON.stringify(prescriptionMetadata.theme) : null,
         verificationHash: prescriptionMetadata?.verificationHash || null
       },
       {}, // No farcaster-specific data for prescription shares

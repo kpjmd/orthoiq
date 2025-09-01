@@ -23,18 +23,32 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   const [isGenerating, setIsGenerating] = useState(true);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const prescriptionRef = useRef<SVGSVGElement>(null);
+  
+  // Use refs to store stable values that shouldn't change during modal lifecycle
+  const stableTimestamp = useRef<string>('');
+  const stableCaseId = useRef<string>('');
 
   // Stable prescription data to prevent re-renders
-  const prescriptionData: PrescriptionData = useMemo(() => ({
-    userQuestion: question,
-    claudeResponse: response,
-    confidence: 0.85, // Default confidence
-    fid: fid,
-    caseId: `modal-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    inquiry: inquiry,
-    keyPoints: keyPoints
-  }), [question, response, fid, inquiry, keyPoints]);
+  const prescriptionData: PrescriptionData = useMemo(() => {
+    // Generate stable values only once
+    if (!stableTimestamp.current) {
+      stableTimestamp.current = new Date().toISOString();
+    }
+    if (!stableCaseId.current) {
+      stableCaseId.current = `modal-${Date.now()}`;
+    }
+    
+    return {
+      userQuestion: question,
+      claudeResponse: response,
+      confidence: 0.85, // Default confidence
+      fid: fid,
+      caseId: stableCaseId.current,
+      timestamp: stableTimestamp.current,
+      inquiry: inquiry,
+      keyPoints: keyPoints
+    };
+  }, [question, response, fid, inquiry, keyPoints]);
 
   // Generate metadata directly in modal to ensure it's always available
   const generatedMetadata = useMemo(() => {
@@ -50,6 +64,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   useEffect(() => {
     if (isOpen) {
       console.log('Modal opened, resetting state and setting metadata...');
+      // Reset stable values for new prescription
+      stableTimestamp.current = new Date().toISOString();
+      stableCaseId.current = `modal-${Date.now()}`;
+      
       setIsGenerating(true);
       setGenerationError(null);
       setPrescriptionMetadata(null);
@@ -72,11 +90,6 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     }
   }, [isOpen, generatedMetadata]);
 
-  // Stable callback to prevent re-renders (kept for compatibility)
-  const handlePrescriptionGenerated = useCallback((metadata: PrescriptionMetadata) => {
-    console.log('Callback received metadata (not used):', metadata);
-    // We don't use this anymore since we generate metadata directly
-  }, []);
 
   if (!isOpen) return null;
 
@@ -252,7 +265,6 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           <div ref={prescriptionRef as any}>
             <PrescriptionGenerator
               data={prescriptionData}
-              onGenerated={handlePrescriptionGenerated}
             />
           </div>
           

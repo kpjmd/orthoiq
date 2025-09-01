@@ -446,17 +446,27 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
     // Scale context for high DPI
     ctx.scale(scaleFactor, scaleFactor);
     
-    // Convert SVG to data URL
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
+    // Clean SVG data to prevent taint issues
+    let svgData = new XMLSerializer().serializeToString(svgElement);
+    
+    // Ensure all styles are embedded and no external resources
+    svgData = svgData.replace(/href="[^"]*"/g, ''); // Remove external href links
+    svgData = svgData.replace(/<image[^>]*>/g, ''); // Remove external images
+    
+    // Create data URL directly instead of blob to avoid cross-origin issues
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgData);
     
     // Create image and copy to clipboard
     const img = new Image();
+    img.crossOrigin = 'anonymous'; // Prevent taint issues
     
     return new Promise((resolve, reject) => {
       img.onload = async () => {
         try {
+          // Clear canvas with white background
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, canvas.width / scaleFactor, canvas.height / scaleFactor);
+          
           ctx.drawImage(img, 0, 0);
           
           // Convert canvas to blob
@@ -468,29 +478,30 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
                 ]);
                 resolve();
               } catch (clipboardError) {
+                console.warn('Image clipboard failed, trying data URL fallback:', clipboardError);
                 // Fallback to data URL in clipboard
-                const dataUrl = canvas.toDataURL('image/png');
-                await navigator.clipboard.writeText(dataUrl);
-                resolve();
+                try {
+                  const dataUrl = canvas.toDataURL('image/png');
+                  await navigator.clipboard.writeText(dataUrl);
+                  resolve();
+                } catch (fallbackError) {
+                  reject(new Error('Both image and text clipboard failed'));
+                }
               }
             } else {
               reject(new Error('Clipboard API not available'));
             }
           }, 'image/png', 0.95);
-          
-          URL.revokeObjectURL(url);
         } catch (error) {
-          URL.revokeObjectURL(url);
           reject(error);
         }
       };
       
       img.onerror = () => {
-        URL.revokeObjectURL(url);
         reject(new Error('Failed to load SVG image'));
       };
       
-      img.src = url;
+      img.src = dataUrl;
     });
   } catch (error) {
     console.error('Error copying prescription as image:', error);
