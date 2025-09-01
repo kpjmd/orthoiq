@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
 import { exportPrescription, copyPrescriptionAsImage } from '@/lib/exportUtils';
+import { calculateQuestionComplexity, calculateRarity, generateMetadata } from '@/lib/prescriptionUtils';
 
 interface PrescriptionModalProps {
   isOpen: boolean;
@@ -23,23 +24,6 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   const [generationError, setGenerationError] = useState<string | null>(null);
   const prescriptionRef = useRef<SVGSVGElement>(null);
 
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setIsGenerating(true);
-      setGenerationError(null);
-      setPrescriptionMetadata(null);
-      
-      // Fallback timeout to prevent infinite loading
-      const timeout = setTimeout(() => {
-        console.warn('Prescription generation timed out, forcing completion');
-        setIsGenerating(false);
-      }, 10000); // 10 second timeout - increased from 5 seconds
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [isOpen]);
-
   // Stable prescription data to prevent re-renders
   const prescriptionData: PrescriptionData = useMemo(() => ({
     userQuestion: question,
@@ -52,23 +36,52 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     keyPoints: keyPoints
   }), [question, response, fid, inquiry, keyPoints]);
 
-  // Stable callback to prevent re-renders
-  const handlePrescriptionGenerated = useCallback((metadata: PrescriptionMetadata) => {
-    try {
-      setPrescriptionMetadata(metadata);
-      setIsGenerating(false);
+  // Generate metadata directly in modal to ensure it's always available
+  const generatedMetadata = useMemo(() => {
+    console.log('Generating prescription metadata...', { question, response, inquiry, keyPoints });
+    const complexity = calculateQuestionComplexity(prescriptionData.userQuestion);
+    const rarity = calculateRarity(prescriptionData.confidence, complexity);
+    const metadata = generateMetadata(prescriptionData, rarity);
+    console.log('Generated metadata:', metadata);
+    return metadata;
+  }, [prescriptionData, question, response, inquiry, keyPoints]);
+
+  // Reset state when modal opens and set metadata
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Modal opened, resetting state and setting metadata...');
+      setIsGenerating(true);
       setGenerationError(null);
-    } catch (error) {
-      console.error('Error setting prescription metadata:', error);
-      setGenerationError('Failed to generate prescription');
-      setIsGenerating(false);
+      setPrescriptionMetadata(null);
+      
+      // Set the generated metadata immediately
+      setTimeout(() => {
+        console.log('Setting generated metadata:', generatedMetadata);
+        setPrescriptionMetadata(generatedMetadata);
+        setIsGenerating(false);
+      }, 100); // Small delay to ensure DOM is ready
+      
+      // Fallback timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.warn('Prescription generation timed out, forcing completion with metadata');
+        setPrescriptionMetadata(generatedMetadata);
+        setIsGenerating(false);
+      }, 10000); // 10 second timeout - increased from 5 seconds
+      
+      return () => clearTimeout(timeout);
     }
+  }, [isOpen, generatedMetadata]);
+
+  // Stable callback to prevent re-renders (kept for compatibility)
+  const handlePrescriptionGenerated = useCallback((metadata: PrescriptionMetadata) => {
+    console.log('Callback received metadata (not used):', metadata);
+    // We don't use this anymore since we generate metadata directly
   }, []);
 
   if (!isOpen) return null;
 
   const shareToSocial = async () => {
-    if (!prescriptionMetadata) {
+    if (!generatedMetadata) {
       console.error('No prescription metadata available for sharing');
       setShareStatus('error');
       setTimeout(() => setShareStatus('idle'), 3000);
@@ -90,10 +103,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           inquiry: prescriptionData.inquiry,
           keyPoints: prescriptionData.keyPoints,
           prescriptionMetadata: {
-            id: prescriptionMetadata.id,
-            rarity: prescriptionMetadata.rarity,
-            theme: prescriptionMetadata.theme,
-            verificationHash: prescriptionMetadata.verificationHash
+            id: generatedMetadata.id,
+            rarity: generatedMetadata.rarity,
+            theme: generatedMetadata.theme,
+            verificationHash: generatedMetadata.verificationHash
           }
         })
       });
@@ -105,7 +118,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
       
-      const shareText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
+      const shareText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${generatedMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
       
       const webShareData = {
         title: 'OrthoIQ Medical Prescription',
@@ -160,9 +173,9 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       }
 
       // Track the share
-      if (prescriptionMetadata.id) {
+      if (generatedMetadata.id) {
         try {
-          await fetch(`/api/prescriptions/${prescriptionMetadata.id}/share`, {
+          await fetch(`/api/prescriptions/${generatedMetadata.id}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -187,8 +200,17 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   };
 
   const shareAsImage = async () => {
-    if (!prescriptionMetadata || !prescriptionRef.current) {
-      console.error('No prescription available for image sharing');
+    if (!generatedMetadata) {
+      console.error('No prescription metadata available for image sharing');
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+      return;
+    }
+
+    // Find the SVG element within the prescription container
+    const svgElement = prescriptionRef.current?.querySelector('svg') as SVGSVGElement;
+    if (!svgElement) {
+      console.error('No SVG element found for image sharing');
       setShareStatus('error');
       setTimeout(() => setShareStatus('idle'), 3000);
       return;
@@ -198,7 +220,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     setShareStatus('idle');
 
     try {
-      await copyPrescriptionAsImage(prescriptionRef.current);
+      await copyPrescriptionAsImage(svgElement);
       setShareStatus('success');
       setTimeout(() => setShareStatus('idle'), 3000);
     } catch (error) {
@@ -272,7 +294,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             )}
             <button
               onClick={shareToSocial}
-              disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
+              disabled={isSharing || isGenerating || generationError !== null || !generatedMetadata}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center"
             >
               {isSharing ? (
@@ -292,7 +314,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             </button>
             <button
               onClick={shareAsImage}
-              disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
+              disabled={isSharing || isGenerating || generationError !== null || !generatedMetadata}
               className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center"
             >
               {isSharing ? (
@@ -312,12 +334,12 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             </button>
           </div>
           
-          {prescriptionMetadata && (
+          {generatedMetadata && (
             <div className="mt-4 text-center">
               <p className="text-sm text-gray-600">
-                Prescription ID: {prescriptionMetadata.id} • 
-                Rarity: <span className="font-medium">{prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}</span> • 
-                Verification: {prescriptionMetadata.verificationHash}
+                Prescription ID: {generatedMetadata.id} • 
+                Rarity: <span className="font-medium">{generatedMetadata.rarity.toUpperCase().replace('-', ' ')}</span> • 
+                Verification: {generatedMetadata.verificationHash}
               </p>
             </div>
           )}
