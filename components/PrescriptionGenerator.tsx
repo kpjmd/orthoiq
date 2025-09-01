@@ -46,9 +46,10 @@ export default function PrescriptionGenerator({
   const parsedResponse = useMemo(() => {
     return parseClaudeResponse(data.claudeResponse, { 
       inquiry: data.inquiry, 
-      keyPoints: data.keyPoints 
+      keyPoints: data.keyPoints,
+      userQuestion: data.userQuestion
     });
-  }, [data.claudeResponse, data.inquiry, data.keyPoints]);
+  }, [data.claudeResponse, data.inquiry, data.keyPoints, data.userQuestion]);
 
   const theme = prescriptionMetadata.theme;
   const formatDate = (timestamp: string) => {
@@ -254,19 +255,56 @@ export default function PrescriptionGenerator({
           
           {/* Synopsis - Combined Assessment and Recommendations */}
           <text x="60" y="315" className="prescription-header">SYNOPSIS</text>
-          {[...parsedResponse.assessment.slice(0, 2), ...parsedResponse.recommendations.slice(0, 2)].map((item, index) => (
-            <g key={index}>
-              <circle cx="75" cy={335 + (index * 25)} r="2" fill={index < 2 ? theme.primaryColor : theme.accentColor} />
-              <text x="85" y={340 + (index * 25)} className="prescription-text">
-                {item.length > 70 ? item.substring(0, 70) + '...' : item}
-              </text>
-            </g>
-          ))}
+          {[...parsedResponse.assessment.slice(0, 2), ...parsedResponse.recommendations.slice(0, 2)].map((item, index) => {
+            const maxCharsPerLine = 65;
+            const maxLines = 2;
+            const words = item.split(' ');
+            const lines = [];
+            let currentLine = '';
+            
+            for (const word of words) {
+              const testLine = currentLine ? `${currentLine} ${word}` : word;
+              if (testLine.length <= maxCharsPerLine) {
+                currentLine = testLine;
+              } else {
+                if (currentLine) {
+                  lines.push(currentLine);
+                  currentLine = word;
+                }
+                if (lines.length >= maxLines) break;
+              }
+            }
+            
+            if (currentLine && lines.length < maxLines) {
+              lines.push(currentLine);
+            }
+            
+            // If text was truncated, add ellipsis to last line
+            if (words.join(' ').length > lines.join(' ').length) {
+              const lastLine = lines[lines.length - 1];
+              if (lastLine && lastLine.length > maxCharsPerLine - 3) {
+                lines[lines.length - 1] = lastLine.substring(0, maxCharsPerLine - 3) + '...';
+              } else if (lastLine) {
+                lines[lines.length - 1] = lastLine + '...';
+              }
+            }
+            
+            return (
+              <g key={index}>
+                <circle cx="75" cy={335 + (index * 35)} r="2" fill={index < 2 ? theme.primaryColor : theme.accentColor} />
+                {lines.map((line, lineIndex) => (
+                  <text key={lineIndex} x="85" y={340 + (index * 35) + (lineIndex * 14)} className="prescription-text">
+                    {line}
+                  </text>
+                ))}
+              </g>
+            );
+          })}
           
           {/* Confidence Score - Moved after Synopsis */}
           <rect 
             x={size - 180} 
-            y="435" 
+            y="475" 
             width="140" 
             height="60" 
             fill="#f8fafc" 
@@ -274,10 +312,10 @@ export default function PrescriptionGenerator({
             strokeWidth="1" 
             rx="5" 
           />
-          <text x={size - 110} y="455" textAnchor="middle" className="prescription-small">
+          <text x={size - 110} y="495" textAnchor="middle" className="prescription-small">
             AI CONFIDENCE
           </text>
-          <text x={size - 110} y="475" textAnchor="middle" className="prescription-header">
+          <text x={size - 110} y="515" textAnchor="middle" className="prescription-header">
             {Math.round(data.confidence * 100)}%
           </text>
           {/* MD Review Stamp */}
@@ -285,16 +323,16 @@ export default function PrescriptionGenerator({
             <g>
               <circle 
                 cx={size - 80} 
-                cy="420" 
+                cy="460" 
                 r="35" 
                 fill="rgba(16,185,129,0.1)" 
                 stroke="#10b981" 
                 strokeWidth="2" 
               />
-              <text x={size - 80} y="415" textAnchor="middle" className="prescription-small" fill="#10b981" fontWeight="bold">
+              <text x={size - 80} y="455" textAnchor="middle" className="prescription-small" fill="#10b981" fontWeight="bold">
                 MD
               </text>
-              <text x={size - 80} y="430" textAnchor="middle" className="prescription-small" fill="#10b981" fontWeight="bold">
+              <text x={size - 80} y="470" textAnchor="middle" className="prescription-small" fill="#10b981" fontWeight="bold">
                 REVIEWED
               </text>
             </g>

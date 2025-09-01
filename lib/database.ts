@@ -430,6 +430,21 @@ export async function logInteraction(
   }
 }
 
+// Delete a question and all related data
+export async function deleteQuestion(questionId: string): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    // Delete cascades to reviews, review_details, and medical_categories due to foreign key constraints
+    await sql`
+      DELETE FROM questions WHERE id = ${parseInt(questionId)}
+    `;
+  } catch (error) {
+    console.error('Error deleting question:', error);
+    throw error;
+  }
+}
+
 // Get interaction history for a user
 export async function getUserHistory(fid: string, limit: number = 10): Promise<Question[]> {
   const sql = getSql();

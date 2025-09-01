@@ -75,6 +75,38 @@ function AdminDashboardContent() {
     }
   };
 
+  const handleDeleteQuestion = async (responseId: string) => {
+    if (!confirm('Are you sure you want to delete this question? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/delete-question', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: responseId })
+      });
+
+      if (res.ok) {
+        // Remove from pending list and update state
+        setPendingResponses(prev => prev.filter(r => r.id !== responseId));
+        setSelectedResponse(null);
+        // Clear form data
+        setReviewForm(prev => {
+          const newForm = {...prev};
+          delete newForm[responseId];
+          return newForm;
+        });
+      } else {
+        const error = await res.json();
+        alert(`Failed to delete question: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to delete question:', error);
+      alert('Failed to delete question: Network error');
+    }
+  };
+
   const handleEnhancedReview = async (responseId: string) => {
     const formData = reviewForm[responseId];
     if (!formData?.reviewType) {
@@ -250,6 +282,12 @@ function AdminDashboardContent() {
                 className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
               >
                 📈 Analytics
+              </a>
+              <a
+                href="/admin/prescriptions"
+                className="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-purple-50 transition-colors"
+              >
+                💊 Prescriptions
               </a>
               <button
                 onClick={() => setShowExportModal(true)}
@@ -491,8 +529,14 @@ function AdminDashboardContent() {
                         </div>
                       </div>
 
-                      {/* Submit Button */}
-                      <div className="mt-4 flex justify-end">
+                      {/* Action Buttons */}
+                      <div className="mt-4 flex justify-between">
+                        <button
+                          onClick={() => handleDeleteQuestion(response.id)}
+                          className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                        >
+                          🗑️ Delete
+                        </button>
                         <button
                           onClick={() => handleEnhancedReview(response.id)}
                           disabled={!reviewForm[response.id]?.reviewType}

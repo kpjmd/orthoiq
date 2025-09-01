@@ -79,6 +79,8 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           question,
           response,
           confidence: Math.round(prescriptionData.confidence * 100),
+          inquiry: prescriptionData.inquiry,
+          keyPoints: prescriptionData.keyPoints,
           metadata: {
             prescriptionId: prescriptionMetadata.id,
             rarity: prescriptionMetadata.rarity,
@@ -98,33 +100,50 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       const baseText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.`;
       
       let shareText = baseText;
-      let platformUrl = shareUrl;
+      let platformUrl = '';
       
       switch (platform) {
         case 'instagram':
           shareText = `${baseText}\n\n#OrthoIQ #AIHealthcare #OrthopedicCare #MedicalAI`;
-          break;
+          // Instagram doesn't support direct sharing, so fallback to clipboard
+          await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+          setShareStatus('success');
+          setTimeout(() => setShareStatus('idle'), 3000);
+          return;
         case 'facebook':
           shareText = `${baseText}\n\nRarity: ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}\nConfidence: ${Math.round(prescriptionData.confidence * 100)}%`;
+          platformUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`;
           break;
         case 'twitter':
           shareText = `${baseText}\n\n🔬 Rarity: ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}\n📊 Confidence: ${Math.round(prescriptionData.confidence * 100)}%\n\n#OrthoIQ #AIHealthcare`;
+          platformUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
           break;
         case 'farcaster':
           shareText = `${baseText}\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
+          platformUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(shareUrl)}`;
           break;
       }
 
-      // Try to use Web Share API first
-      if (navigator.share && navigator.canShare({ text: shareText, url: platformUrl })) {
-        await navigator.share({
-          title: 'OrthoIQ Medical Prescription',
-          text: shareText,
-          url: platformUrl
-        });
-      } else {
-        // Fallback to clipboard
-        await navigator.clipboard.writeText(`${shareText}\n\n${platformUrl}`);
+      // Track the share
+      if (prescriptionMetadata.id) {
+        try {
+          await fetch(`/api/prescriptions/${prescriptionMetadata.id}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fid: prescriptionData.fid,
+              platform: platform,
+              shareUrl: shareUrl
+            })
+          });
+        } catch (trackError) {
+          console.warn('Failed to track share:', trackError);
+        }
+      }
+
+      // Open platform-specific URL
+      if (platformUrl) {
+        window.open(platformUrl, '_blank', 'width=600,height=400');
         setShareStatus('success');
         setTimeout(() => setShareStatus('idle'), 3000);
       }

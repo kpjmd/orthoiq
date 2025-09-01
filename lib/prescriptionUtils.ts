@@ -53,7 +53,7 @@ export const RARITY_CONFIGS: RarityConfig[] = [
   }
 ];
 
-export function parseClaudeResponse(response: string, claudeResponse?: { inquiry?: string; keyPoints?: string[] }): ParsedResponse {
+export function parseClaudeResponse(response: string, claudeResponse?: { inquiry?: string; keyPoints?: string[]; userQuestion?: string }): ParsedResponse {
   // Try to parse as JSON first (new structured format)
   let parsedJSON: any = null;
   try {
@@ -144,7 +144,7 @@ export function parseClaudeResponse(response: string, claudeResponse?: { inquiry
   }
   
   return {
-    chiefComplaint: chiefInquiry || 'Medical consultation inquiry',
+    chiefComplaint: chiefInquiry || claudeResponse?.inquiry || claudeResponse?.userQuestion || 'Medical consultation inquiry',
     assessment: assessment.length ? assessment : ['Medical assessment available'],
     recommendations: recommendations.length ? recommendations : ['Treatment recommendations available'],
     disclaimers: disclaimers.length ? disclaimers : ['This is AI-generated information. Consult a healthcare provider.']

@@ -7,7 +7,10 @@ export async function POST(request: NextRequest) {
     const { 
       question, 
       response, 
-      confidence = 95
+      confidence = 95,
+      inquiry,
+      keyPoints,
+      metadata
     } = body;
 
     if (!question || !response) {
@@ -17,13 +20,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store share data in database
+    // Store share data in database with inquiry and keyPoints
     const shareId = await createShare(
       'response',
       question,
       response,
       confidence,
-      {}, // No artwork metadata for response shares
+      { 
+        inquiry: inquiry || null,
+        keyPoints: keyPoints || null,
+        metadata: metadata || {}
+      }, // Include inquiry/keyPoints in artwork metadata
       {}, // No farcaster-specific data for response shares
       30 // Expire in 30 days
     );

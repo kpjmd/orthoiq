@@ -146,7 +146,9 @@ export default async function SharePage({ params, searchParams }: SharePageProps
                   confidence: Number(confidence) / 100 || 0.85,
                   fid: 'shared-user',
                   caseId: shareId,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  inquiry: shareData?.artworkMetadata?.inquiry || question,
+                  keyPoints: shareData?.artworkMetadata?.keyPoints || []
                 }}
               />
             </div>
