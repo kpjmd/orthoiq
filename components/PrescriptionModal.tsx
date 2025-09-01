@@ -34,7 +34,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       const timeout = setTimeout(() => {
         console.warn('Prescription generation timed out, forcing completion');
         setIsGenerating(false);
-      }, 5000); // 5 second timeout
+      }, 10000); // 10 second timeout - increased from 5 seconds
       
       return () => clearTimeout(timeout);
     }
@@ -67,7 +67,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
   if (!isOpen) return null;
 
-  const shareToSocial = async (platform: 'instagram' | 'facebook' | 'twitter' | 'farcaster') => {
+  const shareToSocial = async () => {
     if (!prescriptionMetadata) {
       console.error('No prescription metadata available for sharing');
       setShareStatus('error');
@@ -79,8 +79,8 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     setShareStatus('idle');
 
     try {
-      // Create prescription share first
-      const shareResponse = await fetch('/api/share-response', {
+      // Create prescription share using new endpoint
+      const shareResponse = await fetch('/api/share-prescription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,8 +89,8 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           confidence: Math.round(prescriptionData.confidence * 100),
           inquiry: prescriptionData.inquiry,
           keyPoints: prescriptionData.keyPoints,
-          metadata: {
-            prescriptionId: prescriptionMetadata.id,
+          prescriptionMetadata: {
+            id: prescriptionMetadata.id,
             rarity: prescriptionMetadata.rarity,
             theme: prescriptionMetadata.theme,
             verificationHash: prescriptionMetadata.verificationHash
@@ -105,127 +105,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
       
-      const baseText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.`;
-      
-      let shareText = baseText;
-      let platformUrl = '';
-      
-      switch (platform) {
-        case 'instagram':
-          shareText = `${baseText}\n\n#OrthoIQ #AIHealthcare #OrthopedicCare #MedicalAI`;
-          // Instagram doesn't support direct sharing, so fallback to clipboard
-          try {
-            // Ensure document is focused before clipboard operation
-            window.focus();
-            if (navigator.clipboard) {
-              await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
-              setShareStatus('success');
-            } else {
-              throw new Error('Clipboard API not available');
-            }
-          } catch (clipboardError) {
-            console.warn('Clipboard failed, using fallback:', clipboardError);
-            // Fallback for browsers without clipboard API or focus issues
-            const textArea = document.createElement('textarea');
-            textArea.value = `${shareText}\n\n${shareUrl}`;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-9999px';
-            textArea.style.top = '0';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            if (successful) {
-              setShareStatus('success');
-            } else {
-              // Final fallback - show alert with text to copy
-              alert(`Please copy this text to share:\n\n${shareText}\n\n${shareUrl}`);
-              setShareStatus('success');
-            }
-          }
-          setTimeout(() => setShareStatus('idle'), 3000);
-          return;
-        case 'facebook':
-          shareText = `${baseText}\n\nRarity: ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}\nConfidence: ${Math.round(prescriptionData.confidence * 100)}%`;
-          platformUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`;
-          break;
-        case 'twitter':
-          shareText = `${baseText}\n\n🔬 Rarity: ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}\n📊 Confidence: ${Math.round(prescriptionData.confidence * 100)}%\n\n#OrthoIQ #AIHealthcare`;
-          platformUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-          break;
-        case 'farcaster':
-          shareText = `${baseText}\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
-          platformUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(shareText)}&embeds[]=${encodeURIComponent(shareUrl)}`;
-          break;
-      }
-
-      // Track the share
-      if (prescriptionMetadata.id) {
-        try {
-          await fetch(`/api/prescriptions/${prescriptionMetadata.id}/share`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fid: prescriptionData.fid,
-              platform: platform,
-              shareUrl: shareUrl
-            })
-          });
-        } catch (trackError) {
-          console.warn('Failed to track share:', trackError);
-        }
-      }
-
-      // Open platform-specific URL
-      if (platformUrl) {
-        const popup = window.open(platformUrl, '_blank', 'width=600,height=400,scrollbars=yes,resizable=yes');
-        if (!popup) {
-          // Popup blocked - try direct navigation
-          window.location.href = platformUrl;
-        }
-        setShareStatus('success');
-        setTimeout(() => setShareStatus('idle'), 3000);
-      }
-    } catch (error) {
-      console.error(`Error sharing to ${platform}:`, error);
-      setShareStatus('error');
-      setTimeout(() => setShareStatus('idle'), 3000);
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
-  const sharePrescription = async () => {
-    setIsSharing(true);
-    setShareStatus('idle');
-
-    try {
-      // Create prescription share via API
-      const shareResponse = await fetch('/api/share-response', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question,
-          response,
-          confidence: 85,
-          metadata: prescriptionMetadata ? {
-            prescriptionId: prescriptionMetadata.id,
-            rarity: prescriptionMetadata.rarity,
-            theme: prescriptionMetadata.theme,
-            verificationHash: prescriptionMetadata.verificationHash
-          } : null
-        })
-      });
-
-      if (!shareResponse.ok) {
-        throw new Error('Failed to create share link');
-      }
-
-      const shareData = await shareResponse.json();
-      const shareUrl = shareData.shareUrl;
-      
-      const shareText = `Just generated my OrthoIQ medical prescription! 📋 "${question.substring(0, 80)}${question.length > 80 ? '...' : ''}" Get AI-powered orthopedic insights reviewed by board-certified surgeons.`;
+      const shareText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
       
       const webShareData = {
         title: 'OrthoIQ Medical Prescription',
@@ -233,15 +113,13 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         url: shareUrl
       };
 
-      // Check if we're on mobile and can use Web Share API
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile && navigator.share && navigator.canShare && navigator.canShare(webShareData)) {
+      // Use Web Share API if available (mobile and supported platforms)
+      if (navigator.share && navigator.canShare && navigator.canShare(webShareData)) {
         try {
           await navigator.share(webShareData);
           setShareStatus('success');
         } catch (shareError) {
-          // User cancelled share or error occurred, fallback to clipboard
+          // User cancelled or error occurred, fallback to clipboard
           if (navigator.clipboard) {
             await navigator.clipboard.writeText(shareUrl);
             setShareStatus('success');
@@ -250,9 +128,8 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           }
         }
       } else {
-        // For desktop or when Web Share API is not available, directly copy to clipboard
+        // Fallback to clipboard for desktop
         try {
-          // Ensure document is focused before clipboard operation
           window.focus();
           if (navigator.clipboard) {
             await navigator.clipboard.writeText(shareUrl);
@@ -262,7 +139,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           }
         } catch (clipboardError) {
           console.warn('Clipboard failed, using fallback:', clipboardError);
-          // Fallback for older browsers or focus issues
+          // Final fallback - manual copy
           const textArea = document.createElement('textarea');
           textArea.value = shareUrl;
           textArea.style.position = 'fixed';
@@ -276,10 +153,26 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
           if (successful) {
             setShareStatus('success');
           } else {
-            // Final fallback - show alert with URL to copy
             alert(`Please copy this link to share:\n\n${shareUrl}`);
             setShareStatus('success');
           }
+        }
+      }
+
+      // Track the share
+      if (prescriptionMetadata.id) {
+        try {
+          await fetch(`/api/prescriptions/${prescriptionMetadata.id}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fid: prescriptionData.fid,
+              platform: 'unified',
+              shareUrl: shareUrl
+            })
+          });
+        } catch (trackError) {
+          console.warn('Failed to track share:', trackError);
         }
       }
 
@@ -292,6 +185,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       setIsSharing(false);
     }
   };
+
 
 
   return (
@@ -347,68 +241,33 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
         {/* Action Buttons */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t rounded-b-xl">
-          <div className="flex flex-wrap gap-3 justify-between items-center">
-            {/* Social Media Sharing */}
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => shareToSocial('instagram')}
-                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
-                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
-              >
-                📷 Instagram
-              </button>
-              <button
-                onClick={() => shareToSocial('facebook')}
-                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
-              >
-                📘 Facebook
-              </button>
-              <button
-                onClick={() => shareToSocial('twitter')}
-                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
-                className="px-4 py-2 bg-gray-900 hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
-              >
-                𝕏 Twitter
-              </button>
-              <button
-                onClick={() => shareToSocial('farcaster')}
-                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
-              >
-                🟣 Farcaster
-              </button>
-            </div>
-
-            {/* Main Share Button */}
-            <div className="flex items-center gap-3">
-              {shareStatus === 'success' && (
-                <span className="text-green-600 text-sm">✓ Link copied!</span>
+          <div className="flex justify-center items-center gap-3">
+            {shareStatus === 'success' && (
+              <span className="text-green-600 text-sm">✓ Prescription shared!</span>
+            )}
+            {shareStatus === 'error' && (
+              <span className="text-red-600 text-sm">✗ Share failed</span>
+            )}
+            <button
+              onClick={shareToSocial}
+              disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center text-lg"
+            >
+              {isSharing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Sharing Prescription...
+                </>
+              ) : (
+                <>
+                  <span className="mr-2">📤</span>
+                  Share Prescription
+                </>
               )}
-              {shareStatus === 'error' && (
-                <span className="text-red-600 text-sm">✗ Share failed</span>
-              )}
-              <button
-                onClick={sharePrescription}
-                disabled={isSharing || isGenerating || generationError !== null}
-                className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg font-medium transition-colors flex items-center"
-              >
-                {isSharing ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Sharing...
-                  </>
-                ) : (
-                  <>
-                    <span className="mr-2">🔗</span>
-                    Copy Share Link
-                  </>
-                )}
-              </button>
-            </div>
+            </button>
           </div>
           
           {prescriptionMetadata && (

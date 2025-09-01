@@ -1066,7 +1066,7 @@ export async function cleanupOldData(daysToKeep: number = 30) {
 
 // Share data functions
 export async function createShare(
-  shareType: 'response' | 'artwork',
+  shareType: 'response' | 'artwork' | 'prescription',
   question: string,
   response: string,
   confidence: number = 0.0,

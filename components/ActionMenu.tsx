@@ -10,9 +10,11 @@ interface ActionMenuProps {
   onRate: (rating: number) => void;
   canAskAnother?: boolean;
   questionsRemaining?: number;
+  inquiry?: string;
+  keyPoints?: string[];
 }
 
-export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0 }: ActionMenuProps) {
+export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0, inquiry, keyPoints }: ActionMenuProps) {
   const [showRating, setShowRating] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [shareText, setShareText] = useState('Share Response');
@@ -28,7 +30,9 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
         body: JSON.stringify({
           question,
           response,
-          confidence: 95 // This would come from actual response data
+          confidence: 95, // This would come from actual response data
+          inquiry,
+          keyPoints
         })
       });
 

@@ -273,6 +273,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               onRate={handleRate}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
+              inquiry={responseData.inquiry}
+              keyPoints={responseData.keyPoints}
             />
           </div>
         )}

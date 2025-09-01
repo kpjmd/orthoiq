@@ -10,6 +10,7 @@ interface SharePageProps {
     question?: string
     response?: string 
     confidence?: string
+    view?: string
   }>
 }
 
@@ -99,7 +100,11 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const question = shareData?.question || resolvedSearchParams.question;
   const response = shareData?.response || resolvedSearchParams.response;
   const confidence = shareData?.confidence || resolvedSearchParams.confidence;
-  // All shares are now prescription-based
+  const viewMode = resolvedSearchParams.view || 'full'; // 'prescription' or 'full'
+  
+  // Extract inquiry and keyPoints from stored data
+  const inquiry = shareData?.artworkMetadata?.inquiry || question;
+  const keyPoints = shareData?.artworkMetadata?.keyPoints || [];
 
   if (!question || !response) {
     notFound();
@@ -115,21 +120,23 @@ export default async function SharePage({ params, searchParams }: SharePageProps
             <h1 className="text-3xl font-bold">OrthoIQ</h1>
           </div>
           <p className="text-lg opacity-90">
-            AI Medical Prescription
+            {viewMode === 'prescription' ? 'Medical Prescription' : 'AI Medical Prescription'}
           </p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
         </div>
       </div>
 
       <div className="p-6 max-w-2xl mx-auto">
-        {/* Question */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-            <span className="text-2xl mr-2">❓</span>
-            Question:
-          </h2>
-          <p className="text-gray-700 leading-relaxed">{question}</p>
-        </div>
+        {/* Question - only show in full view mode */}
+        {viewMode === 'full' && (
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+              <span className="text-2xl mr-2">❓</span>
+              Question:
+            </h2>
+            <p className="text-gray-700 leading-relaxed">{question}</p>
+          </div>
+        )}
 
         {/* Prescription Display */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
@@ -147,29 +154,31 @@ export default async function SharePage({ params, searchParams }: SharePageProps
                   fid: 'shared-user',
                   caseId: shareId,
                   timestamp: shareData?.createdAt || new Date().toISOString(),
-                  inquiry: shareData?.artworkMetadata?.inquiry || shareData?.question || question,
-                  keyPoints: shareData?.artworkMetadata?.keyPoints || []
+                  inquiry: inquiry,
+                  keyPoints: keyPoints
                 }}
               />
             </div>
           </div>
         </div>
 
-        {/* Response */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-              <span className="text-2xl mr-2">🔬</span>
-              OrthoIQ Response:
-            </h2>
-            {confidence && (
-              <div className="text-sm text-gray-600">
-                Confidence: {confidence}%
-              </div>
-            )}
+        {/* Response - only show in full view mode */}
+        {viewMode === 'full' && (
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                <span className="text-2xl mr-2">🔬</span>
+                OrthoIQ Response:
+              </h2>
+              {confidence && (
+                <div className="text-sm text-gray-600">
+                  Confidence: {confidence}%
+                </div>
+              )}
+            </div>
+            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
           </div>
-          <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
-        </div>
+        )}
 
         {/* Share Statistics (if from database) */}
         {shareData && (
