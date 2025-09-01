@@ -318,6 +318,26 @@ export default function PrescriptionGenerator({
           <text x={size - 110} y="515" textAnchor="middle" className="prescription-header">
             {Math.round(data.confidence * 100)}%
           </text>
+          
+          {/* Rarity Badge - Moved to avoid overlap */}
+          <rect 
+            x={size - 180} 
+            y="540" 
+            width="140" 
+            height="20" 
+            fill={theme.primaryColor + "20"} 
+            stroke={theme.primaryColor} 
+            strokeWidth="1" 
+            rx="10" 
+          />
+          <text x={size - 110} y="555" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
+            {prescriptionMetadata.rarity === 'ultra-rare' && '✨'}
+            {prescriptionMetadata.rarity === 'rare' && '⭐'}
+            {prescriptionMetadata.rarity === 'uncommon' && '💫'}
+            {prescriptionMetadata.rarity === 'common' && '🔹'}
+            {' '}{prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}
+          </text>
+
           {/* MD Review Stamp */}
           {mdReviewed && (
             <g>
@@ -337,25 +357,6 @@ export default function PrescriptionGenerator({
               </text>
             </g>
           )}
-
-          {/* Rarity Badge - Pure SVG version */}
-          <rect 
-            x={size - 140} 
-            y="485" 
-            width="80" 
-            height="20" 
-            fill={theme.primaryColor + "20"} 
-            stroke={theme.primaryColor} 
-            strokeWidth="1" 
-            rx="10" 
-          />
-          <text x={size - 100} y="500" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
-            {prescriptionMetadata.rarity === 'ultra-rare' && '✨'}
-            {prescriptionMetadata.rarity === 'rare' && '⭐'}
-            {prescriptionMetadata.rarity === 'uncommon' && '💫'}
-            {prescriptionMetadata.rarity === 'common' && '🔹'}
-            {' '}{prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}
-          </text>
           
           {/* Footer Section */}
           <line x1="40" y1={size * 1.4 - 200} x2={size - 40} y2={size * 1.4 - 200} stroke="#e5e7eb" strokeWidth="1" />
@@ -401,8 +402,8 @@ export default function PrescriptionGenerator({
             Reviewed under Board Certified MD supervision
           </text>
           
-          {/* Logo Seal - OrthoIQ Component */}
-          <foreignObject x={size - 100} y={size * 1.4 - 160} width="80" height="80">
+          {/* Logo Seal - OrthoIQ Component - Moved inward from border */}
+          <foreignObject x={size - 120} y={size * 1.4 - 140} width="80" height="80">
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 

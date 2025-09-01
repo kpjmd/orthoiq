@@ -68,7 +68,15 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   if (!isOpen) return null;
 
   const shareToSocial = async (platform: 'instagram' | 'facebook' | 'twitter' | 'farcaster') => {
-    if (!prescriptionMetadata) return;
+    if (!prescriptionMetadata) {
+      console.error('No prescription metadata available for sharing');
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 3000);
+      return;
+    }
+
+    setIsSharing(true);
+    setShareStatus('idle');
 
     try {
       // Create prescription share first
@@ -91,7 +99,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       });
 
       if (!shareResponse.ok) {
-        throw new Error('Failed to create share link');
+        throw new Error(`Failed to create share link: ${shareResponse.status}`);
       }
 
       const shareData = await shareResponse.json();
@@ -106,8 +114,19 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         case 'instagram':
           shareText = `${baseText}\n\n#OrthoIQ #AIHealthcare #OrthopedicCare #MedicalAI`;
           // Instagram doesn't support direct sharing, so fallback to clipboard
-          await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
-          setShareStatus('success');
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+            setShareStatus('success');
+          } else {
+            // Fallback for browsers without clipboard API
+            const textArea = document.createElement('textarea');
+            textArea.value = `${shareText}\n\n${shareUrl}`;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            setShareStatus('success');
+          }
           setTimeout(() => setShareStatus('idle'), 3000);
           return;
         case 'facebook':
@@ -143,7 +162,11 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
       // Open platform-specific URL
       if (platformUrl) {
-        window.open(platformUrl, '_blank', 'width=600,height=400');
+        const popup = window.open(platformUrl, '_blank', 'width=600,height=400,scrollbars=yes,resizable=yes');
+        if (!popup) {
+          // Popup blocked - try direct navigation
+          window.location.href = platformUrl;
+        }
         setShareStatus('success');
         setTimeout(() => setShareStatus('idle'), 3000);
       }
@@ -151,6 +174,8 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       console.error(`Error sharing to ${platform}:`, error);
       setShareStatus('error');
       setTimeout(() => setShareStatus('idle'), 3000);
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -191,27 +216,37 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         url: shareUrl
       };
 
-      // Try to use Web Share API if available
-      if (navigator.share && navigator.canShare && navigator.canShare(webShareData)) {
+      // Check if we're on mobile and can use Web Share API
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile && navigator.share && navigator.canShare && navigator.canShare(webShareData)) {
         try {
           await navigator.share(webShareData);
           setShareStatus('success');
         } catch (shareError) {
-          // Fallback to clipboard
+          // User cancelled share or error occurred, fallback to clipboard
           if (navigator.clipboard) {
-            await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+            await navigator.clipboard.writeText(shareUrl);
             setShareStatus('success');
           } else {
-            throw new Error('Sharing not available');
+            throw new Error('Sharing cancelled or not available');
           }
         }
       } else {
-        // Fallback: copy to clipboard
+        // For desktop or when Web Share API is not available, directly copy to clipboard
         if (navigator.clipboard) {
-          await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+          await navigator.clipboard.writeText(shareUrl);
           setShareStatus('success');
         } else {
-          alert(`Please copy this to share:\n\n${shareText}\n\n${shareUrl}`);
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = shareUrl;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-9999px';
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
           setShareStatus('success');
         }
       }
