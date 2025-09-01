@@ -249,9 +249,47 @@ export default function PrescriptionGenerator({
           <text x="60" y="270" className="prescription-rx">℞</text>
           
           <text x="120" y="255" className="prescription-header">CHIEF INQUIRY</text>
-          <text x="120" y="275" className="prescription-text">
-            {parsedResponse.chiefComplaint}
-          </text>
+          {(() => {
+            const inquiry = parsedResponse.chiefComplaint;
+            const maxCharsPerLine = 50; // Shorter than synopsis to account for left margin
+            const maxLines = 3;
+            const words = inquiry.split(' ');
+            const lines = [];
+            let currentLine = '';
+            
+            for (const word of words) {
+              const testLine = currentLine ? `${currentLine} ${word}` : word;
+              if (testLine.length <= maxCharsPerLine) {
+                currentLine = testLine;
+              } else {
+                if (currentLine) {
+                  lines.push(currentLine);
+                  currentLine = word;
+                }
+                if (lines.length >= maxLines) break;
+              }
+            }
+            
+            if (currentLine && lines.length < maxLines) {
+              lines.push(currentLine);
+            }
+            
+            // If text was truncated, add ellipsis to last line
+            if (words.join(' ').length > lines.join(' ').length) {
+              const lastLine = lines[lines.length - 1];
+              if (lastLine && lastLine.length > maxCharsPerLine - 3) {
+                lines[lines.length - 1] = lastLine.substring(0, maxCharsPerLine - 3) + '...';
+              } else if (lastLine) {
+                lines[lines.length - 1] = lastLine + '...';
+              }
+            }
+            
+            return lines.map((line, lineIndex) => (
+              <text key={lineIndex} x="120" y={275 + (lineIndex * 14)} className="prescription-text">
+                {line}
+              </text>
+            ));
+          })()}
           
           {/* Synopsis - Combined Assessment and Recommendations */}
           <text x="60" y="315" className="prescription-header">SYNOPSIS</text>
@@ -402,8 +440,8 @@ export default function PrescriptionGenerator({
             Reviewed under Board Certified MD supervision
           </text>
           
-          {/* Logo Seal - OrthoIQ Component - Moved inward from border */}
-          <foreignObject x={size - 120} y={size * 1.4 - 140} width="80" height="80">
+          {/* Logo Seal - OrthoIQ Component - Moved inward from border and aligned with QR code */}
+          <foreignObject x={size - 120} y={size * 1.4 - 180} width="80" height="80">
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 

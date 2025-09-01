@@ -114,18 +114,35 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         case 'instagram':
           shareText = `${baseText}\n\n#OrthoIQ #AIHealthcare #OrthopedicCare #MedicalAI`;
           // Instagram doesn't support direct sharing, so fallback to clipboard
-          if (navigator.clipboard) {
-            await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
-            setShareStatus('success');
-          } else {
-            // Fallback for browsers without clipboard API
+          try {
+            // Ensure document is focused before clipboard operation
+            window.focus();
+            if (navigator.clipboard) {
+              await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
+              setShareStatus('success');
+            } else {
+              throw new Error('Clipboard API not available');
+            }
+          } catch (clipboardError) {
+            console.warn('Clipboard failed, using fallback:', clipboardError);
+            // Fallback for browsers without clipboard API or focus issues
             const textArea = document.createElement('textarea');
             textArea.value = `${shareText}\n\n${shareUrl}`;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '0';
             document.body.appendChild(textArea);
+            textArea.focus();
             textArea.select();
-            document.execCommand('copy');
+            const successful = document.execCommand('copy');
             document.body.removeChild(textArea);
-            setShareStatus('success');
+            if (successful) {
+              setShareStatus('success');
+            } else {
+              // Final fallback - show alert with text to copy
+              alert(`Please copy this text to share:\n\n${shareText}\n\n${shareUrl}`);
+              setShareStatus('success');
+            }
           }
           setTimeout(() => setShareStatus('idle'), 3000);
           return;
@@ -234,20 +251,35 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         }
       } else {
         // For desktop or when Web Share API is not available, directly copy to clipboard
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(shareUrl);
-          setShareStatus('success');
-        } else {
-          // Fallback for older browsers
+        try {
+          // Ensure document is focused before clipboard operation
+          window.focus();
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(shareUrl);
+            setShareStatus('success');
+          } else {
+            throw new Error('Clipboard API not available');
+          }
+        } catch (clipboardError) {
+          console.warn('Clipboard failed, using fallback:', clipboardError);
+          // Fallback for older browsers or focus issues
           const textArea = document.createElement('textarea');
           textArea.value = shareUrl;
           textArea.style.position = 'fixed';
           textArea.style.left = '-9999px';
+          textArea.style.top = '0';
           document.body.appendChild(textArea);
+          textArea.focus();
           textArea.select();
-          document.execCommand('copy');
+          const successful = document.execCommand('copy');
           document.body.removeChild(textArea);
-          setShareStatus('success');
+          if (successful) {
+            setShareStatus('success');
+          } else {
+            // Final fallback - show alert with URL to copy
+            alert(`Please copy this link to share:\n\n${shareUrl}`);
+            setShareStatus('success');
+          }
         }
       }
 
@@ -320,28 +352,28 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => shareToSocial('instagram')}
-                disabled={isGenerating || generationError !== null || isSharing}
+                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
                 className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
               >
                 📷 Instagram
               </button>
               <button
                 onClick={() => shareToSocial('facebook')}
-                disabled={isGenerating || generationError !== null || isSharing}
+                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
               >
                 📘 Facebook
               </button>
               <button
                 onClick={() => shareToSocial('twitter')}
-                disabled={isGenerating || generationError !== null || isSharing}
+                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
                 className="px-4 py-2 bg-gray-900 hover:bg-black disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
               >
                 𝕏 Twitter
               </button>
               <button
                 onClick={() => shareToSocial('farcaster')}
-                disabled={isGenerating || generationError !== null || isSharing}
+                disabled={isGenerating || generationError !== null || isSharing || !prescriptionMetadata}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center"
               >
                 🟣 Farcaster
