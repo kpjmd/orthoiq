@@ -29,9 +29,11 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
   // Stable prescription data to prevent re-renders
   const prescriptionData: PrescriptionData = useMemo(() => {
-    // Generate stable values only once when modal opens
-    if (isOpen && !stableTimestamp.current) {
+    // Generate stable values only once when needed
+    if (!stableTimestamp.current) {
       stableTimestamp.current = new Date().toISOString();
+    }
+    if (!stableCaseId.current) {
       stableCaseId.current = `modal-${Date.now()}`;
     }
     
@@ -40,12 +42,12 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       claudeResponse: response,
       confidence: 0.85, // Default confidence
       fid: fid,
-      caseId: stableCaseId.current || `modal-${Date.now()}`,
-      timestamp: stableTimestamp.current || new Date().toISOString(),
+      caseId: stableCaseId.current,
+      timestamp: stableTimestamp.current,
       inquiry: inquiry,
       keyPoints: keyPoints
     };
-  }, [isOpen, question, response, fid, inquiry, keyPoints]);
+  }, [question, response, fid, inquiry, keyPoints]);
 
   // Callback to receive metadata from PrescriptionGenerator
   const handleMetadataGenerated = useCallback((metadata: PrescriptionMetadata) => {
@@ -54,14 +56,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     setIsGenerating(false);
   }, []);
 
-  // Reset state when modal opens
+  // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       console.log('Modal opened, resetting state...');
-      // Reset stable values for new prescription
-      stableTimestamp.current = '';
-      stableCaseId.current = '';
-      
       setIsGenerating(true);
       setGenerationError(null);
       setPrescriptionMetadata(null);
@@ -74,6 +72,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       }, 15000); // 15 second timeout
       
       return () => clearTimeout(timeout);
+    } else {
+      // Reset stable values when modal closes for next use
+      stableTimestamp.current = '';
+      stableCaseId.current = '';
     }
   }, [isOpen]);
 
