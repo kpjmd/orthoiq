@@ -20,6 +20,11 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
   const [isGenerating, setIsGenerating] = useState(true);
+  
+  // Debug state changes
+  useEffect(() => {
+    console.log('Modal: isGenerating state changed to:', isGenerating);
+  }, [isGenerating]);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const prescriptionRef = useRef<SVGSVGElement>(null);
   
@@ -51,7 +56,8 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
   // Callback to receive metadata from PrescriptionGenerator
   const handleMetadataGenerated = useCallback((metadata: PrescriptionMetadata) => {
-    console.log('Received metadata from PrescriptionGenerator:', metadata);
+    console.log('Modal: Received metadata from PrescriptionGenerator:', metadata);
+    console.log('Modal: Setting isGenerating to false and prescriptionMetadata');
     setPrescriptionMetadata(metadata);
     setIsGenerating(false);
   }, []);
@@ -60,20 +66,26 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   useEffect(() => {
     if (isOpen) {
       console.log('Modal opened, resetting state...');
+      console.log('Setting isGenerating to true');
       setIsGenerating(true);
       setGenerationError(null);
       setPrescriptionMetadata(null);
       
       // Fallback timeout to prevent infinite loading
       const timeout = setTimeout(() => {
-        console.warn('Prescription generation timed out');
+        console.warn('Prescription generation timed out - callback may not have fired');
+        console.log('Timeout triggered, setting error and stopping generation');
         setGenerationError('Prescription generation timed out. Please try again.');
         setIsGenerating(false);
-      }, 15000); // 15 second timeout
+      }, 10000); // Reduced to 10 seconds for faster testing
       
-      return () => clearTimeout(timeout);
+      return () => {
+        console.log('Cleaning up timeout');
+        clearTimeout(timeout);
+      };
     } else {
       // Reset stable values when modal closes for next use
+      console.log('Modal closed, resetting stable values');
       stableTimestamp.current = '';
       stableCaseId.current = '';
     }

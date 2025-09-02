@@ -30,19 +30,22 @@ export default function PrescriptionGenerator({
   const prescriptionRef = useRef<SVGSVGElement>(null);
 
   const prescriptionMetadata = useMemo(() => {
+    console.log('PrescriptionGenerator: Generating metadata for data:', data);
     const complexity = calculateQuestionComplexity(data.userQuestion);
     const rarity = calculateRarity(data.confidence, complexity);
     const metadata = generateMetadata(data, rarity);
+    console.log('PrescriptionGenerator: Generated metadata:', metadata);
     return metadata;
   }, [data]);
 
-  // Separate effect to avoid re-renders
+  // Effect to call onGenerated callback when metadata is ready
   React.useEffect(() => {
+    console.log('PrescriptionGenerator: useEffect triggered', { onGenerated: !!onGenerated, prescriptionMetadata: !!prescriptionMetadata });
     if (onGenerated && prescriptionMetadata) {
+      console.log('PrescriptionGenerator: Calling onGenerated callback');
       onGenerated(prescriptionMetadata);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prescriptionMetadata]); // Remove onGenerated from dependencies to prevent re-renders
+  }, [onGenerated, prescriptionMetadata]);
 
   const parsedResponse = useMemo(() => {
     return parseClaudeResponse(data.claudeResponse, { 
