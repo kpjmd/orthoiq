@@ -27,6 +27,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   }, [isGenerating]);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const prescriptionRef = useRef<SVGSVGElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Use refs to store stable values that shouldn't change during modal lifecycle
   const stableTimestamp = useRef<string>('');
@@ -57,7 +58,15 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   // Callback to receive metadata from PrescriptionGenerator
   const handleMetadataGenerated = useCallback((metadata: PrescriptionMetadata) => {
     console.log('Modal: Received metadata from PrescriptionGenerator:', metadata);
-    console.log('Modal: Setting isGenerating to false and prescriptionMetadata');
+    console.log('Modal: Setting isGenerating to false and clearing timeout');
+    
+    // Clear timeout since generation is complete
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+      console.log('Modal: Timeout cleared successfully');
+    }
+    
     setPrescriptionMetadata(metadata);
     setIsGenerating(false);
   }, []);
@@ -68,33 +77,49 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       console.log('Modal opened, checking current state...');
       console.log('Current prescriptionMetadata:', prescriptionMetadata);
       
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
       // Only reset state if we don't already have metadata
       if (!prescriptionMetadata) {
-        console.log('No metadata yet, setting isGenerating to true');
+        console.log('No metadata yet, setting isGenerating to true and starting timeout');
         setIsGenerating(true);
+        
+        // Fallback timeout to prevent infinite loading
+        timeoutRef.current = setTimeout(() => {
+          console.warn('Prescription generation timed out - callback may not have fired');
+          console.log('Timeout triggered, setting error and stopping generation');
+          setGenerationError('Prescription generation timed out. Please try again.');
+          setIsGenerating(false);
+          timeoutRef.current = null;
+        }, 10000); // 10 seconds timeout
       } else {
-        console.log('Metadata already exists, setting isGenerating to false');
+        console.log('Metadata already exists, setting isGenerating to false, no timeout needed');
         setIsGenerating(false);
       }
       
       setGenerationError(null);
-      // Don't reset prescriptionMetadata - preserve it if it exists
-      
-      // Fallback timeout to prevent infinite loading
-      const timeout = setTimeout(() => {
-        console.warn('Prescription generation timed out - callback may not have fired');
-        console.log('Timeout triggered, setting error and stopping generation');
-        setGenerationError('Prescription generation timed out. Please try again.');
-        setIsGenerating(false);
-      }, 10000); // Reduced to 10 seconds for faster testing
       
       return () => {
-        console.log('Cleaning up timeout');
-        clearTimeout(timeout);
+        console.log('Cleaning up timeout on modal close/reopen');
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
       };
     } else {
       // Reset stable values when modal closes for next use
       console.log('Modal closed, resetting stable values and metadata');
+      
+      // Clear timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
       stableTimestamp.current = '';
       stableCaseId.current = '';
       setPrescriptionMetadata(null);
