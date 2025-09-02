@@ -65,11 +65,20 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      console.log('Modal opened, resetting state...');
-      console.log('Setting isGenerating to true');
-      setIsGenerating(true);
+      console.log('Modal opened, checking current state...');
+      console.log('Current prescriptionMetadata:', prescriptionMetadata);
+      
+      // Only reset state if we don't already have metadata
+      if (!prescriptionMetadata) {
+        console.log('No metadata yet, setting isGenerating to true');
+        setIsGenerating(true);
+      } else {
+        console.log('Metadata already exists, setting isGenerating to false');
+        setIsGenerating(false);
+      }
+      
       setGenerationError(null);
-      setPrescriptionMetadata(null);
+      // Don't reset prescriptionMetadata - preserve it if it exists
       
       // Fallback timeout to prevent infinite loading
       const timeout = setTimeout(() => {
@@ -85,11 +94,13 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       };
     } else {
       // Reset stable values when modal closes for next use
-      console.log('Modal closed, resetting stable values');
+      console.log('Modal closed, resetting stable values and metadata');
       stableTimestamp.current = '';
       stableCaseId.current = '';
+      setPrescriptionMetadata(null);
+      setIsGenerating(true);
     }
-  }, [isOpen]);
+  }, [isOpen, prescriptionMetadata]);
 
 
   if (!isOpen) return null;
