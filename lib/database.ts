@@ -1572,6 +1572,292 @@ export async function getPrescriptionAnalytics(): Promise<any> {
   }
 }
 
+// Get time-series prescription analytics
+export async function getPrescriptionTimeSeries(days: number = 30): Promise<any> {
+  const sql = getSql();
+  
+  try {
+    const timeSeries = await sql`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as prescriptions,
+        COUNT(CASE WHEN rarity_type = 'ultra-rare' THEN 1 END) as ultra_rare_count,
+        AVG(CASE WHEN q.confidence IS NOT NULL THEN q.confidence ELSE 0.8 END) as avg_confidence
+      FROM prescriptions p
+      LEFT JOIN questions q ON p.question_id = q.id
+      WHERE p.created_at >= CURRENT_DATE - INTERVAL '${days} days'
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at)
+    `;
+
+    const rarityTrends = await sql`
+      SELECT 
+        DATE(created_at) as date,
+        rarity_type,
+        COUNT(*) as count
+      FROM prescriptions
+      WHERE created_at >= CURRENT_DATE - INTERVAL '${days} days'
+      GROUP BY DATE(created_at), rarity_type
+      ORDER BY DATE(created_at), rarity_type
+    `;
+
+    return {
+      timeSeries,
+      rarityTrends
+    };
+  } catch (error) {
+    console.error('Error getting prescription time series:', error);
+    return { timeSeries: [], rarityTrends: [] };
+  }
+}
+
+// Get engagement and viral metrics
+export async function getEngagementMetrics(): Promise<any> {
+  const sql = getSql();
+  
+  try {
+    const shareMetrics = await sql`
+      SELECT 
+        ps.platform,
+        COUNT(*) as total_shares,
+        SUM(ps.clicks) as total_clicks,
+        AVG(ps.clicks) as avg_clicks_per_share,
+        COUNT(DISTINCT ps.fid) as unique_sharers
+      FROM prescription_shares ps
+      GROUP BY ps.platform
+      ORDER BY total_shares DESC
+    `;
+
+    const viralCoefficient = await sql`
+      WITH share_data AS (
+        SELECT 
+          ps.fid as sharer_fid,
+          ps.clicks,
+          ps.shared_at,
+          p.fid as prescription_owner_fid
+        FROM prescription_shares ps
+        JOIN prescriptions p ON ps.prescription_id = p.prescription_id
+        WHERE ps.shared_at >= CURRENT_DATE - INTERVAL '30 days'
+      ),
+      new_users AS (
+        SELECT COUNT(DISTINCT fid) as new_user_count
+        FROM prescriptions
+        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+      ),
+      total_shares AS (
+        SELECT COUNT(*) as share_count
+        FROM share_data
+      )
+      SELECT 
+        CASE 
+          WHEN ts.share_count > 0 THEN (nu.new_user_count::float / ts.share_count)
+          ELSE 0 
+        END as viral_coefficient
+      FROM new_users nu, total_shares ts
+    `;
+
+    const engagementByRarity = await sql`
+      SELECT 
+        p.rarity_type,
+        AVG(p.share_count) as avg_shares,
+        AVG(p.download_count) as avg_downloads,
+        COUNT(*) as total_prescriptions
+      FROM prescriptions p
+      GROUP BY p.rarity_type
+      ORDER BY 
+        CASE p.rarity_type 
+          WHEN 'common' THEN 1
+          WHEN 'uncommon' THEN 2
+          WHEN 'rare' THEN 3
+          WHEN 'ultra-rare' THEN 4
+        END
+    `;
+
+    return {
+      shareMetrics,
+      viralCoefficient: viralCoefficient[0]?.viral_coefficient || 0,
+      engagementByRarity
+    };
+  } catch (error) {
+    console.error('Error getting engagement metrics:', error);
+    return { shareMetrics: [], viralCoefficient: 0, engagementByRarity: [] };
+  }
+}
+
+// Get user journey and retention analytics
+export async function getUserJourneyAnalytics(): Promise<any> {
+  const sql = getSql();
+  
+  try {
+    const userRetention = await sql`
+      WITH user_cohorts AS (
+        SELECT 
+          fid,
+          DATE_TRUNC('week', MIN(created_at)) as cohort_week,
+          MIN(created_at) as first_prescription
+        FROM prescriptions
+        GROUP BY fid
+      ),
+      cohort_sizes AS (
+        SELECT 
+          cohort_week,
+          COUNT(*) as cohort_size
+        FROM user_cohorts
+        GROUP BY cohort_week
+      ),
+      user_activity AS (
+        SELECT 
+          uc.fid,
+          uc.cohort_week,
+          p.created_at,
+          EXTRACT(epoch FROM (p.created_at - uc.first_prescription)) / 86400 as days_since_first
+        FROM user_cohorts uc
+        JOIN prescriptions p ON uc.fid = p.fid
+      )
+      SELECT 
+        ua.cohort_week,
+        cs.cohort_size,
+        CASE 
+          WHEN ua.days_since_first <= 1 THEN 'day_1'
+          WHEN ua.days_since_first <= 7 THEN 'week_1'
+          WHEN ua.days_since_first <= 30 THEN 'month_1'
+          ELSE 'beyond_month_1'
+        END as retention_period,
+        COUNT(DISTINCT ua.fid) as active_users
+      FROM user_activity ua
+      JOIN cohort_sizes cs ON ua.cohort_week = cs.cohort_week
+      GROUP BY ua.cohort_week, cs.cohort_size, retention_period
+      ORDER BY ua.cohort_week, retention_period
+    `;
+
+    const prescriptionGenerationRate = await sql`
+      WITH response_stats AS (
+        SELECT 
+          COUNT(*) as total_responses,
+          COUNT(CASE WHEN q.id IN (SELECT DISTINCT question_id FROM prescriptions) THEN 1 END) as responses_with_prescriptions
+        FROM questions q
+        WHERE q.timestamp >= CURRENT_DATE - INTERVAL '30 days'
+      )
+      SELECT 
+        total_responses,
+        responses_with_prescriptions,
+        CASE 
+          WHEN total_responses > 0 THEN (responses_with_prescriptions::float / total_responses * 100)
+          ELSE 0 
+        END as generation_rate
+      FROM response_stats
+    `;
+
+    const topMedicalTopics = await sql`
+      SELECT 
+        LOWER(TRIM(regexp_split_to_table(q.question, '\\s+'))) as word,
+        COUNT(*) as frequency
+      FROM prescriptions p
+      JOIN questions q ON p.question_id = q.id
+      WHERE LENGTH(TRIM(regexp_split_to_table(q.question, '\\s+'))) > 4
+        AND LOWER(TRIM(regexp_split_to_table(q.question, '\\s+'))) NOT IN ('what', 'when', 'where', 'how', 'why', 'can', 'could', 'would', 'should', 'the', 'and', 'or', 'but', 'with', 'for', 'from', 'about', 'have', 'had', 'has', 'been', 'this', 'that', 'they', 'them', 'their')
+      GROUP BY LOWER(TRIM(regexp_split_to_table(q.question, '\\s+')))
+      HAVING COUNT(*) >= 3
+      ORDER BY frequency DESC
+      LIMIT 20
+    `;
+
+    return {
+      userRetention,
+      prescriptionGenerationRate: prescriptionGenerationRate[0] || { total_responses: 0, responses_with_prescriptions: 0, generation_rate: 0 },
+      topMedicalTopics
+    };
+  } catch (error) {
+    console.error('Error getting user journey analytics:', error);
+    return { userRetention: [], prescriptionGenerationRate: { total_responses: 0, responses_with_prescriptions: 0, generation_rate: 0 }, topMedicalTopics: [] };
+  }
+}
+
+// Get revenue projection analytics
+export async function getRevenueProjections(): Promise<any> {
+  const sql = getSql();
+  
+  try {
+    const mdReviewCandidates = await sql`
+      SELECT 
+        p.prescription_id,
+        p.fid,
+        p.rarity_type,
+        p.created_at,
+        q.question,
+        q.confidence,
+        CASE 
+          WHEN p.rarity_type = 'ultra-rare' THEN 25.00
+          WHEN p.rarity_type = 'rare' THEN 15.00
+          WHEN p.rarity_type = 'uncommon' THEN 10.00
+          ELSE 5.00
+        END as potential_value
+      FROM prescriptions p
+      JOIN questions q ON p.question_id = q.id
+      WHERE p.md_reviewed = false
+        AND q.confidence >= 0.7
+        AND p.rarity_type IN ('rare', 'ultra-rare')
+      ORDER BY 
+        CASE p.rarity_type 
+          WHEN 'ultra-rare' THEN 1
+          WHEN 'rare' THEN 2
+        END,
+        q.confidence DESC
+      LIMIT 50
+    `;
+
+    const revenueProjection = await sql`
+      SELECT 
+        COUNT(CASE WHEN rarity_type = 'ultra-rare' AND md_reviewed = false THEN 1 END) as ultra_rare_candidates,
+        COUNT(CASE WHEN rarity_type = 'rare' AND md_reviewed = false THEN 1 END) as rare_candidates,
+        COUNT(CASE WHEN rarity_type = 'uncommon' AND md_reviewed = false THEN 1 END) as uncommon_candidates,
+        SUM(CASE 
+          WHEN rarity_type = 'ultra-rare' AND md_reviewed = false THEN 25.00
+          WHEN rarity_type = 'rare' AND md_reviewed = false THEN 15.00
+          WHEN rarity_type = 'uncommon' AND md_reviewed = false THEN 10.00
+          ELSE 0
+        END) as potential_revenue
+      FROM prescriptions p
+      JOIN questions q ON p.question_id = q.id
+      WHERE q.confidence >= 0.6
+    `;
+
+    const walletConnectionRate = await sql`
+      WITH farcaster_users AS (
+        SELECT DISTINCT fid
+        FROM prescriptions
+        WHERE fid IS NOT NULL
+      ),
+      total_users AS (
+        SELECT COUNT(*) as total_count FROM farcaster_users
+      )
+      SELECT 
+        tu.total_count as total_farcaster_users,
+        COALESCE(COUNT(CASE WHEN p.payment_status != 'none' THEN 1 END), 0) as users_with_payments,
+        CASE 
+          WHEN tu.total_count > 0 THEN (COUNT(CASE WHEN p.payment_status != 'none' THEN 1 END)::float / tu.total_count * 100)
+          ELSE 0 
+        END as wallet_connection_rate
+      FROM total_users tu
+      LEFT JOIN prescriptions p ON true
+      GROUP BY tu.total_count
+    `;
+
+    return {
+      mdReviewCandidates,
+      revenueProjection: revenueProjection[0] || { ultra_rare_candidates: 0, rare_candidates: 0, uncommon_candidates: 0, potential_revenue: 0 },
+      walletConnectionRate: walletConnectionRate[0] || { total_farcaster_users: 0, users_with_payments: 0, wallet_connection_rate: 0 }
+    };
+  } catch (error) {
+    console.error('Error getting revenue projections:', error);
+    return { 
+      mdReviewCandidates: [], 
+      revenueProjection: { ultra_rare_candidates: 0, rare_candidates: 0, uncommon_candidates: 0, potential_revenue: 0 },
+      walletConnectionRate: { total_farcaster_users: 0, users_with_payments: 0, wallet_connection_rate: 0 }
+    };
+  }
+}
+
 // Get user collection summary
 export async function getUserCollectionSummary(fid: string): Promise<any> {
   const sql = getSql();
