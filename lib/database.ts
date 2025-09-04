@@ -1565,7 +1565,7 @@ export async function trackPrescriptionShare(
     `;
 
     // If no prescription record exists, that's ok for tracking purposes
-    if (updateResult.count === 0) {
+    if (updateResult.length === 0) {
       console.log(`No prescription record found for ID: ${prescriptionId}, but share tracked`);
     }
 
