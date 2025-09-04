@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
+import FeedbackWidget from './FeedbackWidget';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
 
@@ -22,6 +23,8 @@ interface ResponseCardProps {
   caseId?: string;
   inquiry?: string;
   keyPoints?: string[];
+  questionId?: string;
+  isAuthenticated?: boolean;
 }
 
 export default function ResponseCard({ 
@@ -40,7 +43,9 @@ export default function ResponseCard({
   fid,
   caseId,
   inquiry,
-  keyPoints
+  keyPoints,
+  questionId,
+  isAuthenticated = false
 }: ResponseCardProps) {
   const [showConfidence, setShowConfidence] = useState(false);
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
@@ -233,6 +238,17 @@ export default function ResponseCard({
         )}
         
       </div>
+      
+      {/* User Feedback Widget */}
+      {!isFiltered && questionId && fid && (
+        <div className="px-4">
+          <FeedbackWidget
+            questionId={questionId}
+            fid={fid}
+            isAuthenticated={isAuthenticated}
+          />
+        </div>
+      )}
       
       {/* Medical Disclaimer */}
       {!isFiltered && (

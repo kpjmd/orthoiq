@@ -25,6 +25,7 @@ interface ResponseData {
   correctionsText?: string;
   inquiry?: string;
   keyPoints?: string[];
+  questionId?: number;
 }
 
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
@@ -96,7 +97,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         additionsText: data.additionsText,
         correctionsText: data.correctionsText,
         inquiry: data.inquiry,
-        keyPoints: data.keyPoints
+        keyPoints: data.keyPoints,
+        questionId: data.questionId
       });
       
       setQuestion('');
@@ -262,6 +264,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               caseId={`web-${Date.now()}`}
               inquiry={responseData.inquiry}
               keyPoints={responseData.keyPoints}
+              questionId={responseData.questionId?.toString()}
+              isAuthenticated={isAuthenticated}
             />
             
             {/* Action Menu */}

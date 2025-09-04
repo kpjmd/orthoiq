@@ -73,6 +73,41 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_ratings_created_at ON ratings(created_at);
     `;
 
+    // User feedback table for RLHF training data
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_feedback (
+        id SERIAL PRIMARY KEY,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        was_helpful VARCHAR(20) NOT NULL CHECK (was_helpful IN ('yes', 'no', 'somewhat')),
+        ai_answered BOOLEAN DEFAULT TRUE,
+        improvement_suggestion TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT suggestion_length CHECK (LENGTH(improvement_suggestion) <= 500),
+        UNIQUE(question_id, fid)
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_question_id ON user_feedback(question_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_fid ON user_feedback(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_was_helpful ON user_feedback(was_helpful);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_ai_answered ON user_feedback(ai_answered);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_feedback_created_at ON user_feedback(created_at);
+    `;
+
     await sql`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
@@ -686,6 +721,52 @@ export async function logRating(fid: string, question: string, rating: number): 
   }
 }
 
+// Log user feedback for RLHF training
+export async function logUserFeedback(
+  questionId: number,
+  fid: string,
+  wasHelpful: 'yes' | 'no' | 'somewhat',
+  aiAnswered: boolean = true,
+  improvementSuggestion?: string
+): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    await sql`
+      INSERT INTO user_feedback (question_id, fid, was_helpful, ai_answered, improvement_suggestion)
+      VALUES (${questionId}, ${fid}, ${wasHelpful}, ${aiAnswered}, ${improvementSuggestion || null})
+      ON CONFLICT (question_id, fid) 
+      DO UPDATE SET 
+        was_helpful = EXCLUDED.was_helpful,
+        ai_answered = EXCLUDED.ai_answered,
+        improvement_suggestion = EXCLUDED.improvement_suggestion,
+        created_at = CURRENT_TIMESTAMP
+    `;
+  } catch (error) {
+    console.error('Error logging user feedback:', error);
+    throw error;
+  }
+}
+
+// Get user feedback for a specific question
+export async function getUserFeedback(questionId: number, fid: string): Promise<any | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT was_helpful, ai_answered, improvement_suggestion, created_at
+      FROM user_feedback
+      WHERE question_id = ${questionId} AND fid = ${fid}
+      LIMIT 1
+    `;
+    
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('Error getting user feedback:', error);
+    return null;
+  }
+}
+
 // Get pending responses for admin review
 export async function getPendingResponses(): Promise<any[]> {
   const sql = getSql();
@@ -1033,6 +1114,30 @@ export async function getEnhancedAnalytics() {
       WHERE confidence_score IS NOT NULL OR communication_quality IS NOT NULL
     `;
 
+    // Get user feedback analytics
+    const userFeedbackStats = await sql`
+      SELECT 
+        COUNT(*) as total_feedback,
+        COUNT(CASE WHEN was_helpful = 'yes' THEN 1 END) as helpful_yes,
+        COUNT(CASE WHEN was_helpful = 'no' THEN 1 END) as helpful_no,
+        COUNT(CASE WHEN was_helpful = 'somewhat' THEN 1 END) as helpful_somewhat,
+        COUNT(CASE WHEN ai_answered = false THEN 1 END) as ai_refusal_count,
+        COUNT(CASE WHEN improvement_suggestion IS NOT NULL AND LENGTH(improvement_suggestion) > 0 THEN 1 END) as suggestions_count
+      FROM user_feedback
+    `;
+
+    const feedbackByDay = await sql`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as feedback_count,
+        COUNT(CASE WHEN was_helpful = 'yes' THEN 1 END) as helpful_yes,
+        COUNT(CASE WHEN was_helpful = 'no' THEN 1 END) as helpful_no
+      FROM user_feedback
+      WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY DATE(created_at)
+      ORDER BY DATE(created_at)
+    `;
+
     return {
       totalReviewed: parseInt(totalReviewed[0].count),
       approvalRate: approvalRate[0].total > 0 ? 
@@ -1041,7 +1146,26 @@ export async function getEnhancedAnalytics() {
       specialtyDistribution,
       qualityDistribution,
       avgConfidenceScore: parseFloat(avgScores[0].avg_confidence) || 0,
-      avgCommunicationQuality: parseFloat(avgScores[0].avg_communication) || 0
+      avgCommunicationQuality: parseFloat(avgScores[0].avg_communication) || 0,
+      userFeedbackStats: userFeedbackStats[0] ? {
+        totalFeedback: parseInt(userFeedbackStats[0].total_feedback),
+        helpfulYes: parseInt(userFeedbackStats[0].helpful_yes),
+        helpfulNo: parseInt(userFeedbackStats[0].helpful_no),
+        helpfulSomewhat: parseInt(userFeedbackStats[0].helpful_somewhat),
+        aiRefusalCount: parseInt(userFeedbackStats[0].ai_refusal_count),
+        suggestionsCount: parseInt(userFeedbackStats[0].suggestions_count),
+        helpfulnessRate: parseInt(userFeedbackStats[0].total_feedback) > 0 ? 
+          ((parseInt(userFeedbackStats[0].helpful_yes) + parseInt(userFeedbackStats[0].helpful_somewhat)) / parseInt(userFeedbackStats[0].total_feedback) * 100) : 0
+      } : {
+        totalFeedback: 0,
+        helpfulYes: 0,
+        helpfulNo: 0,
+        helpfulSomewhat: 0,
+        aiRefusalCount: 0,
+        suggestionsCount: 0,
+        helpfulnessRate: 0
+      },
+      feedbackByDay
     };
   } catch (error) {
     console.error('Error getting enhanced analytics:', error);
@@ -1052,7 +1176,17 @@ export async function getEnhancedAnalytics() {
       specialtyDistribution: [],
       qualityDistribution: [],
       avgConfidenceScore: 0,
-      avgCommunicationQuality: 0
+      avgCommunicationQuality: 0,
+      userFeedbackStats: {
+        totalFeedback: 0,
+        helpfulYes: 0,
+        helpfulNo: 0,
+        helpfulSomewhat: 0,
+        aiRefusalCount: 0,
+        suggestionsCount: 0,
+        helpfulnessRate: 0
+      },
+      feedbackByDay: []
     };
   }
 }

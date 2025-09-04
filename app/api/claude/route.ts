@@ -207,7 +207,8 @@ export async function POST(request: NextRequest) {
       additionsText: reviewStatus.additionsText,
       correctionsText: reviewStatus.correctionsText,
       inquiry: claudeResponse.inquiry,
-      keyPoints: claudeResponse.keyPoints
+      keyPoints: claudeResponse.keyPoints,
+      questionId: questionId
     });
 
   } catch (error) {
