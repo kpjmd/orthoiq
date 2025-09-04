@@ -143,11 +143,24 @@ export function parseClaudeResponse(response: string, claudeResponse?: { inquiry
     }
   }
   
+  // Generate a proper inquiry from user question if not provided
+  const finalInquiry = chiefInquiry || claudeResponse?.inquiry || 
+    (claudeResponse?.userQuestion ? 
+      (claudeResponse.userQuestion.length > 60 ? 
+        claudeResponse.userQuestion.substring(0, 60).trim() + "..." : 
+        claudeResponse.userQuestion) : 
+      'Medical consultation inquiry');
+
   return {
-    chiefComplaint: chiefInquiry || claudeResponse?.inquiry || claudeResponse?.userQuestion || 'Medical consultation inquiry',
+    chiefComplaint: finalInquiry,
     assessment: assessment.length ? assessment : ['Medical assessment available'],
     recommendations: recommendations.length ? recommendations : ['Treatment recommendations available'],
-    disclaimers: disclaimers.length ? disclaimers : ['This is AI-generated information. Consult a healthcare provider.']
+    disclaimers: disclaimers.length ? disclaimers : ['This is AI-generated information. Consult a healthcare provider.'],
+    inquiry: finalInquiry,
+    keyPoints: claudeResponse?.keyPoints?.length ? claudeResponse.keyPoints : 
+      (assessment.length || recommendations.length ? 
+        [...assessment.slice(0, 2), ...recommendations.slice(0, 2)] : 
+        ['Medical assessment points available'])
   };
 }
 

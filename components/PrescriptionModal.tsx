@@ -225,15 +225,21 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       // Track the share
       if (prescriptionMetadata.id) {
         try {
-          await fetch(`/api/prescriptions/${prescriptionMetadata.id}/share`, {
+          const trackResponse = await fetch(`/api/prescriptions/${prescriptionMetadata.id}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              fid: prescriptionData.fid,
+              fid: prescriptionData.fid || 'modal-user',
               platform: 'unified',
               shareUrl: shareUrl
             })
           });
+          
+          if (!trackResponse.ok) {
+            console.warn('Share tracking failed with status:', trackResponse.status);
+          } else {
+            console.log('Share tracking successful');
+          }
         } catch (trackError) {
           console.warn('Failed to track share:', trackError);
         }

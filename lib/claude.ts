@@ -71,10 +71,23 @@ export async function getOrthoResponse(question: string): Promise<ClaudeResponse
         fallbackResponse = "I apologize, but I'm having trouble formatting my response properly. Please try asking your question again.";
       }
       
+      // Generate inquiry and keyPoints for fallback
+      const inquiryFallback = question.length > 60 
+        ? question.substring(0, 60).trim() + "..." 
+        : question;
+      
+      const keyPointsFallback = fallbackResponse
+        .split(/[.!?]/)
+        .filter(sentence => sentence.trim().length > 20)
+        .slice(0, 4)
+        .map(point => point.trim().substring(0, 80));
+      
       parsedResponse = {
         response: fallbackResponse,
         isRelevant: true,
-        confidence: 0.7
+        confidence: 0.7,
+        inquiry: inquiryFallback,
+        keyPoints: keyPointsFallback.length > 0 ? keyPointsFallback : ["Medical assessment points available"]
       };
     }
 

@@ -103,8 +103,14 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const viewMode = resolvedSearchParams.view || 'full'; // 'prescription' or 'full'
   
   // Extract inquiry and keyPoints from stored data
-  const inquiry = shareData?.artworkMetadata?.inquiry || question;
-  const keyPoints = shareData?.artworkMetadata?.keyPoints || [];
+  const inquiry = shareData?.artworkMetadata?.inquiry || 
+    (typeof question === 'string' && question.length > 60 ? 
+      question.substring(0, 60).trim() + "..." : 
+      question) || 'Medical consultation inquiry';
+  const keyPoints = shareData?.artworkMetadata?.keyPoints || 
+    (typeof response === 'string' ? 
+      response.split(/[.!?]/).filter(s => s.trim().length > 20).slice(0, 4).map(s => s.trim().substring(0, 80)) :
+      []) || ['Medical assessment points available'];
 
   if (!question || !response) {
     notFound();

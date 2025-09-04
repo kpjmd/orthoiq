@@ -350,13 +350,28 @@ export async function initDatabase() {
     await sql`
       CREATE TABLE IF NOT EXISTS prescription_shares (
         id SERIAL PRIMARY KEY,
-        prescription_id VARCHAR(255) REFERENCES prescriptions(prescription_id) ON DELETE CASCADE,
-        platform VARCHAR(50) NOT NULL CHECK (platform IN ('farcaster', 'twitter', 'facebook', 'telegram', 'email', 'copy_link')),
+        prescription_id VARCHAR(255),
+        platform VARCHAR(50) NOT NULL,
         share_url TEXT,
         clicks INTEGER DEFAULT 0,
         fid VARCHAR(255) NOT NULL,
         shared_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    // Drop and recreate constraints to be more flexible
+    await sql`
+      ALTER TABLE prescription_shares 
+      DROP CONSTRAINT IF EXISTS prescription_shares_platform_check
+    `;
+    await sql`
+      ALTER TABLE prescription_shares 
+      DROP CONSTRAINT IF EXISTS prescription_shares_prescription_id_fkey
+    `;
+    await sql`
+      ALTER TABLE prescription_shares 
+      ADD CONSTRAINT prescription_shares_platform_check 
+      CHECK (platform IN ('farcaster', 'twitter', 'facebook', 'telegram', 'email', 'copy_link', 'unified'))
     `;
 
     await sql`
@@ -1521,13 +1536,13 @@ export async function trackPrescriptionDownload(
 export async function trackPrescriptionShare(
   prescriptionId: string,
   fid: string,
-  platform: 'farcaster' | 'twitter' | 'facebook' | 'telegram' | 'email' | 'copy_link',
+  platform: 'farcaster' | 'twitter' | 'facebook' | 'telegram' | 'email' | 'copy_link' | 'unified',
   shareUrl?: string
 ): Promise<void> {
   const sql = getSql();
   
   try {
-    // Insert share record
+    // Insert share record - but don't enforce foreign key constraint strictly
     await sql`
       INSERT INTO prescription_shares (
         prescription_id, fid, platform, share_url
@@ -1535,8 +1550,8 @@ export async function trackPrescriptionShare(
       VALUES (${prescriptionId}, ${fid}, ${platform}, ${shareUrl || null})
     `;
 
-    // Update prescription share count and platforms
-    await sql`
+    // Update prescription share count and platforms only if prescription exists
+    const updateResult = await sql`
       UPDATE prescriptions 
       SET 
         share_count = share_count + 1,
@@ -1548,6 +1563,11 @@ export async function trackPrescriptionShare(
         updated_at = CURRENT_TIMESTAMP
       WHERE prescription_id = ${prescriptionId}
     `;
+
+    // If no prescription record exists, that's ok for tracking purposes
+    if (updateResult.count === 0) {
+      console.log(`No prescription record found for ID: ${prescriptionId}, but share tracked`);
+    }
 
     // Update user collection stats
     await sql`

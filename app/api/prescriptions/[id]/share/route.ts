@@ -17,29 +17,19 @@ export async function POST(
       );
     }
 
-    if (!fid) {
-      return NextResponse.json(
-        { error: 'FID is required' },
-        { status: 400 }
-      );
-    }
+    // Use defaults for missing fields
+    const finalFid = fid || 'unknown-user';
+    const finalPlatform = platform || 'unified';
 
-    if (!platform) {
-      return NextResponse.json(
-        { error: 'Platform is required' },
-        { status: 400 }
-      );
-    }
-
-    const validPlatforms = ['farcaster', 'twitter', 'facebook', 'telegram', 'email', 'copy_link'];
-    if (!validPlatforms.includes(platform)) {
+    const validPlatforms = ['farcaster', 'twitter', 'facebook', 'telegram', 'email', 'copy_link', 'unified'];
+    if (!validPlatforms.includes(finalPlatform)) {
       return NextResponse.json(
         { error: 'Invalid platform' },
         { status: 400 }
       );
     }
 
-    await trackPrescriptionShare(id, fid, platform, shareUrl);
+    await trackPrescriptionShare(id, finalFid, finalPlatform, shareUrl);
 
     return NextResponse.json({
       success: true,
