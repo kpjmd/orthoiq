@@ -7,14 +7,15 @@
   "miniapp": {
     "version": "1",
     "name": "OrthoIQ - AI Orthopedic Expert",
-    "iconUrl": "https://orthoiq.vercel.app/icon.svg",
+    "iconUrl": "https://orthoiq.vercel.app/icon.png",
     "imageUrl": "https://orthoiq.vercel.app/og-image.png",
     "buttonTitle": "Ask OrthoIQ",
-    "splashImageUrl": "https://orthoiq.vercel.app/splash-image.svg",
+    "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
     "splashBackgroundColor": "#1e3a8a",
-    "homeUrl": "https://orthoiq.vercel.app/mini",
+    "webhookUrl": "https://orthoiq.vercel.app/api/webhook",
+    "homeUrl": "https://orthoiq.vercel.app",
     "subtitle": "AI Orthopedic Expert",
-    "description": "Get expert orthopedic advice from AI trained by Dr. KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
+    "description": "Get expert orthopedic advice from AI founded by Dr. KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
     "tagline": "Premier Medical AI Assistant",
     "tags": [
       "medical",
@@ -22,6 +23,14 @@
       "ai",
       "health",
       "doctor"
+    ],
+    "ogTitle": "OrthoIQ - AI Orthopedic Expert",
+    "ogImageUrl": "https://orthoiq.vercel.app/og-image.png",
+    "heroImageUrl": "https://orthoiq.vercel.app/embed-image.png",
+    "castShareUrl": "https://farcaster.xyz/miniapps/12zkRyhWt8Az/orthoiq---ai-orthopedic-expert",
+    "ogDescription": "Get your orthopedic questions answers here, powered by Claude AI. Responses reviewed by MD.",
+    "screenshotUrls": [
+      "https://orthoiq.vercel.app/orthoiq-screenshot.jpg"
     ],
     "primaryCategory": "health-fitness"
   },
