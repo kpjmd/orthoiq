@@ -12,9 +12,11 @@ interface ActionMenuProps {
   questionsRemaining?: number;
   inquiry?: string;
   keyPoints?: string[];
+  confidence?: number;
+  prescriptionMetadata?: any;
 }
 
-export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0, inquiry, keyPoints }: ActionMenuProps) {
+export default function ActionMenu({ response, question, onAskAnother, onViewArtwork, onRate, canAskAnother = true, questionsRemaining = 0, inquiry, keyPoints, confidence = 85, prescriptionMetadata }: ActionMenuProps) {
   const [showRating, setShowRating] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [shareText, setShareText] = useState('Share Response');
@@ -30,9 +32,10 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
         body: JSON.stringify({
           question,
           response,
-          confidence: 95, // This would come from actual response data
+          confidence, // Use actual confidence value
           inquiry,
-          keyPoints
+          keyPoints,
+          prescriptionMetadata // Include prescription metadata if available
         })
       });
 

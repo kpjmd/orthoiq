@@ -76,3 +76,70 @@ export interface RarityConfig {
   theme: PrescriptionTheme;
   minConfidence?: number;
 }
+
+// Payment system interfaces for MD review
+export interface PaymentRequest {
+  id: number;
+  paymentId: string;
+  prescriptionId: string;
+  questionId: number;
+  fid: string;
+  amountUSDC: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
+  paymentHash?: string;
+  walletAddress?: string;
+  requestedAt: Date;
+  paidAt?: Date;
+  refundedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MDReviewQueue {
+  id: number;
+  prescriptionId: string;
+  paymentId: string;
+  fid: string;
+  priority: number;
+  status: 'pending' | 'in_review' | 'completed' | 'expired';
+  assignedToMD?: string;
+  reviewNotes?: string;
+  mdSignature?: string;
+  reviewedAt?: Date;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WalletConnectionState {
+  isConnected: boolean;
+  address?: string;
+  balance?: number;
+  isConnecting: boolean;
+  error?: string;
+}
+
+export interface PaymentModalProps {
+  prescriptionId: string;
+  questionId: number;
+  fid: string;
+  isOpen: boolean;
+  onClose: () => void;
+  onPaymentSuccess: (paymentId: string) => void;
+  onPaymentError: (error: string) => void;
+}
+
+export interface MDReviewUpgradeProps {
+  prescriptionId: string;
+  questionId: number;
+  fid: string;
+  isAlreadyPaid: boolean;
+  paymentStatus?: string;
+  inReviewQueue: boolean;
+  isReviewed: boolean;
+}
+
+export interface PaymentStatusProps {
+  paymentId: string;
+  onStatusUpdate: (status: string) => void;
+}

@@ -164,12 +164,25 @@ export function parseClaudeResponse(response: string, claudeResponse?: { inquiry
   };
 }
 
-export function calculateRarity(confidence: number, questionComplexity: number): RarityConfig {
+// Seeded random number generator
+function seededRandom(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  // Convert to 0-1 range
+  return (Math.abs(hash) % 1000000) / 1000000;
+}
+
+export function calculateRarity(confidence: number, questionComplexity: number, seed?: string): RarityConfig {
   // Calculate base probability multiplier based on confidence and complexity
   const confidenceBonus = confidence > 0.8 ? 1.2 : confidence > 0.6 ? 1.0 : 0.8;
   const complexityBonus = questionComplexity > 100 ? 1.3 : questionComplexity > 50 ? 1.1 : 1.0;
   
-  const random = Math.random();
+  // Use seeded random if seed is provided, otherwise use Math.random()
+  const random = seed ? seededRandom(seed) : Math.random();
   let cumulativeProbability = 0;
   
   // Adjust probabilities based on confidence and complexity
@@ -192,7 +205,22 @@ export function calculateRarity(confidence: number, questionComplexity: number):
   return RARITY_CONFIGS[0]; // Default to common
 }
 
-export function generatePrescriptionId(): string {
+export function generatePrescriptionId(seed?: string): string {
+  // If seed is provided, generate deterministic ID
+  if (seed) {
+    // Create a hash from the seed
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    const hashStr = Math.abs(hash).toString(36).substring(0, 8);
+    const timestamp = Date.now().toString(36).substring(0, 6);
+    return `OIQ-${timestamp}-${hashStr}`.toUpperCase();
+  }
+  
+  // Fallback to random generation for backward compatibility
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 8);
   return `OIQ-${timestamp}-${random}`.toUpperCase();
@@ -245,13 +273,18 @@ export function calculateQuestionComplexity(question: string): number {
   return Math.min(complexity, 200); // Cap at 200
 }
 
-export function generateMetadata(prescriptionData: PrescriptionData, rarity: RarityConfig): PrescriptionMetadata {
+export function generateMetadata(prescriptionData: PrescriptionData, rarity: RarityConfig, useDeterministic: boolean = false): PrescriptionMetadata {
   const watermarkType = rarity.name === 'common' ? 'none' : 
                        rarity.name === 'uncommon' ? 'medical_pattern' :
                        rarity.name === 'rare' ? 'gold_caduceus' : 'holographic';
 
+  // Create seed from prescription data for deterministic generation
+  const seed = useDeterministic ? 
+    `${prescriptionData.userQuestion}${prescriptionData.claudeResponse}${prescriptionData.fid}` : 
+    undefined;
+
   return {
-    id: generatePrescriptionId(),
+    id: generatePrescriptionId(seed),
     rarity: rarity.name,
     theme: rarity.theme,
     generatedAt: new Date().toISOString(),

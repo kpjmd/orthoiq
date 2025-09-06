@@ -102,12 +102,18 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const confidence = shareData?.confidence || resolvedSearchParams.confidence;
   const viewMode = resolvedSearchParams.view || 'full'; // 'prescription' or 'full'
   
+  // Extract stored prescription metadata
+  const storedPrescriptionId = shareData?.artworkMetadata?.prescriptionId || shareData?.artwork_metadata?.prescriptionId;
+  const storedRarity = shareData?.artworkMetadata?.prescriptionRarity || shareData?.artwork_metadata?.prescriptionRarity;
+  const storedTheme = shareData?.artworkMetadata?.prescriptionTheme || shareData?.artwork_metadata?.prescriptionTheme;
+  const storedHash = shareData?.artworkMetadata?.prescriptionHash || shareData?.artwork_metadata?.prescriptionHash;
+  
   // Extract inquiry and keyPoints from stored data
-  const inquiry = shareData?.artworkMetadata?.inquiry || 
+  const inquiry = shareData?.artworkMetadata?.inquiry || shareData?.artwork_metadata?.inquiry ||
     (typeof question === 'string' && question.length > 60 ? 
       question.substring(0, 60).trim() + "..." : 
       question) || 'Medical consultation inquiry';
-  const keyPoints = shareData?.artworkMetadata?.keyPoints || 
+  const keyPoints = shareData?.artworkMetadata?.keyPoints || shareData?.artwork_metadata?.keyPoints ||
     (typeof response === 'string' ? 
       response.split(/[.!?]/).filter(s => s.trim().length > 20).slice(0, 4).map(s => s.trim().substring(0, 80)) :
       []) || ['Medical assessment points available'];
@@ -163,6 +169,12 @@ export default async function SharePage({ params, searchParams }: SharePageProps
                   inquiry: inquiry,
                   keyPoints: keyPoints
                 }}
+                storedMetadata={storedPrescriptionId ? {
+                  id: storedPrescriptionId,
+                  rarity: storedRarity,
+                  theme: storedTheme,
+                  verificationHash: storedHash
+                } : undefined}
               />
             </div>
           </div>

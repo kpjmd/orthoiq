@@ -7,7 +7,9 @@ import {
   parseClaudeResponse, 
   calculateRarity, 
   calculateQuestionComplexity,
-  generateMetadata 
+  generateMetadata,
+  generateVerificationHash,
+  RARITY_CONFIGS
 } from '@/lib/prescriptionUtils';
 
 interface PrescriptionGeneratorProps {
@@ -17,6 +19,7 @@ interface PrescriptionGeneratorProps {
   onGenerated?: (metadata: PrescriptionMetadata) => void;
   mdReviewed?: boolean;
   mdReviewerName?: string;
+  storedMetadata?: Partial<PrescriptionMetadata>;
 }
 
 export default function PrescriptionGenerator({ 
@@ -25,18 +28,40 @@ export default function PrescriptionGenerator({
   className = "",
   onGenerated,
   mdReviewed = false,
-  mdReviewerName
+  mdReviewerName,
+  storedMetadata
 }: PrescriptionGeneratorProps) {
   const prescriptionRef = useRef<SVGSVGElement>(null);
 
   const prescriptionMetadata = useMemo(() => {
+    // If stored metadata is provided, use it
+    if (storedMetadata?.id && storedMetadata?.rarity) {
+      console.log('PrescriptionGenerator: Using stored metadata:', storedMetadata);
+      // Find the rarity config for the stored rarity
+      const rarityConfig = RARITY_CONFIGS.find(r => r.name === storedMetadata.rarity) || RARITY_CONFIGS[0];
+      return {
+        id: storedMetadata.id,
+        rarity: storedMetadata.rarity,
+        theme: storedMetadata.theme || rarityConfig.theme,
+        generatedAt: new Date().toISOString(),
+        verificationHash: storedMetadata.verificationHash || generateVerificationHash(data),
+        patientId: `ANON-${data.fid}`,
+        prescriberId: 'ORTHOIQ-AI-001',
+        watermarkType: storedMetadata.rarity === 'common' ? 'none' : 
+                      storedMetadata.rarity === 'uncommon' ? 'medical_pattern' :
+                      storedMetadata.rarity === 'rare' ? 'gold_caduceus' : 'holographic'
+      } as PrescriptionMetadata;
+    }
+    
+    // Otherwise generate new metadata with deterministic seed for consistency
     console.log('PrescriptionGenerator: Generating metadata for data:', data);
+    const seed = `${data.userQuestion}${data.claudeResponse}${data.fid}`;
     const complexity = calculateQuestionComplexity(data.userQuestion);
-    const rarity = calculateRarity(data.confidence, complexity);
-    const metadata = generateMetadata(data, rarity);
+    const rarity = calculateRarity(data.confidence, complexity, seed);
+    const metadata = generateMetadata(data, rarity, true); // Use deterministic generation
     console.log('PrescriptionGenerator: Generated metadata:', metadata);
     return metadata;
-  }, [data]);
+  }, [data, storedMetadata]);
 
   // Effect to call onGenerated callback when metadata is ready
   React.useEffect(() => {

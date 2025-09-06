@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
       confidence = 95,
       inquiry,
       keyPoints,
-      metadata
+      metadata,
+      prescriptionMetadata
     } = body;
 
     if (!question || !response) {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store share data in database with inquiry and keyPoints
+    // Store share data in database with inquiry, keyPoints, and prescription metadata
     const shareId = await createShare(
       'response',
       question,
@@ -29,8 +30,12 @@ export async function POST(request: NextRequest) {
       { 
         inquiry: inquiry || null,
         keyPoints: keyPoints || null,
-        metadata: metadata || {}
-      }, // Include inquiry/keyPoints in artwork metadata
+        metadata: metadata || {},
+        prescriptionId: prescriptionMetadata?.id || null,
+        prescriptionRarity: prescriptionMetadata?.rarity || null,
+        prescriptionTheme: prescriptionMetadata?.theme || null,
+        prescriptionHash: prescriptionMetadata?.verificationHash || null
+      }, // Include all prescription metadata
       {}, // No farcaster-specific data for response shares
       30 // Expire in 30 days
     );

@@ -457,6 +457,81 @@ export async function initDatabase() {
       console.log('Note: Shares table constraint update may have already been applied');
     }
 
+    // Payment requests table for MD review payments
+    await sql`
+      CREATE TABLE IF NOT EXISTS payment_requests (
+        id SERIAL PRIMARY KEY,
+        payment_id VARCHAR(255) UNIQUE NOT NULL,
+        prescription_id VARCHAR(255) REFERENCES prescriptions(prescription_id) ON DELETE CASCADE,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        amount_usdc DECIMAL(10,2) NOT NULL DEFAULT 10.00,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'refunded')),
+        payment_hash VARCHAR(255),
+        wallet_address VARCHAR(255),
+        requested_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        paid_at TIMESTAMP WITH TIME ZONE,
+        refunded_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_payment_requests_payment_id ON payment_requests(payment_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_payment_requests_prescription_id ON payment_requests(prescription_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_payment_requests_fid ON payment_requests(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON payment_requests(status);
+    `;
+
+    // MD review queue table
+    await sql`
+      CREATE TABLE IF NOT EXISTS md_review_queue (
+        id SERIAL PRIMARY KEY,
+        prescription_id VARCHAR(255) REFERENCES prescriptions(prescription_id) ON DELETE CASCADE,
+        payment_id VARCHAR(255) REFERENCES payment_requests(payment_id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        priority INTEGER DEFAULT 1,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_review', 'completed', 'expired')),
+        assigned_to_md VARCHAR(255),
+        review_notes TEXT,
+        md_signature VARCHAR(255),
+        reviewed_at TIMESTAMP WITH TIME ZONE,
+        expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '48 hours'),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_md_review_queue_prescription_id ON md_review_queue(prescription_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_md_review_queue_payment_id ON md_review_queue(payment_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_md_review_queue_status ON md_review_queue(status);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_md_review_queue_assigned_to_md ON md_review_queue(assigned_to_md);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_md_review_queue_expires_at ON md_review_queue(expires_at);
+    `;
+
     console.log('Database initialized successfully with Neon');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -2053,5 +2128,306 @@ export async function getUserCollectionSummary(fid: string): Promise<any> {
       totalShares: 0,
       lastPrescriptionAt: null
     };
+  }
+}
+
+// Payment request functions for MD review
+export async function createPaymentRequest(
+  prescriptionId: string,
+  questionId: number,
+  fid: string,
+  amountUSDC: number = 10.00
+): Promise<string> {
+  const sql = getSql();
+  
+  try {
+    // Generate unique payment ID
+    const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    await sql`
+      INSERT INTO payment_requests (
+        payment_id, prescription_id, question_id, fid, amount_usdc
+      )
+      VALUES (${paymentId}, ${prescriptionId}, ${questionId}, ${fid}, ${amountUSDC})
+    `;
+    
+    return paymentId;
+  } catch (error) {
+    console.error('Error creating payment request:', error);
+    throw error;
+  }
+}
+
+export async function getPaymentRequest(paymentId: string): Promise<any | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT 
+        pr.*,
+        p.rarity_type,
+        q.question,
+        q.response,
+        q.confidence
+      FROM payment_requests pr
+      JOIN prescriptions p ON pr.prescription_id = p.prescription_id
+      JOIN questions q ON pr.question_id = q.id
+      WHERE pr.payment_id = ${paymentId}
+    `;
+    
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('Error getting payment request:', error);
+    return null;
+  }
+}
+
+export async function updatePaymentStatus(
+  paymentId: string,
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'refunded',
+  paymentHash?: string,
+  walletAddress?: string
+): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    // Update base status
+    await sql`
+      UPDATE payment_requests 
+      SET status = ${status}, updated_at = CURRENT_TIMESTAMP
+      WHERE payment_id = ${paymentId}
+    `;
+    
+    // Update payment hash if provided
+    if (paymentHash) {
+      await sql`
+        UPDATE payment_requests 
+        SET payment_hash = ${paymentHash}
+        WHERE payment_id = ${paymentId}
+      `;
+    }
+    
+    // Update wallet address if provided
+    if (walletAddress) {
+      await sql`
+        UPDATE payment_requests 
+        SET wallet_address = ${walletAddress}
+        WHERE payment_id = ${paymentId}
+      `;
+    }
+    
+    // Update timestamp fields based on status
+    if (status === 'completed') {
+      await sql`
+        UPDATE payment_requests 
+        SET paid_at = CURRENT_TIMESTAMP
+        WHERE payment_id = ${paymentId}
+      `;
+    }
+    
+    if (status === 'refunded') {
+      await sql`
+        UPDATE payment_requests 
+        SET refunded_at = CURRENT_TIMESTAMP
+        WHERE payment_id = ${paymentId}
+      `;
+    }
+    
+    // If payment completed, add to MD review queue
+    if (status === 'completed') {
+      await addToMDReviewQueue(paymentId);
+    }
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    throw error;
+  }
+}
+
+export async function addToMDReviewQueue(paymentId: string): Promise<number> {
+  const sql = getSql();
+  
+  try {
+    // Get payment request details
+    const paymentRequest = await sql`
+      SELECT pr.*, p.rarity_type
+      FROM payment_requests pr
+      JOIN prescriptions p ON pr.prescription_id = p.prescription_id
+      WHERE pr.payment_id = ${paymentId}
+    `;
+    
+    if (paymentRequest.length === 0) {
+      throw new Error('Payment request not found');
+    }
+    
+    const request = paymentRequest[0];
+    
+    // Set priority based on rarity (higher rarity = higher priority)
+    const priorityMap: { [key: string]: number } = {
+      'ultra-rare': 1,
+      'rare': 2,
+      'uncommon': 3,
+      'common': 4
+    };
+    
+    const priority = priorityMap[request.rarity_type] || 4;
+    
+    const result = await sql`
+      INSERT INTO md_review_queue (
+        prescription_id, payment_id, fid, priority
+      )
+      VALUES (
+        ${request.prescription_id}, 
+        ${paymentId}, 
+        ${request.fid}, 
+        ${priority}
+      )
+      RETURNING id
+    `;
+    
+    return result[0].id;
+  } catch (error) {
+    console.error('Error adding to MD review queue:', error);
+    throw error;
+  }
+}
+
+export async function getMDReviewQueue(): Promise<any[]> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT 
+        mq.*,
+        pr.amount_usdc,
+        pr.paid_at,
+        p.rarity_type,
+        q.question,
+        q.response,
+        q.confidence
+      FROM md_review_queue mq
+      JOIN payment_requests pr ON mq.payment_id = pr.payment_id
+      JOIN prescriptions p ON mq.prescription_id = p.prescription_id
+      JOIN questions q ON pr.question_id = q.id
+      WHERE mq.status IN ('pending', 'in_review')
+      ORDER BY mq.priority ASC, mq.created_at ASC
+    `;
+    
+    return result;
+  } catch (error) {
+    console.error('Error getting MD review queue:', error);
+    return [];
+  }
+}
+
+export async function completeMDReview(
+  queueId: number,
+  mdName: string,
+  reviewNotes?: string,
+  mdSignature?: string
+): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    // Update MD review queue
+    await sql`
+      UPDATE md_review_queue 
+      SET 
+        status = 'completed',
+        assigned_to_md = ${mdName},
+        review_notes = ${reviewNotes || null},
+        md_signature = ${mdSignature || null},
+        reviewed_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${queueId}
+    `;
+    
+    // Get prescription ID to update prescription record
+    const queueRecord = await sql`
+      SELECT prescription_id FROM md_review_queue WHERE id = ${queueId}
+    `;
+    
+    if (queueRecord.length > 0) {
+      const prescriptionId = queueRecord[0].prescription_id;
+      
+      // Update prescription with MD review info
+      await sql`
+        UPDATE prescriptions 
+        SET 
+          md_reviewed = TRUE,
+          md_reviewer_name = ${mdName},
+          md_review_notes = ${reviewNotes || null},
+          md_reviewed_at = CURRENT_TIMESTAMP,
+          mint_status = 'ready_to_mint',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE prescription_id = ${prescriptionId}
+      `;
+    }
+  } catch (error) {
+    console.error('Error completing MD review:', error);
+    throw error;
+  }
+}
+
+export async function getUserPaymentRequests(fid: string): Promise<any[]> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT 
+        pr.*,
+        p.rarity_type,
+        p.md_reviewed,
+        p.md_reviewer_name,
+        q.question
+      FROM payment_requests pr
+      JOIN prescriptions p ON pr.prescription_id = p.prescription_id
+      JOIN questions q ON pr.question_id = q.id
+      WHERE pr.fid = ${fid}
+      ORDER BY pr.created_at DESC
+    `;
+    
+    return result;
+  } catch (error) {
+    console.error('Error getting user payment requests:', error);
+    return [];
+  }
+}
+
+export async function checkPrescriptionPaymentStatus(prescriptionId: string): Promise<{
+  hasPaymentRequest: boolean;
+  paymentStatus?: string;
+  paymentId?: string;
+  inReviewQueue: boolean;
+}> {
+  const sql = getSql();
+  
+  try {
+    // Check for payment request
+    const paymentRequest = await sql`
+      SELECT payment_id, status
+      FROM payment_requests
+      WHERE prescription_id = ${prescriptionId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    
+    // Check if in review queue
+    const queueStatus = await sql`
+      SELECT status
+      FROM md_review_queue
+      WHERE prescription_id = ${prescriptionId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    
+    return {
+      hasPaymentRequest: paymentRequest.length > 0,
+      paymentStatus: paymentRequest.length > 0 ? paymentRequest[0].status : undefined,
+      paymentId: paymentRequest.length > 0 ? paymentRequest[0].payment_id : undefined,
+      inReviewQueue: queueStatus.length > 0 && queueStatus[0].status !== 'completed'
+    };
+  } catch (error) {
+    console.error('Error checking prescription payment status:', error);
+    return { hasPaymentRequest: false, inReviewQueue: false };
   }
 }

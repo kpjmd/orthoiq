@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import FeedbackWidget from './FeedbackWidget';
+import MDReviewUpgrade from './MDReviewUpgrade';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
 
@@ -49,7 +50,32 @@ export default function ResponseCard({
 }: ResponseCardProps) {
   const [showConfidence, setShowConfidence] = useState(false);
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<{
+    hasPaymentRequest: boolean;
+    paymentStatus?: string;
+    paymentId?: string;
+    inReviewQueue: boolean;
+  } | null>(null);
   const prescriptionRef = useRef<SVGSVGElement>(null);
+
+  // Check payment status when prescription metadata is available
+  useEffect(() => {
+    const checkPaymentStatus = async () => {
+      if (prescriptionMetadata?.id && fid) {
+        try {
+          const response = await fetch(`/api/prescription/payment-status?prescriptionId=${prescriptionMetadata.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setPaymentStatus(data);
+          }
+        } catch (error) {
+          console.error('Error checking payment status:', error);
+        }
+      }
+    };
+
+    checkPaymentStatus();
+  }, [prescriptionMetadata?.id, fid]);
 
   // Parse JSON response if it's still in JSON format
   let displayResponse = response;
@@ -238,6 +264,21 @@ export default function ResponseCard({
         )}
         
       </div>
+
+      {/* MD Review Upgrade Section */}
+      {!isFiltered && prescriptionMetadata && questionId && fid && (
+        <div className="px-4 pb-4">
+          <MDReviewUpgrade
+            prescriptionId={prescriptionMetadata.id}
+            questionId={parseInt(questionId)}
+            fid={fid}
+            isAlreadyPaid={paymentStatus?.hasPaymentRequest || false}
+            paymentStatus={paymentStatus?.paymentStatus}
+            inReviewQueue={paymentStatus?.inReviewQueue || false}
+            isReviewed={isApproved && reviewedBy !== undefined}
+          />
+        </div>
+      )}
       
       {/* User Feedback Widget */}
       {!isFiltered && questionId && fid && (
