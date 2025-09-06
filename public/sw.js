@@ -51,6 +51,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip HEAD requests as they're not supported by cache.put()
+  if (event.request.method === 'HEAD') {
+    return;
+  }
+
   // Handle API requests differently - always try network first
   if (event.request.url.includes('/api/')) {
     event.respondWith(
