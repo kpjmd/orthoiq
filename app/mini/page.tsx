@@ -83,11 +83,42 @@ function MiniAppContent() {
   useEffect(() => {
     console.log('Mini App: Starting SDK initialization...');
     
+    // Check if we're in a Mini App context first
+    const url = new URL(window.location.href);
+    const hasMiniAppParam = url.searchParams.get('miniApp') === 'true';
+    const isInFrame = window !== window.top;
+    
+    console.log('Mini App Context Check:');
+    console.log('- Has miniApp param:', hasMiniAppParam);
+    console.log('- Is in frame:', isInFrame);
+    console.log('- Global Mini App flag:', window.__ORTHOIQ_MINI_APP__);
+    
+    // Enhanced context detection using SDK
+    const checkMiniAppContext = async () => {
+      try {
+        // Use the pre-loaded SDK if available, otherwise import it
+        const sdkInstance = window.__FARCASTER_SDK__ || sdk;
+        const isActuallyMiniApp = await sdkInstance.isInMiniApp();
+        console.log('- SDK isInMiniApp result:', isActuallyMiniApp);
+        
+        if (!isActuallyMiniApp && !hasMiniAppParam) {
+          console.warn('Not in Mini App context - user may have accessed /mini directly');
+          setError('This page is designed for Farcaster Mini Apps. Try accessing it from the Farcaster app directory.');
+        }
+        
+        return isActuallyMiniApp;
+      } catch (err) {
+        console.error('Failed to check Mini App context:', err);
+        // Fallback to frame detection
+        return isInFrame || hasMiniAppParam;
+      }
+    };
+    
     // Debug frame context information
     try {
       console.log('Mini App Debug - Frame Context:');
       console.log('- Current origin:', window.location.origin);
-      console.log('- In frame:', window !== window.top);
+      console.log('- In frame:', isInFrame);
       console.log('- Parent available:', window.parent !== window);
       console.log('- Document referrer:', document.referrer);
       console.log('- User agent:', navigator.userAgent);
@@ -132,8 +163,15 @@ function MiniAppContent() {
       try {
         console.log('Mini App: Loading SDK context...');
         
+        // First verify we're in a Mini App context
+        const isMiniAppContext = await checkMiniAppContext();
+        console.log('Mini App: Context verification result:', isMiniAppContext);
+        
+        // Use the pre-loaded SDK if available
+        const sdkInstance = window.__FARCASTER_SDK__ || sdk;
+        
         // Add timeout to prevent infinite loading
-        const contextPromise = sdk.context;
+        const contextPromise = sdkInstance.context;
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('SDK context timeout after 8 seconds')), 8000)
         );

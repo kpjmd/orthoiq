@@ -95,92 +95,80 @@ export default function HomePage() {
       {/* Frame detection and redirect script */}
       <Script id="frame-redirect" strategy="afterInteractive">
         {`
-          // Enhanced frame detection with origin validation
-          function detectAndHandleFrame() {
+          // Enhanced Mini App detection with proper SDK integration
+          function detectAndHandleMiniApp() {
             try {
+              const url = new URL(window.location.href);
               const isInFrame = window !== window.top;
-              const currentOrigin = window.location.origin;
               const referrer = document.referrer;
+              const isMiniAppParam = url.searchParams.get('miniApp') === 'true';
               
-              console.log('Frame Detection Debug:');
+              console.log('Mini App Detection Debug:');
               console.log('- Is in frame:', isInFrame);
-              console.log('- Current origin:', currentOrigin);
+              console.log('- Has miniApp param:', isMiniAppParam);
               console.log('- Current href:', window.location.href);
               console.log('- Document referrer:', referrer);
-              console.log('- Parent available:', window.parent !== window);
-              console.log('- Top available:', window.top !== window);
               
-              // Check CSP headers for debugging
-              fetch(window.location.href, { method: 'HEAD' })
-                .then(response => {
-                  const csp = response.headers.get('Content-Security-Policy');
-                  console.log('- CSP header from main page:', csp);
-                })
-                .catch(e => console.log('- Could not fetch CSP header:', e.message));
-                
-              // Also test debug endpoint
-              fetch('/api/debug-headers')
-                .then(response => {
-                  const csp = response.headers.get('Content-Security-Policy');
-                  const debugCsp = response.headers.get('X-Debug-CSP');
-                  console.log('- Debug endpoint CSP:', csp);
-                  console.log('- Debug endpoint X-Debug-CSP:', debugCsp);
-                  return response.json();
-                })
-                .then(data => console.log('- Debug endpoint data:', data))
-                .catch(e => console.log('- Debug endpoint error:', e.message));
-                
-              // Test if we can access our debug endpoint directly
-              const testUrl = window.location.origin + '/api/debug-headers';
-              console.log('- Testing debug URL:', testUrl);
+              // Check if we're already flagged as a Mini App context
+              const isMiniAppContext = window.__ORTHOIQ_MINI_APP__ || isMiniAppParam;
+              
+              if (isMiniAppContext) {
+                console.log('Mini App context detected, ensuring proper SDK initialization');
+                return; // Don't redirect if already in Mini App mode
+              }
               
               if (!isInFrame) {
                 console.log('Not in frame context, staying on root page');
                 return;
               }
               
-              // Check if referrer indicates we're in a legitimate Farcaster/Warpcast frame
+              // Check if referrer indicates Farcaster/Warpcast frame
               const isFarcasterFrame = referrer && (
                 referrer.includes('farcaster.xyz') ||
                 referrer.includes('warpcast.com') ||
                 referrer.includes('client.warpcast.com') ||
-                // Handle cases where referrer might be empty but we're clearly in a cross-origin frame
-                (referrer !== currentOrigin && referrer !== currentOrigin + '/')
+                referrer.includes('miniapps.farcaster.xyz')
               );
               
-              // Additional check: try to determine if this is a same-origin frame (avoid redirect loops)
-              const isSameOriginFrame = referrer === currentOrigin || referrer === currentOrigin + '/';
-              
               console.log('- Is Farcaster frame:', isFarcasterFrame);
-              console.log('- Is same-origin frame:', isSameOriginFrame);
               
-              // Only redirect if we're in a frame AND it's likely a Farcaster frame OR referrer is empty (cross-origin)
-              if (isInFrame && (isFarcasterFrame || !referrer || referrer === '')) {
-                console.log('Redirecting to /mini - detected legitimate frame context');
-                window.location.href = '/mini';
-              } else if (isInFrame && isSameOriginFrame) {
-                console.log('Same-origin frame detected - avoiding redirect loop');
-                // Don't redirect if it appears to be a same-origin frame to avoid loops
-              } else {
-                console.log('Frame context detected but not redirecting - referrer check failed');
+              // For Mini Apps, use isInMiniApp() if SDK is available
+              if (window.__FARCASTER_SDK__) {
+                console.log('SDK available, checking isInMiniApp()...');
+                window.__FARCASTER_SDK__.isInMiniApp().then(inMiniApp => {
+                  console.log('- SDK isInMiniApp result:', inMiniApp);
+                  if (inMiniApp && window.location.pathname === '/') {
+                    console.log('SDK confirmed Mini App context, redirecting to /mini');
+                    window.location.href = '/mini?miniApp=true';
+                  }
+                }).catch(err => {
+                  console.error('SDK isInMiniApp check failed:', err);
+                  // Fallback to frame detection
+                  if (isInFrame && (isFarcasterFrame || !referrer)) {
+                    console.log('Fallback: redirecting to /mini based on frame detection');
+                    window.location.href = '/mini?miniApp=true';
+                  }
+                });
+              } else if (isInFrame && (isFarcasterFrame || !referrer)) {
+                console.log('No SDK available, using frame detection for redirect');
+                window.location.href = '/mini?miniApp=true';
               }
               
             } catch (error) {
-              console.error('Frame detection error:', error);
-              // On error, be conservative and don't redirect
+              console.error('Mini App detection error:', error);
             }
           }
           
           // Run detection immediately and with a small delay for safety
-          detectAndHandleFrame();
+          detectAndHandleMiniApp();
           
           // Add a fallback check after a short delay in case initial detection was too early
           setTimeout(() => {
             if (window.location.pathname === '/' && window !== window.top) {
-              console.log('Fallback frame check triggered');
-              detectAndHandleFrame();
+              console.log('Fallback Mini App check triggered');
+              detectAndHandleMiniApp();
             }
-          }, 100);
+          }, 500);
         `}
       </Script>
       </main>

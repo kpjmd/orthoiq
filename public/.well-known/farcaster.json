@@ -13,7 +13,7 @@
     "splashImageUrl": "https://orthoiq.vercel.app/orthoiq-splash-image.png",
     "splashBackgroundColor": "#1e3a8a",
     "webhookUrl": "https://orthoiq.vercel.app/api/webhook",
-    "homeUrl": "https://orthoiq.vercel.app",
+    "homeUrl": "https://orthoiq.vercel.app/mini?miniApp=true",
     "subtitle": "AI Orthopedic Expert",
     "description": "Get expert orthopedic advice from AI founded by KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
     "tagline": "Premier Medical AI Assistant",
