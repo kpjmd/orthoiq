@@ -110,7 +110,7 @@ export default function HomePage() {
               console.log('- Document referrer:', referrer);
               
               // Check if we're already flagged as a Mini App context
-              const isMiniAppContext = window.__ORTHOIQ_MINI_APP__ || isMiniAppParam;
+              const isMiniAppContext = (window.__ORTHOIQ_MINI_APP__ || false) || isMiniAppParam;
               
               if (isMiniAppContext) {
                 console.log('Mini App context detected, ensuring proper SDK initialization');
@@ -135,13 +135,13 @@ export default function HomePage() {
               // For Mini Apps, use isInMiniApp() if SDK is available
               if (window.__FARCASTER_SDK__) {
                 console.log('SDK available, checking isInMiniApp()...');
-                window.__FARCASTER_SDK__.isInMiniApp().then(inMiniApp => {
+                (window.__FARCASTER_SDK__ as any).isInMiniApp().then((inMiniApp: boolean) => {
                   console.log('- SDK isInMiniApp result:', inMiniApp);
                   if (inMiniApp && window.location.pathname === '/') {
                     console.log('SDK confirmed Mini App context, redirecting to /mini');
                     window.location.href = '/mini?miniApp=true';
                   }
-                }).catch(err => {
+                }).catch((err: Error) => {
                   console.error('SDK isInMiniApp check failed:', err);
                   // Fallback to frame detection
                   if (isInFrame && (isFarcasterFrame || !referrer)) {

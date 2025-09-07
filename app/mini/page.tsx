@@ -91,13 +91,13 @@ function MiniAppContent() {
     console.log('Mini App Context Check:');
     console.log('- Has miniApp param:', hasMiniAppParam);
     console.log('- Is in frame:', isInFrame);
-    console.log('- Global Mini App flag:', window.__ORTHOIQ_MINI_APP__);
+    console.log('- Global Mini App flag:', window.__ORTHOIQ_MINI_APP__ || false);
     
     // Enhanced context detection using SDK
     const checkMiniAppContext = async () => {
       try {
         // Use the pre-loaded SDK if available, otherwise import it
-        const sdkInstance = window.__FARCASTER_SDK__ || sdk;
+        const sdkInstance = (window.__FARCASTER_SDK__ as typeof sdk) || sdk;
         const isActuallyMiniApp = await sdkInstance.isInMiniApp();
         console.log('- SDK isInMiniApp result:', isActuallyMiniApp);
         
@@ -168,7 +168,7 @@ function MiniAppContent() {
         console.log('Mini App: Context verification result:', isMiniAppContext);
         
         // Use the pre-loaded SDK if available
-        const sdkInstance = window.__FARCASTER_SDK__ || sdk;
+        const sdkInstance = (window.__FARCASTER_SDK__ as typeof sdk) || sdk;
         
         // Add timeout to prevent infinite loading
         const contextPromise = sdkInstance.context;
