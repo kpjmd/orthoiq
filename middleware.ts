@@ -10,11 +10,12 @@ export function middleware(request: NextRequest) {
   // Enhanced CSP for Farcaster Mini Apps
   const cspValue = "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com https://miniapps.farcaster.xyz;";
 
-  // Check if this is a Mini App request
+  // Check if this is a Mini App request or frames request
   const isMiniAppRequest = pathname.startsWith('/mini') || searchParams.get('miniApp') === 'true';
+  const isFramesRequest = pathname.startsWith('/frames');
   
-  // Apply CSP for root and mini routes (Mini App compatible)
-  if (pathname === '/' || pathname.startsWith('/mini') || isMiniAppRequest) {
+  // Apply CSP for root, mini, and frames routes (Farcaster compatible)
+  if (pathname === '/' || pathname.startsWith('/mini') || pathname.startsWith('/frames') || isMiniAppRequest) {
     response.headers.set('Content-Security-Policy', cspValue);
     response.headers.delete('X-Frame-Options'); // Remove conflicting header
     
@@ -23,9 +24,12 @@ export function middleware(request: NextRequest) {
     
     console.log(`[MIDDLEWARE DEBUG] Set Mini App CSP for ${pathname}: ${cspValue}`);
     
-    // Log Mini App context
+    // Log Mini App and Frames context
     if (isMiniAppRequest) {
       console.log(`[MIDDLEWARE DEBUG] Mini App request detected: ${pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`);
+    }
+    if (isFramesRequest) {
+      console.log(`[MIDDLEWARE DEBUG] Frames request detected: ${pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`);
     }
     
     // Force log to ensure it appears

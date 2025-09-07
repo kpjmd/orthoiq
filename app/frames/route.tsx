@@ -15,7 +15,7 @@ const handleRequest = frames(async (ctx) => {
   if (!message) {
     return {
       image: (
-        <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
+        <div tw="flex flex-col w-full h-full text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
           <div tw="flex items-center mb-4">
             <div style={{
               width: '48px',
@@ -243,7 +243,7 @@ const handleRequest = frames(async (ctx) => {
   // Default fallback to home
   return {
     image: (
-      <div tw="flex flex-col w-full h-full bg-gradient-to-br from-blue-900 text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
+      <div tw="flex flex-col w-full h-full text-white items-center justify-center p-8" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #2563eb)' }}>
         <div tw="flex items-center mb-4">
           <div style={{
             width: '48px',
