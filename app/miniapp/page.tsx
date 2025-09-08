@@ -101,11 +101,9 @@ function MiniAppContent() {
         const isActuallyMiniApp = await sdkInstance.isInMiniApp();
         console.log('- SDK isInMiniApp result:', isActuallyMiniApp);
         
-        // If not in Farcaster context, redirect to main web app
+        // Log context but don't redirect - always show mini app UI
         if (!isActuallyMiniApp && !hasMiniAppParam && !isInFrame) {
-          console.log('Not in Farcaster context - redirecting to web app');
-          window.location.href = '/';
-          return false;
+          console.log('Not in Farcaster context - but still showing mini app UI');
         }
         
         return isActuallyMiniApp || isInFrame || hasMiniAppParam;
@@ -165,10 +163,8 @@ function MiniAppContent() {
       try {
         console.log('MiniApp: Loading SDK context...');
         
-        // First verify we're in a Mini App context
+        // Check Mini App context (for logging and SDK optimization)
         const isMiniAppContext = await checkMiniAppContext();
-        if (!isMiniAppContext) return; // Redirect happened
-        
         console.log('MiniApp: Context verification result:', isMiniAppContext);
         
         // Use the pre-loaded SDK if available
@@ -256,10 +252,10 @@ function MiniAppContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim() || !context?.user?.fid) return;
+    if (!question.trim()) return;
     
-    // Use Farcaster FID for all users
-    const fid = context.user.fid;
+    // Use Farcaster FID if available, otherwise use guest
+    const fid = context?.user?.fid || 'guest';
 
     setIsLoading(true);
     setError('');
@@ -272,7 +268,7 @@ function MiniAppContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           question: question.trim(),
-          fid: fid.toString(),
+          fid: typeof fid === 'number' ? fid.toString() : fid,
           authUser: authUser ? {
             fid: authUser.fid,
             username: authUser.username,
@@ -324,7 +320,7 @@ function MiniAppContent() {
       setQuestion('');
       
       // Update rate limit info
-      await loadRateLimitStatus(fid.toString(), getUserTier());
+      await loadRateLimitStatus(typeof fid === 'number' ? fid.toString() : fid, getUserTier());
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -341,16 +337,16 @@ function MiniAppContent() {
   };
 
   const handleRate = async (rating: number) => {
-    if (!currentQuestion || !context?.user?.fid) return;
+    if (!currentQuestion) return;
     
-    const fid = context.user.fid;
+    const fid = context?.user?.fid || 'guest';
 
     try {
       await fetch('/api/rate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fid: fid.toString(),
+          fid: typeof fid === 'number' ? fid.toString() : fid,
           question: currentQuestion,
           rating
         })
@@ -362,6 +358,8 @@ function MiniAppContent() {
 
 
   const getRemainingQuestions = () => {
+    // If no Farcaster context, allow unlimited questions (guest mode)
+    if (!context?.user?.fid) return 5; // Default guest allowance
     return rateLimitInfo ? rateLimitInfo.remaining : 0;
   };
 
@@ -524,7 +522,7 @@ function MiniAppContent() {
               additionsText={responseData.additionsText}
               correctionsText={responseData.correctionsText}
               question={currentQuestion}
-              fid={context?.user?.fid.toString() || authUser?.fid.toString() || 'guest'}
+              fid={context?.user?.fid ? context.user.fid.toString() : (authUser?.fid?.toString() || 'guest')}
               caseId={`miniapp-${Date.now()}`}
             />
             
@@ -549,7 +547,7 @@ function MiniAppContent() {
           onClose={() => setShowPrescriptionModal(false)}
           question={currentQuestion}
           response={responseData?.response || ''}
-          fid={context?.user?.fid.toString() || authUser?.fid.toString() || 'guest'}
+          fid={context?.user?.fid ? context.user.fid.toString() : (authUser?.fid?.toString() || 'guest')}
           inquiry={responseData?.inquiry}
           keyPoints={responseData?.keyPoints}
         />
