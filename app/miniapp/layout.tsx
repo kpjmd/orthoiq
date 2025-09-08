@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'OrthoIQ - AI Orthopedic Expert',
@@ -32,10 +33,14 @@ export const metadata: Metadata = {
   }
 }
 
-export default function MiniAppLandingLayout({
+export default function MiniAppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return children;
+  return (
+    <AuthProvider>
+      {children}
+    </AuthProvider>
+  );
 }
