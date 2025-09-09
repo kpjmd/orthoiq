@@ -17,7 +17,8 @@ interface PrescriptionModalProps {
 
 export default function PrescriptionModal({ isOpen, onClose, question, response, fid, inquiry, keyPoints }: PrescriptionModalProps) {
   const [isSharing, setIsSharing] = useState(false);
-  const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error' | 'miniapp_success'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
   const [isGenerating, setIsGenerating] = useState(true);
   
@@ -277,12 +278,27 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
     try {
       await copyPrescriptionAsImage(svgElement);
-      setShareStatus('success');
-      setTimeout(() => setShareStatus('idle'), 3000);
+      
+      // Check if we're in mini app to show appropriate success message
+      const isMiniApp = window.__ORTHOIQ_MINI_APP__ || 
+        window.location.pathname.startsWith('/mini') || 
+        window.location.pathname.startsWith('/miniapp');
+      
+      setShareStatus(isMiniApp ? 'miniapp_success' : 'success');
+      setErrorMessage('');
+      setTimeout(() => setShareStatus('idle'), 4000);
     } catch (error) {
       console.error('Error sharing prescription as image:', error);
       setShareStatus('error');
-      setTimeout(() => setShareStatus('idle'), 3000);
+      
+      // Set specific error message based on error type
+      const errorMsg = error instanceof Error ? error.message : 'Failed to copy image';
+      setErrorMessage(errorMsg);
+      
+      setTimeout(() => {
+        setShareStatus('idle');
+        setErrorMessage('');
+      }, 5000);
     } finally {
       setIsSharing(false);
     }
@@ -343,10 +359,16 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t rounded-b-xl">
           <div className="flex justify-center items-center gap-3">
             {shareStatus === 'success' && (
-              <span className="text-green-600 text-sm">✓ Prescription shared!</span>
+              <span className="text-green-600 text-sm">✓ Image copied to clipboard!</span>
+            )}
+            {shareStatus === 'miniapp_success' && (
+              <span className="text-green-600 text-sm">✓ Image shared/downloaded successfully!</span>
             )}
             {shareStatus === 'error' && (
-              <span className="text-red-600 text-sm">✗ Share failed</span>
+              <div className="text-center">
+                <span className="text-red-600 text-sm">✗ {errorMessage || 'Share failed'}</span>
+                <p className="text-xs text-gray-500 mt-1">Try using the Share Link button instead</p>
+              </div>
             )}
             <button
               onClick={shareToSocial}

@@ -428,9 +428,26 @@ export function generateNFTMetadata(
 }
 
 // Helper function to detect if we're in a mini app environment
-function isMiniAppEnvironment(): boolean {
+async function isMiniAppEnvironment(): Promise<boolean> {
   try {
-    // Check for Farcaster mini app context
+    // First check the global flag set by layout.tsx
+    if (window.__ORTHOIQ_MINI_APP__) {
+      console.log('Mini app detected via global flag');
+      return true;
+    }
+    
+    // Try to use Farcaster SDK if available
+    if (window.__FARCASTER_SDK__) {
+      try {
+        const isInMiniApp = await window.__FARCASTER_SDK__.isInMiniApp();
+        console.log('Mini app detected via Farcaster SDK:', isInMiniApp);
+        if (isInMiniApp) return true;
+      } catch (sdkError) {
+        console.warn('Farcaster SDK check failed:', sdkError);
+      }
+    }
+    
+    // Fallback to heuristic detection
     const userAgent = navigator.userAgent;
     const referrer = document.referrer;
     
@@ -452,7 +469,10 @@ function isMiniAppEnvironment(): boolean {
     // Check if we're on a mini app path
     const isMiniAppPath = window.location.pathname.startsWith('/mini') || window.location.pathname.startsWith('/miniapp');
     
-    return isInFrame && (isFarcasterFrame || hasMiniAppParam || isMiniAppPath);
+    const isHeuristicMiniApp = isInFrame && (isFarcasterFrame || hasMiniAppParam || isMiniAppPath);
+    console.log('Mini app heuristic detection:', isHeuristicMiniApp);
+    
+    return isHeuristicMiniApp;
   } catch (error) {
     console.warn('Error detecting mini app environment:', error);
     return false;
@@ -460,7 +480,7 @@ function isMiniAppEnvironment(): boolean {
 }
 
 export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promise<void> {
-  const isMiniApp = isMiniAppEnvironment();
+  const isMiniApp = await isMiniAppEnvironment();
   console.log('Copy Image: Mini app environment detected:', isMiniApp);
   
   try {
@@ -508,45 +528,83 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
           if (isMiniApp) {
             console.log('Using mini app compatible image copy method');
             
-            // In mini apps, try simpler clipboard methods first
-            if (navigator.clipboard && navigator.clipboard.writeText) {
+            // Method 1: Try Web Share API first (most compatible with mini apps)
+            if (navigator.share) {
               try {
-                // Convert to data URL and copy as text (many mini apps support this)
-                const imageDataUrl = canvas.toDataURL('image/png', 0.95);
-                await navigator.clipboard.writeText(imageDataUrl);
-                console.log('Successfully copied image as data URL to clipboard');
-                resolve();
+                canvas.toBlob(async (blob) => {
+                  if (blob) {
+                    try {
+                      const file = new File([blob], 'orthoiq-prescription.png', { type: 'image/png' });
+                      await navigator.share({
+                        files: [file],
+                        title: 'OrthoIQ Prescription',
+                        text: 'My OrthoIQ medical prescription'
+                      });
+                      console.log('Successfully shared image via Web Share API');
+                      resolve();
+                    } catch (shareError) {
+                      console.warn('Web Share API failed:', shareError);
+                      // Continue to next method
+                      tryNextMiniAppMethod();
+                    }
+                  } else {
+                    tryNextMiniAppMethod();
+                  }
+                }, 'image/png', 0.95);
                 return;
-              } catch (textError) {
-                console.warn('Text clipboard fallback failed in mini app:', textError);
+              } catch (shareSetupError) {
+                console.warn('Web Share API setup failed:', shareSetupError);
               }
             }
             
-            // Alternative: Download the image (works in most environments)
-            try {
-              canvas.toBlob((blob) => {
-                if (blob) {
-                  const downloadUrl = URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = downloadUrl;
-                  link.download = `orthoiq-prescription-${Date.now()}.png`;
-                  
-                  // For mini apps, trigger download
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  URL.revokeObjectURL(downloadUrl);
-                  
-                  console.log('Image downloaded as fallback in mini app');
+            // Method 2: Try copying as data URL text
+            async function tryNextMiniAppMethod() {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                  const imageDataUrl = canvas.toDataURL('image/png', 0.95);
+                  await navigator.clipboard.writeText(imageDataUrl);
+                  console.log('Successfully copied image as data URL to clipboard');
                   resolve();
-                } else {
-                  reject(new Error('Failed to create blob for download'));
+                  return;
+                } catch (textError) {
+                  console.warn('Text clipboard fallback failed in mini app:', textError);
                 }
-              }, 'image/png', 0.95);
-              return;
-            } catch (downloadError) {
-              console.warn('Download fallback failed:', downloadError);
+              }
+              
+              // Method 3: Download the image as last resort
+              try {
+                canvas.toBlob((blob) => {
+                  if (blob) {
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = `orthoiq-prescription-${Date.now()}.png`;
+                    
+                    // For mini apps, trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(downloadUrl);
+                    
+                    console.log('Image downloaded as fallback in mini app');
+                    resolve();
+                  } else {
+                    console.error('All mini app methods failed');
+                    reject(new Error('Unable to copy or share image in mini app environment. All methods failed.'));
+                  }
+                }, 'image/png', 0.95);
+              } catch (downloadError) {
+                console.error('Download fallback failed:', downloadError);
+                reject(new Error('Unable to copy or share image in mini app environment. Download failed.'));
+              }
             }
+            
+            // Start with the fallback method if Web Share API isn't available
+            if (!navigator.share) {
+              tryNextMiniAppMethod();
+            }
+            
+            return; // Exit early for mini app handling
           }
           
           // Standard web app handling
