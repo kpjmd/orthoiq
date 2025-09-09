@@ -427,7 +427,42 @@ export function generateNFTMetadata(
   };
 }
 
+// Helper function to detect if we're in a mini app environment
+function isMiniAppEnvironment(): boolean {
+  try {
+    // Check for Farcaster mini app context
+    const userAgent = navigator.userAgent;
+    const referrer = document.referrer;
+    
+    // Check if we're in a frame (common in mini apps)
+    const isInFrame = window !== window.top;
+    
+    // Check for Farcaster-specific indicators
+    const isFarcasterFrame = referrer && (
+      referrer.includes('farcaster.xyz') ||
+      referrer.includes('warpcast.com') ||
+      referrer.includes('client.warpcast.com') ||
+      referrer.includes('miniapps.farcaster.xyz')
+    );
+    
+    // Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasMiniAppParam = urlParams.get('miniApp') === 'true';
+    
+    // Check if we're on a mini app path
+    const isMiniAppPath = window.location.pathname.startsWith('/mini') || window.location.pathname.startsWith('/miniapp');
+    
+    return isInFrame && (isFarcasterFrame || hasMiniAppParam || isMiniAppPath);
+  } catch (error) {
+    console.warn('Error detecting mini app environment:', error);
+    return false;
+  }
+}
+
 export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promise<void> {
+  const isMiniApp = isMiniAppEnvironment();
+  console.log('Copy Image: Mini app environment detected:', isMiniApp);
+  
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -469,23 +504,90 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
           
           ctx.drawImage(img, 0, 0);
           
-          // Convert canvas to blob
+          // Mini app specific handling
+          if (isMiniApp) {
+            console.log('Using mini app compatible image copy method');
+            
+            // In mini apps, try simpler clipboard methods first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              try {
+                // Convert to data URL and copy as text (many mini apps support this)
+                const imageDataUrl = canvas.toDataURL('image/png', 0.95);
+                await navigator.clipboard.writeText(imageDataUrl);
+                console.log('Successfully copied image as data URL to clipboard');
+                resolve();
+                return;
+              } catch (textError) {
+                console.warn('Text clipboard fallback failed in mini app:', textError);
+              }
+            }
+            
+            // Alternative: Download the image (works in most environments)
+            try {
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const downloadUrl = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = downloadUrl;
+                  link.download = `orthoiq-prescription-${Date.now()}.png`;
+                  
+                  // For mini apps, trigger download
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(downloadUrl);
+                  
+                  console.log('Image downloaded as fallback in mini app');
+                  resolve();
+                } else {
+                  reject(new Error('Failed to create blob for download'));
+                }
+              }, 'image/png', 0.95);
+              return;
+            } catch (downloadError) {
+              console.warn('Download fallback failed:', downloadError);
+            }
+          }
+          
+          // Standard web app handling
           canvas.toBlob(async (blob) => {
             if (blob && navigator.clipboard && navigator.clipboard.write) {
               try {
-                await navigator.clipboard.write([
-                  new ClipboardItem({ 'image/png': blob })
-                ]);
+                // Try modern Clipboard API first
+                const clipboardItem = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([clipboardItem]);
+                console.log('Successfully copied image using Clipboard API');
                 resolve();
               } catch (clipboardError) {
-                console.warn('Image clipboard failed, trying data URL fallback:', clipboardError);
-                // Fallback to data URL in clipboard
+                console.warn('Modern clipboard failed, trying fallbacks:', clipboardError);
+                
+                // Fallback 1: Copy as data URL text
                 try {
-                  const dataUrl = canvas.toDataURL('image/png');
-                  await navigator.clipboard.writeText(dataUrl);
+                  const imageDataUrl = canvas.toDataURL('image/png', 0.95);
+                  await navigator.clipboard.writeText(imageDataUrl);
+                  console.log('Successfully copied image as data URL');
                   resolve();
-                } catch (fallbackError) {
-                  reject(new Error('Both image and text clipboard failed'));
+                } catch (textError) {
+                  console.warn('Text clipboard fallback also failed:', textError);
+                  
+                  // Fallback 2: Manual copy instruction
+                  const imageDataUrl = canvas.toDataURL('image/png', 0.95);
+                  const newWindow = window.open();
+                  if (newWindow) {
+                    newWindow.document.write(`
+                      <html>
+                        <head><title>OrthoIQ Prescription</title></head>
+                        <body style="margin:0;text-align:center;background:#f0f0f0;">
+                          <h3>Right-click the image below and select "Copy Image"</h3>
+                          <img src="${imageDataUrl}" style="max-width:100%;margin:20px;" alt="OrthoIQ Prescription" />
+                        </body>
+                      </html>
+                    `);
+                    newWindow.document.close();
+                    resolve();
+                  } else {
+                    reject(new Error('All clipboard methods failed'));
+                  }
                 }
               }
             } else {

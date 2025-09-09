@@ -29,10 +29,15 @@ export async function POST(request: NextRequest) {
       { 
         inquiry: inquiry || null,
         keyPoints: keyPoints || null,
+        // Store prescription metadata with consistent naming
         prescriptionId: prescriptionMetadata?.id || null,
         rarity: prescriptionMetadata?.rarity || null,
-        theme: prescriptionMetadata?.theme ? JSON.stringify(prescriptionMetadata.theme) : null,
-        verificationHash: prescriptionMetadata?.verificationHash || null
+        theme: prescriptionMetadata?.theme || null,
+        verificationHash: prescriptionMetadata?.verificationHash || null,
+        // Also store with alternative naming for compatibility
+        prescriptionRarity: prescriptionMetadata?.rarity || null,
+        prescriptionTheme: prescriptionMetadata?.theme || null,
+        prescriptionHash: prescriptionMetadata?.verificationHash || null
       },
       {}, // No farcaster-specific data for prescription shares
       30 // Expire in 30 days

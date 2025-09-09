@@ -102,11 +102,27 @@ export default async function SharePage({ params, searchParams }: SharePageProps
   const confidence = shareData?.confidence || resolvedSearchParams.confidence;
   const viewMode = resolvedSearchParams.view || 'full'; // 'prescription' or 'full'
   
-  // Extract stored prescription metadata
-  const storedPrescriptionId = shareData?.artworkMetadata?.prescriptionId || shareData?.artwork_metadata?.prescriptionId;
-  const storedRarity = shareData?.artworkMetadata?.prescriptionRarity || shareData?.artwork_metadata?.prescriptionRarity;
-  const storedTheme = shareData?.artworkMetadata?.prescriptionTheme || shareData?.artwork_metadata?.prescriptionTheme;
-  const storedHash = shareData?.artworkMetadata?.prescriptionHash || shareData?.artwork_metadata?.prescriptionHash;
+  // Extract stored prescription metadata with multiple fallback naming patterns
+  const artworkMeta = shareData?.artworkMetadata || shareData?.artwork_metadata || {};
+  const storedPrescriptionId = artworkMeta?.prescriptionId || artworkMeta?.id;
+  const storedRarity = artworkMeta?.rarity || artworkMeta?.prescriptionRarity;
+  const storedTheme = artworkMeta?.theme || artworkMeta?.prescriptionTheme;
+  const storedHash = artworkMeta?.verificationHash || artworkMeta?.prescriptionHash;
+  
+  // Helper function to safely parse theme
+  const parseTheme = (theme: any) => {
+    if (!theme) return null;
+    if (typeof theme === 'object') return theme;
+    if (typeof theme === 'string') {
+      try {
+        return JSON.parse(theme);
+      } catch (error) {
+        console.warn('Failed to parse theme JSON:', error);
+        return null;
+      }
+    }
+    return null;
+  };
   
   // Extract inquiry and keyPoints from stored data
   const inquiry = shareData?.artworkMetadata?.inquiry || shareData?.artwork_metadata?.inquiry ||
@@ -172,7 +188,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
                 storedMetadata={storedPrescriptionId ? {
                   id: storedPrescriptionId,
                   rarity: storedRarity,
-                  theme: storedTheme,
+                  theme: parseTheme(storedTheme),
                   verificationHash: storedHash
                 } : undefined}
               />
