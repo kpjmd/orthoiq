@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
-import { copyPrescriptionAsImage } from '@/lib/exportUtils';
+import { copyPrescriptionAsImage, savePrescriptionAsImage } from '@/lib/exportUtils';
 
 interface PrescriptionModalProps {
   isOpen: boolean;
@@ -256,9 +256,9 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     }
   };
 
-  const shareAsImage = async () => {
+  const saveAsImage = async () => {
     if (!prescriptionMetadata) {
-      console.error('No prescription metadata available for image sharing');
+      console.error('No prescription metadata available for image saving');
       setShareStatus('error');
       setTimeout(() => setShareStatus('idle'), 3000);
       return;
@@ -267,7 +267,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     // Find the SVG element within the prescription container
     const svgElement = prescriptionRef.current?.querySelector('svg') as SVGSVGElement;
     if (!svgElement) {
-      console.error('No SVG element found for image sharing');
+      console.error('No SVG element found for image saving');
       setShareStatus('error');
       setTimeout(() => setShareStatus('idle'), 3000);
       return;
@@ -277,7 +277,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     setShareStatus('idle');
 
     try {
-      await copyPrescriptionAsImage(svgElement);
+      await savePrescriptionAsImage(svgElement, prescriptionMetadata.id);
       
       // Check if we're in mini app to show appropriate success message
       const isMiniApp = window.__ORTHOIQ_MINI_APP__ || 
@@ -288,11 +288,11 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       setErrorMessage('');
       setTimeout(() => setShareStatus('idle'), 4000);
     } catch (error) {
-      console.error('Error sharing prescription as image:', error);
+      console.error('Error saving prescription as image:', error);
       setShareStatus('error');
       
       // Set specific error message based on error type
-      const errorMsg = error instanceof Error ? error.message : 'Failed to copy image';
+      const errorMsg = error instanceof Error ? error.message : 'Failed to save image';
       setErrorMessage(errorMsg);
       
       setTimeout(() => {
@@ -359,14 +359,14 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t rounded-b-xl">
           <div className="flex justify-center items-center gap-3">
             {shareStatus === 'success' && (
-              <span className="text-green-600 text-sm">✓ Image copied to clipboard!</span>
+              <span className="text-green-600 text-sm">✓ Image downloaded successfully!</span>
             )}
             {shareStatus === 'miniapp_success' && (
-              <span className="text-green-600 text-sm">✓ Image shared/downloaded successfully!</span>
+              <span className="text-green-600 text-sm">✓ Image saved successfully!</span>
             )}
             {shareStatus === 'error' && (
               <div className="text-center">
-                <span className="text-red-600 text-sm">✗ {errorMessage || 'Share failed'}</span>
+                <span className="text-red-600 text-sm">✗ {errorMessage || 'Save failed'}</span>
                 <p className="text-xs text-gray-500 mt-1">Try using the Share Link button instead</p>
               </div>
             )}
@@ -391,7 +391,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
               )}
             </button>
             <button
-              onClick={shareAsImage}
+              onClick={saveAsImage}
               disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
               className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center"
             >
@@ -401,12 +401,12 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Copying...
+                  Saving...
                 </>
               ) : (
                 <>
-                  <span className="mr-2">🖼️</span>
-                  Copy Image
+                  <span className="mr-2">💾</span>
+                  Save Image
                 </>
               )}
             </button>

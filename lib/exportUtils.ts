@@ -479,9 +479,9 @@ async function isMiniAppEnvironment(): Promise<boolean> {
   }
 }
 
-export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promise<void> {
+export async function savePrescriptionAsImage(svgElement: SVGSVGElement, prescriptionId?: string): Promise<void> {
   const isMiniApp = await isMiniAppEnvironment();
-  console.log('Copy Image: Mini app environment detected:', isMiniApp);
+  console.log('Save Image: Mini app environment detected:', isMiniApp);
   
   try {
     const canvas = document.createElement('canvas');
@@ -491,15 +491,29 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
       throw new Error('Cannot create canvas context');
     }
 
-    // Get SVG dimensions
+    // Fixed dimensions for social media optimization (9:16 ratio)
+    const targetWidth = 1080;
+    const targetHeight = 1920;
+    
+    // Set canvas to fixed social media dimensions
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    
+    // Get SVG actual dimensions
     const svgRect = svgElement.getBoundingClientRect();
-    const scaleFactor = 2; // For high DPI
     
-    canvas.width = svgRect.width * scaleFactor;
-    canvas.height = svgRect.height * scaleFactor;
+    // Calculate scaling to fit SVG into target dimensions while maintaining aspect ratio
+    const scaleX = targetWidth / svgRect.width;
+    const scaleY = targetHeight / svgRect.height;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't upscale, only downscale if needed
     
-    // Scale context for high DPI
-    ctx.scale(scaleFactor, scaleFactor);
+    // Calculate centered position
+    const scaledWidth = svgRect.width * scale;
+    const scaledHeight = svgRect.height * scale;
+    const offsetX = (targetWidth - scaledWidth) / 2;
+    const offsetY = (targetHeight - scaledHeight) / 2;
+    
+    console.log('Canvas setup:', { targetWidth, targetHeight, scale, offsetX, offsetY });
     
     // Clean SVG data to prevent taint issues
     let svgData = new XMLSerializer().serializeToString(svgElement);
@@ -520,136 +534,35 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
         try {
           // Clear canvas with white background
           ctx.fillStyle = 'white';
-          ctx.fillRect(0, 0, canvas.width / scaleFactor, canvas.height / scaleFactor);
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
           
-          ctx.drawImage(img, 0, 0);
+          // Draw image centered and scaled
+          ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
           
-          // Mini app specific handling
-          if (isMiniApp) {
-            console.log('Using mini app compatible image copy method');
-            
-            // Method 1: Try Web Share API first (most compatible with mini apps)
-            if (navigator.share) {
-              try {
-                canvas.toBlob(async (blob) => {
-                  if (blob) {
-                    try {
-                      const file = new File([blob], 'orthoiq-prescription.png', { type: 'image/png' });
-                      await navigator.share({
-                        files: [file],
-                        title: 'OrthoIQ Prescription',
-                        text: 'My OrthoIQ medical prescription'
-                      });
-                      console.log('Successfully shared image via Web Share API');
-                      resolve();
-                    } catch (shareError) {
-                      console.warn('Web Share API failed:', shareError);
-                      // Continue to next method
-                      tryNextMiniAppMethod();
-                    }
-                  } else {
-                    tryNextMiniAppMethod();
-                  }
-                }, 'image/png', 0.95);
-                return;
-              } catch (shareSetupError) {
-                console.warn('Web Share API setup failed:', shareSetupError);
-              }
-            }
-            
-            // Method 2: Try copying as data URL text
-            async function tryNextMiniAppMethod() {
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                try {
-                  const imageDataUrl = canvas.toDataURL('image/png', 0.95);
-                  await navigator.clipboard.writeText(imageDataUrl);
-                  console.log('Successfully copied image as data URL to clipboard');
-                  resolve();
-                  return;
-                } catch (textError) {
-                  console.warn('Text clipboard fallback failed in mini app:', textError);
-                }
-              }
+          // Universal download approach - works in both web and miniapp
+          console.log('Generating image download...');
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const downloadUrl = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = downloadUrl;
               
-              // Method 3: Download the image as last resort
-              try {
-                canvas.toBlob((blob) => {
-                  if (blob) {
-                    const downloadUrl = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = downloadUrl;
-                    link.download = `orthoiq-prescription-${Date.now()}.png`;
-                    
-                    // For mini apps, trigger download
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(downloadUrl);
-                    
-                    console.log('Image downloaded as fallback in mini app');
-                    resolve();
-                  } else {
-                    console.error('All mini app methods failed');
-                    reject(new Error('Unable to copy or share image in mini app environment. All methods failed.'));
-                  }
-                }, 'image/png', 0.95);
-              } catch (downloadError) {
-                console.error('Download fallback failed:', downloadError);
-                reject(new Error('Unable to copy or share image in mini app environment. Download failed.'));
-              }
-            }
-            
-            // Start with the fallback method if Web Share API isn't available
-            if (!navigator.share) {
-              tryNextMiniAppMethod();
-            }
-            
-            return; // Exit early for mini app handling
-          }
-          
-          // Standard web app handling
-          canvas.toBlob(async (blob) => {
-            if (blob && navigator.clipboard && navigator.clipboard.write) {
-              try {
-                // Try modern Clipboard API first
-                const clipboardItem = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([clipboardItem]);
-                console.log('Successfully copied image using Clipboard API');
-                resolve();
-              } catch (clipboardError) {
-                console.warn('Modern clipboard failed, trying fallbacks:', clipboardError);
-                
-                // Fallback 1: Copy as data URL text
-                try {
-                  const imageDataUrl = canvas.toDataURL('image/png', 0.95);
-                  await navigator.clipboard.writeText(imageDataUrl);
-                  console.log('Successfully copied image as data URL');
-                  resolve();
-                } catch (textError) {
-                  console.warn('Text clipboard fallback also failed:', textError);
-                  
-                  // Fallback 2: Manual copy instruction
-                  const imageDataUrl = canvas.toDataURL('image/png', 0.95);
-                  const newWindow = window.open();
-                  if (newWindow) {
-                    newWindow.document.write(`
-                      <html>
-                        <head><title>OrthoIQ Prescription</title></head>
-                        <body style="margin:0;text-align:center;background:#f0f0f0;">
-                          <h3>Right-click the image below and select "Copy Image"</h3>
-                          <img src="${imageDataUrl}" style="max-width:100%;margin:20px;" alt="OrthoIQ Prescription" />
-                        </body>
-                      </html>
-                    `);
-                    newWindow.document.close();
-                    resolve();
-                  } else {
-                    reject(new Error('All clipboard methods failed'));
-                  }
-                }
-              }
+              // Generate filename with prescription ID or timestamp
+              const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+              const identifier = prescriptionId || timestamp;
+              link.download = `OrthoIQ-Prescription-${identifier}.png`;
+              
+              // Trigger download
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(downloadUrl);
+              
+              console.log('Image download triggered successfully');
+              resolve();
             } else {
-              reject(new Error('Clipboard API not available'));
+              reject(new Error('Failed to generate image blob for download'));
             }
           }, 'image/png', 0.95);
         } catch (error) {
@@ -664,9 +577,14 @@ export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promis
       img.src = dataUrl;
     });
   } catch (error) {
-    console.error('Error copying prescription as image:', error);
+    console.error('Error saving prescription as image:', error);
     throw error;
   }
+}
+
+// Backward compatibility alias
+export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promise<void> {
+  return savePrescriptionAsImage(svgElement);
 }
 
 export async function exportPrescription(
