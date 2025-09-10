@@ -49,6 +49,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Cache control meta tags */}
+        <meta httpEquiv="Cache-Control" content="no-store, no-cache, must-revalidate, private" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
+        
         {/* PWA meta tags - Modern approach */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />

@@ -38,6 +38,16 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Add no-cache headers for HTML pages to prevent browser caching
+  const accept = request.headers.get('accept') || '';
+  if (accept.includes('text/html') || pathname.endsWith('.html') || 
+      (pathname !== '/api' && !pathname.startsWith('/api/') && !pathname.includes('.'))) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    console.log(`[MIDDLEWARE DEBUG] Set no-cache headers for HTML page: ${pathname}`);
+  }
+
   return response;
 }
 

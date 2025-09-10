@@ -1,5 +1,5 @@
 // Service Worker for OrthoIQ PWA
-const CACHE_NAME = 'orthoiq-v1';
+const CACHE_NAME = 'orthoiq-v2-fresh';
 const STATIC_ASSETS = [
   '/',
   '/mini',
@@ -75,18 +75,54 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For all other requests, use cache-first strategy
+  // For HTML navigation requests (pages), use network-first strategy
+  if (event.request.mode === 'navigate' || 
+      event.request.destination === 'document' ||
+      (event.request.method === 'GET' && event.request.headers.get('accept')?.includes('text/html'))) {
+    
+    console.log('OrthoIQ Service Worker: Using network-first for HTML:', event.request.url);
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Cache the fresh response
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+          }
+          console.log('OrthoIQ Service Worker: HTML served fresh from network:', event.request.url);
+          return response;
+        })
+        .catch(() => {
+          // Network failed, try cache
+          console.log('OrthoIQ Service Worker: Network failed, trying cache for:', event.request.url);
+          return caches.match(event.request)
+            .then((cachedResponse) => {
+              if (cachedResponse) {
+                console.log('OrthoIQ Service Worker: Serving HTML from cache (offline):', event.request.url);
+                return cachedResponse;
+              }
+              return new Response('Offline - OrthoIQ requires an internet connection');
+            });
+        })
+    );
+    return;
+  }
+
+  // For static assets (JS, CSS, images), use cache-first strategy
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
         // Return cached version if available
         if (response) {
-          console.log('OrthoIQ Service Worker: Serving from cache:', event.request.url);
+          console.log('OrthoIQ Service Worker: Serving static asset from cache:', event.request.url);
           return response;
         }
         
         // Otherwise fetch from network
-        console.log('OrthoIQ Service Worker: Fetching from network:', event.request.url);
+        console.log('OrthoIQ Service Worker: Fetching static asset from network:', event.request.url);
         return fetch(event.request).then((response) => {
           // Don't cache non-successful responses
           if (!response || response.status !== 200 || response.type !== 'basic') {
@@ -105,10 +141,9 @@ self.addEventListener('fetch', (event) => {
         });
       })
       .catch(() => {
-        // If both cache and network fail, return offline page for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/') || new Response('Offline - OrthoIQ requires an internet connection');
-        }
+        // If both cache and network fail for static assets
+        console.log('OrthoIQ Service Worker: Failed to load static asset:', event.request.url);
+        return new Response('Asset not available', { status: 404 });
       })
   );
 });

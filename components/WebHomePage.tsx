@@ -17,6 +17,11 @@ export default function WebHomePage() {
         </p>
         <div className="mt-6">
           <span className="text-sm opacity-80">by Dr. KPJMD</span>
+          <div className="mt-2">
+            <span className="text-xs opacity-60 bg-white bg-opacity-20 px-2 py-1 rounded">
+              ✅ Fresh content - no caching issues
+            </span>
+          </div>
         </div>
       </div>
       

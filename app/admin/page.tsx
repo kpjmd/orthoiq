@@ -293,6 +293,9 @@ function AdminDashboardContent() {
               <p className="text-sm mt-2 opacity-75">
                 Signed in as: {isPasswordAuthenticated ? 'Admin (Password)' : (user?.displayName || user?.username)}
               </p>
+              <p className="text-xs mt-1 opacity-60">
+                ✅ Cache Fix Applied - Delete button should appear without refresh
+              </p>
             </div>
             <div className="flex space-x-3">
               <a
