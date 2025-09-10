@@ -44,6 +44,7 @@ function AdminDashboardContent() {
     responseQuality: '',
     reviewType: ''
   });
+  const [exportStatus, setExportStatus] = useState<'idle' | 'exporting' | 'success' | 'error'>('idle');
   const [isPasswordAuthenticated, setIsPasswordAuthenticated] = useState(false);
   const [showPasswordAuth, setShowPasswordAuth] = useState(false);
 
@@ -171,10 +172,14 @@ function AdminDashboardContent() {
 
   const handleExportTrainingData = async () => {
     try {
+      setExportStatus('exporting');
+      
       // Remove empty filters
       const cleanFilters = Object.fromEntries(
         Object.entries(exportFilters).filter(([_, value]) => value !== '')
       );
+
+      console.log('Starting export with filters:', cleanFilters);
 
       const res = await fetch('/api/admin/export-training-data', {
         method: 'POST',
@@ -186,17 +191,30 @@ function AdminDashboardContent() {
         })
       });
 
+      const result = await res.json();
+      console.log('Export response:', result);
+
       if (res.ok) {
-        const result = await res.json();
         alert(`✅ Training data exported successfully!\n\nFile: ${result.file_name}\nRecords: ${result.record_count}\nFormat: ${result.format.toUpperCase()}\n\nFile saved to: ${result.file_path}`);
         setShowExportModal(false);
+        setExportStatus('success');
       } else {
-        const error = await res.json();
-        alert(`❌ Export failed: ${error.error}`);
+        console.error('Export failed:', result);
+        const errorMessage = result.details ? 
+          `${result.error}\n\nDetails: ${result.details}` : 
+          result.error;
+        
+        if (result.suggestion) {
+          alert(`❌ Export failed: ${errorMessage}\n\n💡 Suggestion: ${result.suggestion}`);
+        } else {
+          alert(`❌ Export failed: ${errorMessage}`);
+        }
+        setExportStatus('error');
       }
     } catch (error) {
       console.error('Export error:', error);
-      alert('❌ Export failed: Network error');
+      alert(`❌ Export failed: Network error\n\nDetails: ${error instanceof Error ? error.message : String(error)}`);
+      setExportStatus('error');
     }
   };
 

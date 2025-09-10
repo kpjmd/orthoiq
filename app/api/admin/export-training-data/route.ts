@@ -4,19 +4,33 @@ import fs from 'fs';
 import path from 'path';
 
 export async function POST(request: NextRequest) {
+  console.log('Training data export request received');
+  
   try {
+    const requestBody = await request.json();
+    console.log('Request body:', requestBody);
+    
     const { 
       format = 'jsonl',
       filters = {},
       exportedBy = 'KPJMD'
-    } = await request.json();
+    } = requestBody;
+
+    console.log('Export parameters:', { format, filters, exportedBy });
 
     // Get training data based on filters
+    console.log('Fetching training data with filters:', filters);
     const trainingData = await getTrainingData(filters);
+    console.log(`Retrieved ${trainingData.length} training records`);
 
     if (trainingData.length === 0) {
+      console.log('No training data found for filters:', filters);
       return NextResponse.json(
-        { error: 'No training data found matching criteria' },
+        { 
+          error: 'No training data found matching criteria',
+          filters: filters,
+          suggestion: 'Try removing some filters or check if there are any approved reviews in the system'
+        },
         { status: 404 }
       );
     }
@@ -148,22 +162,51 @@ export async function POST(request: NextRequest) {
 
     // Create exports directory if it doesn't exist
     const exportsDir = path.join(process.cwd(), 'exports');
-    if (!fs.existsSync(exportsDir)) {
-      fs.mkdirSync(exportsDir, { recursive: true });
+    console.log('Exports directory path:', exportsDir);
+    
+    try {
+      if (!fs.existsSync(exportsDir)) {
+        console.log('Creating exports directory');
+        fs.mkdirSync(exportsDir, { recursive: true });
+      }
+    } catch (dirError) {
+      console.error('Error creating exports directory:', dirError);
+      return NextResponse.json(
+        { error: 'Failed to create exports directory', details: dirError },
+        { status: 500 }
+      );
     }
 
     // Write file
     const filePath = path.join(exportsDir, fileName);
-    fs.writeFileSync(filePath, exportContent, 'utf8');
+    console.log('Writing file to:', filePath);
+    
+    try {
+      fs.writeFileSync(filePath, exportContent, 'utf8');
+      console.log('File written successfully');
+    } catch (writeError) {
+      console.error('Error writing export file:', writeError);
+      return NextResponse.json(
+        { error: 'Failed to write export file', details: writeError },
+        { status: 500 }
+      );
+    }
 
     // Log the export
-    const exportId = await logTrainingExport(
-      filters,
-      format,
-      trainingData.length,
-      filePath,
-      exportedBy
-    );
+    let exportId;
+    try {
+      exportId = await logTrainingExport(
+        filters,
+        format,
+        trainingData.length,
+        filePath,
+        exportedBy
+      );
+      console.log('Export logged with ID:', exportId);
+    } catch (logError) {
+      console.error('Error logging export (non-critical):', logError);
+      // Continue anyway since the file was created successfully
+    }
 
     return NextResponse.json({
       success: true,
@@ -177,8 +220,14 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error exporting training data:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
     return NextResponse.json(
-      { error: 'Failed to export training data' },
+      { 
+        error: 'Failed to export training data',
+        details: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

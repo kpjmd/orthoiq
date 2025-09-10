@@ -48,13 +48,61 @@ function AnalyticsDashboardContent() {
 
   const loadAnalytics = async () => {
     try {
+      console.log('Loading analytics...');
       const res = await fetch('/api/admin/enhanced-analytics');
+      
       if (res.ok) {
         const data = await res.json();
+        console.log('Analytics loaded successfully:', data);
         setAnalytics(data);
+      } else {
+        const errorData = await res.json();
+        console.error('Analytics API error:', errorData);
+        
+        // Set fallback data
+        setAnalytics({
+          totalReviewed: 0,
+          approvalRate: 0,
+          reviewTypeDistribution: [],
+          specialtyDistribution: [],
+          qualityDistribution: [],
+          avgConfidenceScore: 0,
+          avgCommunicationQuality: 0,
+          userFeedbackStats: {
+            totalFeedback: 0,
+            helpfulYes: 0,
+            helpfulNo: 0,
+            helpfulSomewhat: 0,
+            aiRefusalCount: 0,
+            suggestionsCount: 0,
+            helpfulnessRate: 0
+          },
+          feedbackByDay: []
+        });
       }
     } catch (error) {
       console.error('Failed to load analytics:', error);
+      
+      // Set fallback data even on network error
+      setAnalytics({
+        totalReviewed: 0,
+        approvalRate: 0,
+        reviewTypeDistribution: [],
+        specialtyDistribution: [],
+        qualityDistribution: [],
+        avgConfidenceScore: 0,
+        avgCommunicationQuality: 0,
+        userFeedbackStats: {
+          totalFeedback: 0,
+          helpfulYes: 0,
+          helpfulNo: 0,
+          helpfulSomewhat: 0,
+          aiRefusalCount: 0,
+          suggestionsCount: 0,
+          helpfulnessRate: 0
+        },
+        feedbackByDay: []
+      });
     } finally {
       setIsLoading(false);
     }

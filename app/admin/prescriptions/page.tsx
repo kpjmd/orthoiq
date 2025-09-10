@@ -141,6 +141,8 @@ function PrescriptionsDashboardContent() {
   const loadAllAnalytics = useCallback(async () => {
     setIsLoading(true);
     try {
+      console.log('Loading all prescription analytics...');
+      
       const [
         analyticsRes,
         timeSeriesRes,
@@ -157,30 +159,66 @@ function PrescriptionsDashboardContent() {
 
       if (analyticsRes.ok) {
         const data = await analyticsRes.json();
+        console.log('Prescription analytics loaded:', data);
         setAnalytics(data);
+      } else {
+        const error = await analyticsRes.json();
+        console.error('Prescription analytics failed:', error);
+        setAnalytics({
+          totalPrescriptions: 0,
+          rarityDistribution: [],
+          totalDownloads: 0,
+          totalShares: 0,
+          platformDistribution: [],
+          mdReviewStats: { reviewedCount: 0, totalCount: 0, reviewRate: 0 },
+          paymentStats: [],
+          topCollectors: [],
+          recentActivity: []
+        });
       }
 
       if (timeSeriesRes.ok) {
         const data = await timeSeriesRes.json();
         setTimeSeriesData(data);
+      } else {
+        console.error('Time series data failed:', await timeSeriesRes.json());
       }
 
       if (engagementRes.ok) {
         const data = await engagementRes.json();
         setEngagementData(data);
+      } else {
+        console.error('Engagement data failed:', await engagementRes.json());
       }
 
       if (userJourneyRes.ok) {
         const data = await userJourneyRes.json();
         setUserJourneyData(data);
+      } else {
+        console.error('User journey data failed:', await userJourneyRes.json());
       }
 
       if (revenueRes.ok) {
         const data = await revenueRes.json();
         setRevenueData(data);
+      } else {
+        console.error('Revenue data failed:', await revenueRes.json());
       }
     } catch (error) {
       console.error('Failed to load analytics:', error);
+      
+      // Set fallback data for all analytics
+      setAnalytics({
+        totalPrescriptions: 0,
+        rarityDistribution: [],
+        totalDownloads: 0,
+        totalShares: 0,
+        platformDistribution: [],
+        mdReviewStats: { reviewedCount: 0, totalCount: 0, reviewRate: 0 },
+        paymentStats: [],
+        topCollectors: [],
+        recentActivity: []
+      });
     } finally {
       setIsLoading(false);
     }

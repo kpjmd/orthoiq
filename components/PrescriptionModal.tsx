@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
-import { copyPrescriptionAsImage, savePrescriptionAsImage } from '@/lib/exportUtils';
+import { savePrescriptionAsImage } from '@/lib/exportUtils';
 
 interface PrescriptionModalProps {
   isOpen: boolean;

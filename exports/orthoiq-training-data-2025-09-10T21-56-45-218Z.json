@@ -1,0 +1,127 @@
+{
+  "export_metadata": {
+    "exported_at": "2025-09-10T21:56:45.218Z",
+    "exported_by": "test-user",
+    "filters": {
+      "limit": 5
+    },
+    "total_records": 5
+  },
+  "training_data": [
+    {
+      "id": 89,
+      "question": "60yo softball player felt pop running bases during game but was able to keep playing no problem. Pain/swelling bad a week later. ACL stable on exam to ortho MD. What possible diagnosis?",
+      "original_response": "Given the presentation of a pop during activity followed by delayed symptoms in an older athlete, the most concerning diagnosis would be a medial meniscus tear. The ability to continue playing initially is common with meniscal injuries, but symptoms typically worsen over days as inflammation develops. The age of the patient and mechanism (rotational force while running bases) strongly suggests a degenerative meniscal tear pattern. The stable ACL on examination helps rule out ligamentous injury, further supporting a meniscal diagnosis. Other possibilities include chondral injury or loose body, but the delayed symptom pattern is most classic for meniscus pathology. An MRI would be appropriate to confirm diagnosis and assess tear pattern. Conservative treatment with activity modification, anti-inflammatories, and physical therapy would be initial approach for most degenerative tears.",
+      "corrected_response": "Given the presentation of a pop during activity followed by delayed symptoms in an older athlete, the most concerning diagnosis would be a medial meniscus tear. The ability to continue playing initially is common with meniscal injuries, but symptoms typically worsen over days as inflammation develops. The age of the patient and mechanism (rotational force while running bases) strongly suggests a degenerative meniscal tear pattern. The stable ACL on examination helps rule out ligamentous injury, further supporting a meniscal diagnosis. Other possibilities include chondral injury or loose body, but the delayed symptom pattern is most classic for meniscus pathology. An MRI would be appropriate to confirm diagnosis and assess tear pattern. Conservative treatment with activity modification, anti-inflammatories, and physical therapy would be initial approach for most degenerative tears.",
+      "review_details": {
+        "review_type": "approve_as_is",
+        "additions_text": null,
+        "corrections_text": null,
+        "teaching_notes": null,
+        "confidence_score": 10,
+        "communication_quality": 10
+      },
+      "medical_category": {
+        "specialty": "knee",
+        "complexity": "intermediate",
+        "response_quality": "excellent",
+        "common_issues": []
+      },
+      "original_confidence": 0.95,
+      "reviewer_notes": "",
+      "created_at": "2025-09-08T11:59:41.029Z"
+    },
+    {
+      "id": 88,
+      "question": "My knee is sore and a little stiff when I wake up and I noticed I now can’t bend it as much as my other knee. What is the likely cause of this?",
+      "original_response": "Morning knee stiffness and reduced range of motion can have several potential causes, with osteoarthritis being one of the most common, especially in adults over 40. The symptoms you describe - morning stiffness, decreased flexibility, and asymmetric symptoms compared to the other knee - are classic signs of early osteoarthritis or other inflammatory conditions affecting the knee joint. Other possible causes include meniscus tears, patellofemoral pain syndrome, or post-injury arthrofibrosis. The reduced range of motion (ROM) suggests possible inflammation within the joint or changes to the joint surfaces that are limiting normal movement. It's important to note that these symptoms, particularly when they persist, should be evaluated by an orthopedic specialist for proper diagnosis. Early intervention can help prevent further deterioration and maintain joint function. In the meantime, gentle stretching, avoiding high-impact activities, and using the RICE protocol (Rest, Ice, Compression, Elevation) may help manage symptoms. Consider starting with low-impact exercises like swimming or cycling to maintain fitness while reducing joint stress.",
+      "corrected_response": "Morning knee stiffness and reduced range of motion can have several potential causes, with osteoarthritis being one of the most common, especially in adults over 40. The symptoms you describe - morning stiffness, decreased flexibility, and asymmetric symptoms compared to the other knee - are classic signs of early osteoarthritis or other inflammatory conditions affecting the knee joint. Other possible causes include meniscus tears, patellofemoral pain syndrome, or post-injury arthrofibrosis. The reduced range of motion (ROM) suggests possible inflammation within the joint or changes to the joint surfaces that are limiting normal movement. It's important to note that these symptoms, particularly when they persist, should be evaluated by an orthopedic specialist for proper diagnosis. Early intervention can help prevent further deterioration and maintain joint function. In the meantime, gentle stretching, avoiding high-impact activities, and using the RICE protocol (Rest, Ice, Compression, Elevation) may help manage symptoms. Consider starting with low-impact exercises like swimming or cycling to maintain fitness while reducing joint stress.",
+      "review_details": {
+        "review_type": "approve_as_is",
+        "additions_text": null,
+        "corrections_text": null,
+        "teaching_notes": null,
+        "confidence_score": 10,
+        "communication_quality": 10
+      },
+      "medical_category": {
+        "specialty": "knee",
+        "complexity": "basic",
+        "response_quality": "excellent",
+        "common_issues": []
+      },
+      "original_confidence": 0.9,
+      "reviewer_notes": "",
+      "created_at": "2025-09-08T11:54:35.092Z"
+    },
+    {
+      "id": 76,
+      "question": "is a geniculate artery embolization a good option for end stage knee arthritis pain?",
+      "original_response": "Geniculate artery embolization (GAE) is an emerging minimally invasive treatment option for chronic knee pain from osteoarthritis. This procedure works by blocking small blood vessels (geniculate arteries) that feed inflamed synovial tissue in arthritic knees, potentially reducing inflammation and associated pain. Clinical studies have shown promising early results, with many patients experiencing significant pain reduction for 6-12 months post-procedure. However, it's important to understand that GAE is not a cure for arthritis and may not be suitable for all patients. While it can provide pain relief and potentially delay the need for knee replacement surgery, it's generally considered an intermediate treatment option. The best candidates are typically patients who have failed conservative treatments (like physical therapy and medications) but aren't yet ready or suitable for total knee replacement. The procedure's long-term effectiveness is still being studied, as it's relatively new compared to established treatments. Before considering GAE, patients should undergo thorough evaluation by both an orthopedic specialist and interventional radiologist to determine if they're appropriate candidates.",
+      "corrected_response": "Geniculate artery embolization (GAE) is an emerging minimally invasive treatment option for chronic knee pain from osteoarthritis. This procedure works by blocking small blood vessels (geniculate arteries) that feed inflamed synovial tissue in arthritic knees, potentially reducing inflammation and associated pain. Clinical studies have shown promising early results, with many patients experiencing significant pain reduction for 6-12 months post-procedure. However, it's important to understand that GAE is not a cure for arthritis and may not be suitable for all patients. While it can provide pain relief and potentially delay the need for knee replacement surgery, it's generally considered an intermediate treatment option. The best candidates are typically patients who have failed conservative treatments (like physical therapy and medications) but aren't yet ready or suitable for total knee replacement. The procedure's long-term effectiveness is still being studied, as it's relatively new compared to established treatments. Before considering GAE, patients should undergo thorough evaluation by both an orthopedic specialist and interventional radiologist to determine if they're appropriate candidates.\n\nA significant number of patients may not respond to geniculate artery embolization.",
+      "review_details": {
+        "review_type": "approve_with_additions",
+        "additions_text": "A significant number of patients may not respond to geniculate artery embolization.",
+        "corrections_text": null,
+        "teaching_notes": "Geniculate artery embolization currently lacks long term efficacy and a large number of patients may not respond to treatment.",
+        "confidence_score": 8,
+        "communication_quality": 9
+      },
+      "medical_category": {
+        "specialty": "knee",
+        "complexity": "advanced",
+        "response_quality": "excellent",
+        "common_issues": []
+      },
+      "original_confidence": 0.95,
+      "reviewer_notes": "Geniculate artery embolization currently lacks long term efficacy and a large number of patients may not respond to treatment.",
+      "created_at": "2025-09-02T17:49:29.375Z"
+    },
+    {
+      "id": 65,
+      "question": "Should I have surgery for my clavicle fracture?",
+      "original_response": "The decision for clavicle fracture surgery depends on several key factors that orthopedic surgeons evaluate. Non-displaced fractures (where bone ends align well) typically heal successfully with conservative treatment using a sling and activity modification for 4-6 weeks. However, surgery may be recommended if: 1) The fracture is significantly displaced (>2cm separation), 2) There are multiple fragments, 3) The bone pieces overlap significantly, or 4) The skin is tented or at risk. Surgery is also more commonly considered for athletes and physically active individuals who need a faster return to activity. The most common surgical approach uses plates and screws to stabilize the fracture. While surgery carries risks like infection and hardware irritation, it can provide better alignment and potentially faster healing in appropriate cases. The final decision should be made in consultation with an orthopedic surgeon who can evaluate your specific fracture pattern, activity level, and personal goals. Without examining your specific case and imaging, no definitive recommendation can be made.",
+      "corrected_response": "The decision for clavicle fracture surgery depends on several key factors that orthopedic surgeons evaluate. Non-displaced fractures (where bone ends align well) typically heal successfully with conservative treatment using a sling and activity modification for 4-6 weeks. However, surgery may be recommended if: 1) The fracture is significantly displaced (>2cm separation), 2) There are multiple fragments, 3) The bone pieces overlap significantly, or 4) The skin is tented or at risk. Surgery is also more commonly considered for athletes and physically active individuals who need a faster return to activity. The most common surgical approach uses plates and screws to stabilize the fracture. While surgery carries risks like infection and hardware irritation, it can provide better alignment and potentially faster healing in appropriate cases. The final decision should be made in consultation with an orthopedic surgeon who can evaluate your specific fracture pattern, activity level, and personal goals. Without examining your specific case and imaging, no definitive recommendation can be made.\n\nThe age of the patient may be considered, where younger age and large remaining growth potential in pediatric populations rarely considered for surgery.",
+      "review_details": {
+        "review_type": "approve_with_additions",
+        "additions_text": "The age of the patient may be considered, where younger age and large remaining growth potential in pediatric populations rarely considered for surgery.",
+        "corrections_text": null,
+        "teaching_notes": "Surgery becomes increasingly rare in pediatric populations with high healing and remodeling rates. ",
+        "confidence_score": 9,
+        "communication_quality": 9
+      },
+      "medical_category": {
+        "specialty": "shoulder",
+        "complexity": "intermediate",
+        "response_quality": null,
+        "common_issues": []
+      },
+      "original_confidence": 0.9,
+      "reviewer_notes": "Surgery becomes increasingly rare in pediatric populations with high healing and remodeling rates. ",
+      "created_at": "2025-09-01T16:46:35.812Z"
+    },
+    {
+      "id": 64,
+      "question": "What is turf toe?",
+      "original_response": "Turf toe is a common sports injury that occurs when the big toe (hallux) is forcefully bent upward, causing a sprain of the main joint at the base of the toe (metatarsophalangeal or MTP joint). The condition got its name because it frequently occurs in athletes playing on artificial turf, though it can happen on any surface. The injury typically results from excessive force on the toe when pushing off during running or jumping activities. The damage involves the plantar complex, which includes ligaments, tendons, and other soft tissues that support the toe joint. Severity ranges from Grade 1 (mild stretching) to Grade 3 (complete tear). Common symptoms include pain, swelling, limited motion, and difficulty pushing off when walking or running. Treatment typically involves RICE protocol (Rest, Ice, Compression, Elevation), protective footwear with a stiff sole, and gradual return to activities. Severe cases may require immobilization or, rarely, surgical intervention. Recovery time varies from 2-6 weeks depending on injury severity and proper management.",
+      "corrected_response": "Turf toe is a common sports injury that occurs when the big toe (hallux) is forcefully bent upward, causing a sprain of the main joint at the base of the toe (metatarsophalangeal or MTP joint). The condition got its name because it frequently occurs in athletes playing on artificial turf, though it can happen on any surface. The injury typically results from excessive force on the toe when pushing off during running or jumping activities. The damage involves the plantar complex, which includes ligaments, tendons, and other soft tissues that support the toe joint. Severity ranges from Grade 1 (mild stretching) to Grade 3 (complete tear). Common symptoms include pain, swelling, limited motion, and difficulty pushing off when walking or running. Treatment typically involves RICE protocol (Rest, Ice, Compression, Elevation), protective footwear with a stiff sole, and gradual return to activities. Severe cases may require immobilization or, rarely, surgical intervention. Recovery time varies from 2-6 weeks depending on injury severity and proper management.\n\nTurf toe involves a sprain or tear of the plantar plate below the first metatarsophalangeal joint.",
+      "review_details": {
+        "review_type": "approve_with_additions",
+        "additions_text": "Turf toe involves a sprain or tear of the plantar plate below the first metatarsophalangeal joint.",
+        "corrections_text": null,
+        "teaching_notes": "turf toe specifically involves injury to the plantar plate of the first metatarsophalangeal joint.",
+        "confidence_score": 9,
+        "communication_quality": 10
+      },
+      "medical_category": {
+        "specialty": "foot_ankle",
+        "complexity": "basic",
+        "response_quality": "excellent",
+        "common_issues": []
+      },
+      "original_confidence": 0.95,
+      "reviewer_notes": "turf toe specifically involves injury to the plantar plate of the first metatarsophalangeal joint.",
+      "created_at": "2025-09-01T14:51:06.684Z"
+    }
+  ]
+}

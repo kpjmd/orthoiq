@@ -1043,12 +1043,12 @@ export async function getTrainingData(filters?: {
   const sql = getSql();
   
   try {
-    // Build the base query with all joins
-    let result;
+    console.log('Getting training data with filters:', filters);
     
-    if (!filters || Object.keys(filters).length === 0) {
-      // No filters - get all approved training data
-      result = await sql`
+    // Base query without filters
+    if (!filters || Object.keys(filters).filter(k => filters[k as keyof typeof filters] !== undefined).length === 0) {
+      console.log('No filters, getting all approved training data');
+      const result = await sql`
         SELECT 
           q.id,
           q.question,
@@ -1073,62 +1073,79 @@ export async function getTrainingData(filters?: {
         LEFT JOIN medical_categories mc ON q.id = mc.question_id
         WHERE r.approved = true
         ORDER BY q.created_at DESC
-        ${filters?.limit ? sql`LIMIT ${filters.limit}` : sql``}
       `;
-    } else {
-      // Apply filters
-      let baseQuery = sql`
-        SELECT 
-          q.id,
-          q.question,
-          q.response,
-          q.confidence,
-          r.approved,
-          r.notes as reviewer_notes,
-          rd.review_type,
-          rd.additions_text,
-          rd.corrections_text,
-          rd.teaching_notes,
-          rd.confidence_score,
-          rd.communication_quality,
-          mc.specialty,
-          mc.complexity,
-          mc.response_quality,
-          mc.common_issues,
-          q.created_at
-        FROM questions q
-        JOIN reviews r ON q.id = r.question_id
-        LEFT JOIN review_details rd ON r.id = rd.review_id
-        LEFT JOIN medical_categories mc ON q.id = mc.question_id
-        WHERE r.approved = true
-      `;
-
-      // Add filters dynamically
-      if (filters.specialty) {
-        baseQuery = sql`${baseQuery} AND mc.specialty = ${filters.specialty}`;
-      }
-      if (filters.complexity) {
-        baseQuery = sql`${baseQuery} AND mc.complexity = ${filters.complexity}`;
-      }
-      if (filters.responseQuality) {
-        baseQuery = sql`${baseQuery} AND mc.response_quality = ${filters.responseQuality}`;
-      }
-      if (filters.reviewType) {
-        baseQuery = sql`${baseQuery} AND rd.review_type = ${filters.reviewType}`;
-      }
-
-      baseQuery = sql`${baseQuery} ORDER BY q.created_at DESC`;
-      
-      if (filters.limit) {
-        baseQuery = sql`${baseQuery} LIMIT ${filters.limit}`;
-      }
-      
-      result = await baseQuery;
+      console.log(`Found ${result.length} training records`);
+      return result;
     }
-
+    
+    // Build query string manually for filtered queries
+    let query = `
+      SELECT 
+        q.id,
+        q.question,
+        q.response,
+        q.confidence,
+        r.approved,
+        r.notes as reviewer_notes,
+        rd.review_type,
+        rd.additions_text,
+        rd.corrections_text,
+        rd.teaching_notes,
+        rd.confidence_score,
+        rd.communication_quality,
+        mc.specialty,
+        mc.complexity,
+        mc.response_quality,
+        mc.common_issues,
+        q.created_at
+      FROM questions q
+      JOIN reviews r ON q.id = r.question_id
+      LEFT JOIN review_details rd ON r.id = rd.review_id
+      LEFT JOIN medical_categories mc ON q.id = mc.question_id
+      WHERE r.approved = true
+    `;
+    
+    // Add filters
+    if (filters.specialty) {
+      query += ` AND mc.specialty = '${filters.specialty}'`;
+    }
+    if (filters.complexity) {
+      query += ` AND mc.complexity = '${filters.complexity}'`;
+    }
+    if (filters.responseQuality) {
+      query += ` AND mc.response_quality = '${filters.responseQuality}'`;
+    }
+    if (filters.reviewType) {
+      query += ` AND rd.review_type = '${filters.reviewType}'`;
+    }
+    
+    query += ` ORDER BY q.created_at DESC`;
+    
+    if (filters.limit) {
+      query += ` LIMIT ${filters.limit}`;
+    }
+    
+    if (filters.offset) {
+      query += ` OFFSET ${filters.offset}`;
+    }
+    
+    console.log('Executing filtered query:', query);
+    const result = await sql([query]);
+    console.log(`Found ${result.length} training records`);
+    
     return result;
   } catch (error) {
     console.error('Error getting training data:', error);
+    console.error('Error details:', error);
+    
+    // If there's a database error, try a simpler query to check basic connectivity
+    try {
+      const testResult = await sql`SELECT COUNT(*) as count FROM questions`;
+      console.log('Database connectivity test passed, questions count:', testResult[0].count);
+    } catch (testError) {
+      console.error('Database connectivity test failed:', testError);
+    }
+    
     return [];
   }
 }
@@ -1162,6 +1179,8 @@ export async function getEnhancedAnalytics() {
   const sql = getSql();
   
   try {
+    console.log('Getting enhanced analytics...');
+    
     const totalReviewed = await sql`
       SELECT COUNT(*) as count FROM reviews
     `;
@@ -1259,6 +1278,29 @@ export async function getEnhancedAnalytics() {
     };
   } catch (error) {
     console.error('Error getting enhanced analytics:', error);
+    console.error('Error details:', error);
+    
+    // Try to test individual queries to find specific issues
+    try {
+      const testQueries = [
+        { name: 'reviews count', query: sql`SELECT COUNT(*) as count FROM reviews` },
+        { name: 'review_details count', query: sql`SELECT COUNT(*) as count FROM review_details` },
+        { name: 'medical_categories count', query: sql`SELECT COUNT(*) as count FROM medical_categories` },
+        { name: 'user_feedback count', query: sql`SELECT COUNT(*) as count FROM user_feedback` }
+      ];
+      
+      for (const test of testQueries) {
+        try {
+          const result = await test.query;
+          console.log(`${test.name}: ${result[0].count}`);
+        } catch (testError) {
+          console.error(`Failed ${test.name}:`, testError);
+        }
+      }
+    } catch (testError) {
+      console.error('Test queries failed:', testError);
+    }
+    
     return {
       totalReviewed: 0,
       approvalRate: 0,
@@ -1696,9 +1738,12 @@ export async function getPrescriptionAnalytics(): Promise<any> {
   const sql = getSql();
   
   try {
+    console.log('Getting prescription analytics...');
+    
     const totalPrescriptions = await sql`
       SELECT COUNT(*) as count FROM prescriptions
     `;
+    console.log('Total prescriptions:', totalPrescriptions[0].count);
 
     const rarityDistribution = await sql`
       SELECT rarity_type, COUNT(*) as count
@@ -1787,6 +1832,28 @@ export async function getPrescriptionAnalytics(): Promise<any> {
     };
   } catch (error) {
     console.error('Error getting prescription analytics:', error);
+    console.error('Error details:', error);
+    
+    // Try basic table checks
+    try {
+      const tableTests = [
+        { name: 'prescriptions', query: sql`SELECT COUNT(*) as count FROM prescriptions` },
+        { name: 'prescription_shares', query: sql`SELECT COUNT(*) as count FROM prescription_shares` },
+        { name: 'prescription_collections', query: sql`SELECT COUNT(*) as count FROM prescription_collections` }
+      ];
+      
+      for (const test of tableTests) {
+        try {
+          const result = await test.query;
+          console.log(`${test.name} table count: ${result[0].count}`);
+        } catch (testError) {
+          console.error(`${test.name} table test failed:`, testError);
+        }
+      }
+    } catch (tableTestError) {
+      console.error('Table tests failed:', tableTestError);
+    }
+    
     return {
       totalPrescriptions: 0,
       rarityDistribution: [],
