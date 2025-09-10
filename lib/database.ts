@@ -1130,7 +1130,7 @@ export async function getTrainingData(filters?: {
     }
     
     console.log('Executing filtered query:', query);
-    const result = await sql([query]);
+    const result = await sql(query);
     console.log(`Found ${result.length} training records`);
     
     return result;
