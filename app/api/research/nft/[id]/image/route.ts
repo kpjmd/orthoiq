@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const nftId = params.id;
+    const { id: nftId } = await params;
     
     // Extract rarity from ID or use default
     const rarity = extractRarityFromId(nftId);

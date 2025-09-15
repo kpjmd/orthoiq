@@ -3,10 +3,10 @@ import { ResearchRarity } from '@/lib/types';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const nftId = params.id;
+    const { id: nftId } = await params;
 
     // In a real implementation, this would fetch from database
     // For now, generate preview based on ID
