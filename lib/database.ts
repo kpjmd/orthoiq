@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { Question } from './types';
+import { Question, AgentTask, ResearchSynthesis } from './types';
 
 // Create a Neon SQL client
 function getSql() {
@@ -532,7 +532,178 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_md_review_queue_expires_at ON md_review_queue(expires_at);
     `;
 
-    console.log('Database initialized successfully with Neon');
+    // Agent system tables
+    await sql`
+      CREATE TABLE IF NOT EXISTS agent_tasks (
+        id VARCHAR(255) PRIMARY KEY,
+        agent_name VARCHAR(100) NOT NULL,
+        status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+        context_question TEXT NOT NULL,
+        context_fid VARCHAR(255) NOT NULL,
+        context_user_tier VARCHAR(20) NOT NULL CHECK (context_user_tier IN ('basic', 'authenticated', 'medical', 'scholar', 'practitioner', 'institution')),
+        context_question_id INTEGER,
+        context_metadata JSONB DEFAULT '{}'::jsonb,
+        result_success BOOLEAN,
+        result_data JSONB,
+        result_error TEXT,
+        result_enrichments JSONB DEFAULT '[]'::jsonb,
+        result_cost DECIMAL(10,4) DEFAULT 0.0000,
+        retry_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        started_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent_name ON agent_tasks(agent_name);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_agent_tasks_context_fid ON agent_tasks(context_fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_agent_tasks_created_at ON agent_tasks(created_at);
+    `;
+
+    // Research synthesis tables
+    await sql`
+      CREATE TABLE IF NOT EXISTS research_syntheses (
+        id VARCHAR(255) PRIMARY KEY,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        query_condition VARCHAR(255) NOT NULL,
+        query_body_parts JSONB DEFAULT '[]'::jsonb,
+        query_treatment_type VARCHAR(100),
+        query_study_types JSONB DEFAULT '[]'::jsonb,
+        query_max_age INTEGER DEFAULT 10,
+        query_min_sample_size INTEGER DEFAULT 50,
+        papers_analyzed JSONB DEFAULT '[]'::jsonb,
+        synthesis TEXT NOT NULL,
+        key_findings JSONB DEFAULT '[]'::jsonb,
+        limitations JSONB DEFAULT '[]'::jsonb,
+        clinical_relevance TEXT,
+        evidence_strength VARCHAR(20) CHECK (evidence_strength IN ('strong', 'moderate', 'weak', 'insufficient')),
+        study_count INTEGER DEFAULT 0,
+        publication_years VARCHAR(20),
+        total_citations INTEGER DEFAULT 0,
+        avg_impact_factor DECIMAL(5,2) DEFAULT 0.00,
+        rarity_tier VARCHAR(20) CHECK (rarity_tier IN ('bronze', 'silver', 'gold', 'platinum')),
+        md_reviewed BOOLEAN DEFAULT FALSE,
+        md_reviewer VARCHAR(255),
+        md_notes TEXT,
+        generated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        md_reviewed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_syntheses_question_id ON research_syntheses(question_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_syntheses_fid ON research_syntheses(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_syntheses_rarity_tier ON research_syntheses(rarity_tier);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_syntheses_md_reviewed ON research_syntheses(md_reviewed);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_syntheses_evidence_strength ON research_syntheses(evidence_strength);
+    `;
+
+    // Research subscriptions table
+    await sql`
+      CREATE TABLE IF NOT EXISTS research_subscriptions (
+        fid VARCHAR(255) PRIMARY KEY,
+        tier VARCHAR(20) NOT NULL CHECK (tier IN ('scholar', 'practitioner', 'institution')),
+        bronze_quota INTEGER NOT NULL DEFAULT 5,
+        silver_quota INTEGER NOT NULL DEFAULT 2,
+        gold_quota INTEGER NOT NULL DEFAULT 0,
+        bronze_used INTEGER DEFAULT 0,
+        silver_used INTEGER DEFAULT 0,
+        gold_used INTEGER DEFAULT 0,
+        reset_date DATE DEFAULT CURRENT_DATE,
+        is_active BOOLEAN DEFAULT TRUE,
+        subscription_start_date DATE DEFAULT CURRENT_DATE,
+        subscription_end_date DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_subscriptions_tier ON research_subscriptions(tier);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_subscriptions_is_active ON research_subscriptions(is_active);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_subscriptions_reset_date ON research_subscriptions(reset_date);
+    `;
+
+    // Research NFT metadata table
+    await sql`
+      CREATE TABLE IF NOT EXISTS research_nfts (
+        id SERIAL PRIMARY KEY,
+        research_id VARCHAR(255) REFERENCES research_syntheses(id) ON DELETE CASCADE,
+        nft_id VARCHAR(255) UNIQUE,
+        token_id VARCHAR(100),
+        contract_address VARCHAR(255),
+        blockchain VARCHAR(50) DEFAULT 'base',
+        rarity VARCHAR(20) CHECK (rarity IN ('bronze', 'silver', 'gold', 'platinum')),
+        study_count INTEGER NOT NULL,
+        publication_years VARCHAR(20),
+        evidence_level VARCHAR(10),
+        specialties JSONB DEFAULT '[]'::jsonb,
+        citation_count INTEGER DEFAULT 0,
+        impact_factor DECIMAL(5,2) DEFAULT 0.00,
+        clinical_relevance INTEGER DEFAULT 5,
+        times_viewed INTEGER DEFAULT 0,
+        times_cited INTEGER DEFAULT 0,
+        md_endorsements JSONB DEFAULT '[]'::jsonb,
+        research_hash VARCHAR(255),
+        metadata_uri TEXT,
+        mint_status VARCHAR(20) DEFAULT 'pending' CHECK (mint_status IN ('pending', 'minted', 'failed')),
+        mint_tx_hash VARCHAR(255),
+        minted_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_nfts_research_id ON research_nfts(research_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_nfts_nft_id ON research_nfts(nft_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_nfts_rarity ON research_nfts(rarity);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_research_nfts_mint_status ON research_nfts(mint_status);
+    `;
+
+    console.log('Database initialized successfully with Neon (including agent and research tables)');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -2496,5 +2667,224 @@ export async function checkPrescriptionPaymentStatus(prescriptionId: string): Pr
   } catch (error) {
     console.error('Error checking prescription payment status:', error);
     return { hasPaymentRequest: false, inReviewQueue: false };
+  }
+}
+
+// Agent system database functions
+export async function createAgentTask(task: AgentTask): Promise<number> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      INSERT INTO agent_tasks (
+        id, agent_name, status, context_question, context_fid, 
+        context_user_tier, context_question_id, context_metadata,
+        retry_count
+      )
+      VALUES (
+        ${task.id}, ${task.agentName}, ${task.status}, ${task.context.question}, 
+        ${task.context.fid}, ${task.context.userTier}, ${task.context.questionId || null},
+        ${JSON.stringify(task.context.metadata || {})}, ${task.retryCount}
+      )
+      RETURNING id
+    `;
+    
+    return 1; // Success
+  } catch (error) {
+    console.error('Error creating agent task:', error);
+    throw error;
+  }
+}
+
+export async function updateAgentTask(task: AgentTask): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    await sql`
+      UPDATE agent_tasks 
+      SET 
+        status = ${task.status},
+        result_success = ${task.result?.success || null},
+        result_data = ${task.result?.data ? JSON.stringify(task.result.data) : null},
+        result_error = ${task.result?.error || null},
+        result_enrichments = ${task.result?.enrichments ? JSON.stringify(task.result.enrichments) : null},
+        result_cost = ${task.result?.cost || 0.0},
+        retry_count = ${task.retryCount},
+        started_at = ${task.startedAt?.toISOString() || null},
+        completed_at = ${task.completedAt?.toISOString() || null},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${task.id}
+    `;
+  } catch (error) {
+    console.error('Error updating agent task:', error);
+    throw error;
+  }
+}
+
+export async function getAgentTask(taskId: string): Promise<AgentTask | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT * FROM agent_tasks WHERE id = ${taskId}
+    `;
+    
+    if (result.length === 0) {
+      return null;
+    }
+    
+    const row = result[0];
+    return {
+      id: row.id,
+      agentName: row.agent_name,
+      context: {
+        question: row.context_question,
+        fid: row.context_fid,
+        userTier: row.context_user_tier,
+        questionId: row.context_question_id,
+        metadata: row.context_metadata
+      },
+      status: row.status,
+      result: row.result_success !== null ? {
+        success: row.result_success,
+        data: row.result_data,
+        error: row.result_error,
+        enrichments: row.result_enrichments,
+        cost: parseFloat(row.result_cost)
+      } : undefined,
+      createdAt: new Date(row.created_at),
+      startedAt: row.started_at ? new Date(row.started_at) : undefined,
+      completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
+      retryCount: row.retry_count
+    };
+  } catch (error) {
+    console.error('Error getting agent task:', error);
+    return null;
+  }
+}
+
+// Research synthesis database functions
+export async function storeResearchSynthesis(synthesis: ResearchSynthesis, questionId: number): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    await sql`
+      INSERT INTO research_syntheses (
+        id, question_id, fid, query_condition, query_body_parts, 
+        query_treatment_type, query_study_types, query_max_age, query_min_sample_size,
+        papers_analyzed, synthesis, key_findings, limitations, clinical_relevance,
+        evidence_strength, study_count, publication_years, total_citations,
+        avg_impact_factor, rarity_tier, md_reviewed, md_reviewer, md_notes
+      )
+      VALUES (
+        ${synthesis.id}, ${questionId}, 'unknown', ${synthesis.query.condition}, 
+        ${JSON.stringify(synthesis.query.bodyParts)}, ${synthesis.query.treatmentType || null},
+        ${JSON.stringify(synthesis.query.studyTypes || [])}, ${synthesis.query.maxAge || 10}, 
+        ${synthesis.query.minSampleSize || 50}, ${JSON.stringify(synthesis.papers)},
+        ${synthesis.synthesis}, ${JSON.stringify(synthesis.keyFindings)}, 
+        ${JSON.stringify(synthesis.limitations)}, ${synthesis.clinicalRelevance},
+        ${synthesis.evidenceStrength}, ${synthesis.papers.length}, 'unknown',
+        0, 0.0, 'bronze', ${synthesis.mdReviewed}, ${synthesis.mdReviewer || null}, 
+        ${synthesis.mdNotes || null}
+      )
+    `;
+  } catch (error) {
+    console.error('Error storing research synthesis:', error);
+    throw error;
+  }
+}
+
+export async function getResearchSynthesis(synthesisId: string): Promise<ResearchSynthesis | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT * FROM research_syntheses WHERE id = ${synthesisId}
+    `;
+    
+    if (result.length === 0) {
+      return null;
+    }
+    
+    const row = result[0];
+    return {
+      id: row.id,
+      query: {
+        condition: row.query_condition,
+        bodyParts: row.query_body_parts,
+        treatmentType: row.query_treatment_type,
+        studyTypes: row.query_study_types,
+        maxAge: row.query_max_age,
+        minSampleSize: row.query_min_sample_size
+      },
+      papers: row.papers_analyzed,
+      synthesis: row.synthesis,
+      keyFindings: row.key_findings,
+      limitations: row.limitations,
+      clinicalRelevance: row.clinical_relevance,
+      evidenceStrength: row.evidence_strength,
+      generatedAt: new Date(row.generated_at),
+      mdReviewed: row.md_reviewed,
+      mdReviewer: row.md_reviewer,
+      mdNotes: row.md_notes
+    };
+  } catch (error) {
+    console.error('Error getting research synthesis:', error);
+    return null;
+  }
+}
+
+export async function getUserResearchQuota(fid: string): Promise<{
+  tier: string;
+  bronzeQuota: number;
+  silverQuota: number; 
+  goldQuota: number;
+  bronzeUsed: number;
+  silverUsed: number;
+  goldUsed: number;
+  resetDate: Date;
+} | null> {
+  const sql = getSql();
+  
+  try {
+    const result = await sql`
+      SELECT * FROM research_subscriptions 
+      WHERE fid = ${fid} AND is_active = true
+    `;
+    
+    if (result.length === 0) {
+      return null;
+    }
+    
+    const row = result[0];
+    return {
+      tier: row.tier,
+      bronzeQuota: row.bronze_quota,
+      silverQuota: row.silver_quota,
+      goldQuota: row.gold_quota,
+      bronzeUsed: row.bronze_used,
+      silverUsed: row.silver_used,
+      goldUsed: row.gold_used,
+      resetDate: new Date(row.reset_date)
+    };
+  } catch (error) {
+    console.error('Error getting user research quota:', error);
+    return null;
+  }
+}
+
+export async function updateResearchUsage(fid: string, tier: 'bronze' | 'silver' | 'gold'): Promise<void> {
+  const sql = getSql();
+  
+  try {
+    const column = `${tier}_used`;
+    await sql`
+      UPDATE research_subscriptions 
+      SET ${sql(column)} = ${sql(column)} + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE fid = ${fid} AND is_active = true
+    `;
+  } catch (error) {
+    console.error('Error updating research usage:', error);
+    throw error;
   }
 }

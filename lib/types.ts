@@ -143,3 +143,120 @@ export interface PaymentStatusProps {
   paymentId: string;
   onStatusUpdate: (status: string) => void;
 }
+
+// Agent System Types
+export interface AgentContext {
+  question: string;
+  fid: string;
+  questionId?: number;
+  userTier: 'basic' | 'authenticated' | 'medical' | 'scholar' | 'practitioner' | 'institution';
+  metadata?: Record<string, any>;
+}
+
+export interface AgentResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  enrichments?: AgentEnrichment[];
+  cost?: number; // In Claude API tokens or USDC
+}
+
+export interface AgentEnrichment {
+  type: 'research' | 'citation' | 'image_analysis' | 'followup';
+  title: string;
+  content: string;
+  metadata?: Record<string, any>;
+  nftEligible?: boolean;
+  rarityTier?: ResearchRarity;
+}
+
+export interface Agent {
+  name: string;
+  description: string;
+  canHandle(context: AgentContext): boolean;
+  execute(context: AgentContext): Promise<AgentResult>;
+  estimateCost(context: AgentContext): number;
+}
+
+export interface AgentTask {
+  id: string;
+  agentName: string;
+  context: AgentContext;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  result?: AgentResult;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  retryCount: number;
+}
+
+// Research System Types
+export type ResearchRarity = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export interface ResearchQuery {
+  condition: string;
+  bodyParts: string[];
+  treatmentType?: string;
+  studyTypes?: ('rct' | 'cohort' | 'case-control' | 'systematic-review' | 'meta-analysis')[];
+  maxAge?: number; // Papers published within X years
+  minSampleSize?: number;
+}
+
+export interface ResearchPaper {
+  pmid: string;
+  title: string;
+  authors: string[];
+  journal: string;
+  publicationDate: string;
+  abstract: string;
+  citationCount?: number;
+  impactFactor?: number;
+  evidenceLevel: 'I' | 'II' | 'III' | 'IV' | 'V';
+  fullTextAvailable: boolean;
+}
+
+export interface ResearchSynthesis {
+  id: string;
+  query: ResearchQuery;
+  papers: ResearchPaper[];
+  synthesis: string;
+  keyFindings: string[];
+  limitations: string[];
+  clinicalRelevance: string;
+  evidenceStrength: 'strong' | 'moderate' | 'weak' | 'insufficient';
+  generatedAt: Date;
+  mdReviewed: boolean;
+  mdReviewer?: string;
+  mdNotes?: string;
+}
+
+export interface ResearchNFTMetadata {
+  id: string;
+  rarity: ResearchRarity;
+  studyCount: number;
+  publicationYears: string;
+  evidenceLevel: string;
+  specialties: string[];
+  citationCount: number;
+  impactFactor: number;
+  clinicalRelevance: number;
+  timesViewed: number;
+  timesCited: number;
+  mdEndorsements: string[];
+  researchHash: string;
+  createdAt: Date;
+  lastUpdated: Date;
+}
+
+export interface ResearchSubscription {
+  fid: string;
+  tier: 'scholar' | 'practitioner' | 'institution';
+  bronzeQuota: number;
+  silverQuota: number;
+  goldQuota: number;
+  bronzeUsed: number;
+  silverUsed: number;
+  goldUsed: number;
+  resetDate: Date;
+  isActive: boolean;
+}

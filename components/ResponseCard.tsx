@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import PrescriptionGenerator from './PrescriptionGenerator';
 import FeedbackWidget from './FeedbackWidget';
 import MDReviewUpgrade from './MDReviewUpgrade';
-import { PrescriptionData, PrescriptionMetadata } from '@/lib/types';
+import ResearchEnrichment from './ResearchEnrichment';
+import { PrescriptionData, PrescriptionMetadata, AgentEnrichment } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
 
 interface ResponseCardProps {
@@ -26,6 +27,9 @@ interface ResponseCardProps {
   keyPoints?: string[];
   questionId?: string;
   isAuthenticated?: boolean;
+  enrichments?: AgentEnrichment[];
+  hasResearch?: boolean;
+  userTier?: string;
 }
 
 export default function ResponseCard({ 
@@ -46,7 +50,10 @@ export default function ResponseCard({
   inquiry,
   keyPoints,
   questionId,
-  isAuthenticated = false
+  isAuthenticated = false,
+  enrichments = [],
+  hasResearch = false,
+  userTier = 'basic'
 }: ResponseCardProps) {
   const [showConfidence, setShowConfidence] = useState(false);
   const [prescriptionMetadata, setPrescriptionMetadata] = useState<PrescriptionMetadata | null>(null);
@@ -291,6 +298,41 @@ export default function ResponseCard({
         </div>
       )}
       
+      {/* Research Enrichments */}
+      {enrichments && enrichments.length > 0 && (
+        <div className="border-t bg-gray-50">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">📚</span>
+                <h4 className="font-semibold text-gray-800">Research Insights</h4>
+                {hasResearch && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                    {userTier} user
+                  </span>
+                )}
+              </div>
+              {hasResearch && (
+                <p className="text-xs text-gray-600">
+                  Enhanced with AI research synthesis
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              {enrichments.map((enrichment, index) => (
+                <ResearchEnrichment
+                  key={index}
+                  enrichment={enrichment}
+                  questionId={questionId ? parseInt(questionId) : undefined}
+                  fid={fid || 'unknown'}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Medical Disclaimer */}
       {!isFiltered && (
         <div className="px-4 py-3 bg-yellow-50 border-t">

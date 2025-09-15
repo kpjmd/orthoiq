@@ -26,6 +26,9 @@ interface ResponseData {
   inquiry?: string;
   keyPoints?: string[];
   questionId?: number;
+  enrichments?: any[];
+  hasResearch?: boolean;
+  userTier?: string;
 }
 
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
@@ -98,7 +101,10 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         correctionsText: data.correctionsText,
         inquiry: data.inquiry,
         keyPoints: data.keyPoints,
-        questionId: data.questionId
+        questionId: data.questionId,
+        enrichments: data.enrichments || [],
+        hasResearch: data.hasResearch || false,
+        userTier: data.userTier || 'basic'
       });
       
       setQuestion('');
@@ -266,6 +272,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               keyPoints={responseData.keyPoints}
               questionId={responseData.questionId?.toString()}
               isAuthenticated={isAuthenticated}
+              enrichments={responseData.enrichments}
+              hasResearch={responseData.hasResearch}
+              userTier={responseData.userTier}
             />
             
             {/* Action Menu */}

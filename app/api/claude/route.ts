@@ -5,6 +5,12 @@ import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getRespons
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
 import { validateOrthopedicContent, validateRateLimitRequest, sanitizeInput } from '@/lib/security';
+import { agentOrchestrator } from '@/lib/agentOrchestrator';
+import { ResearchSynthesisAgent } from '@/lib/agents/researchSynthesisAgent';
+
+// Register agents on module load
+const researchAgent = new ResearchSynthesisAgent();
+agentOrchestrator.registerAgent(researchAgent);
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -187,6 +193,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Run agent enrichments for eligible users
+    let agentEnrichments: any[] = [];
+    let agentCost = 0;
+    
+    if (questionId && ['authenticated', 'medical', 'scholar', 'practitioner', 'institution'].includes(userTier)) {
+      try {
+        console.log(`[${requestId}] Running agent enrichments for ${userTier} user`);
+        
+        const agentContext = {
+          question: sanitizedQuestion,
+          fid,
+          userTier: userTier,
+          questionId,
+          metadata: { requestId, claudeResponse }
+        };
+
+        // Execute agents (research synthesis will only run for eligible users)
+        const agentResult = await agentOrchestrator.executeAgents(agentContext);
+        
+        if (agentResult.enrichments.length > 0) {
+          agentEnrichments = agentResult.enrichments;
+          agentCost = agentResult.totalCost;
+          console.log(`[${requestId}] Generated ${agentEnrichments.length} enrichments, cost: $${agentCost}`);
+        }
+
+        if (agentResult.errors.length > 0) {
+          console.warn(`[${requestId}] Agent errors:`, agentResult.errors);
+        }
+        
+      } catch (agentError) {
+        console.error(`[${requestId}] Agent enrichment error:`, agentError);
+        // Don't fail the main request if agents fail
+      }
+    }
+
     const duration = Date.now() - startTime;
     metrics.record('claude_api_success', 1);
     metrics.record('claude_api_duration', duration);
@@ -208,7 +249,12 @@ export async function POST(request: NextRequest) {
       correctionsText: reviewStatus.correctionsText,
       inquiry: claudeResponse.inquiry,
       keyPoints: claudeResponse.keyPoints,
-      questionId: questionId
+      questionId: questionId,
+      // Agent enrichments
+      enrichments: agentEnrichments,
+      agentCost: agentCost,
+      hasResearch: agentEnrichments.some(e => e.type === 'research'),
+      userTier: userTier
     });
 
   } catch (error) {
