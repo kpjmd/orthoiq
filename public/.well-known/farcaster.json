@@ -7,10 +7,10 @@
   "miniapp": {
     "version": "1",
     "name": "OrthoIQ - AI Orthopedic Expert",
-    "iconUrl": "https://orthoiq.vercel.app/icon.png",
+    "iconUrl": "https://orthoiq.vercel.app/icon1.png",
     "imageUrl": "https://orthoiq.vercel.app/og-image.png",
     "buttonTitle": "Ask OrthoIQ",
-    "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
+    "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
     "splashBackgroundColor": "#1e3a8a",
     "webhookUrl": "https://orthoiq.vercel.app/api/webhook",
     "homeUrl": "https://orthoiq.vercel.app/miniapp",
