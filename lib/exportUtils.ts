@@ -427,164 +427,329 @@ export function generateNFTMetadata(
   };
 }
 
-// Helper function to detect if we're in a mini app environment
-async function isMiniAppEnvironment(): Promise<boolean> {
-  try {
-    // First check the global flag set by layout.tsx
-    if (window.__ORTHOIQ_MINI_APP__) {
-      console.log('Mini app detected via global flag');
-      return true;
-    }
-    
-    // Try to use Farcaster SDK if available
-    if (window.__FARCASTER_SDK__) {
-      try {
-        const isInMiniApp = await window.__FARCASTER_SDK__.isInMiniApp();
-        console.log('Mini app detected via Farcaster SDK:', isInMiniApp);
-        if (isInMiniApp) return true;
-      } catch (sdkError) {
-        console.warn('Farcaster SDK check failed:', sdkError);
-      }
-    }
-    
-    // Fallback to heuristic detection
-    const userAgent = navigator.userAgent;
-    const referrer = document.referrer;
-    
-    // Check if we're in a frame (common in mini apps)
-    const isInFrame = window !== window.top;
-    
-    // Check for Farcaster-specific indicators
-    const isFarcasterFrame = referrer && (
-      referrer.includes('farcaster.xyz') ||
-      referrer.includes('warpcast.com') ||
-      referrer.includes('client.warpcast.com') ||
-      referrer.includes('miniapps.farcaster.xyz')
-    );
-    
-    // Check URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasMiniAppParam = urlParams.get('miniApp') === 'true';
-    
-    // Check if we're on a mini app path
-    const isMiniAppPath = window.location.pathname.startsWith('/mini') || window.location.pathname.startsWith('/miniapp');
-    
-    const isHeuristicMiniApp = isInFrame && (isFarcasterFrame || hasMiniAppParam || isMiniAppPath);
-    console.log('Mini app heuristic detection:', isHeuristicMiniApp);
-    
-    return isHeuristicMiniApp;
-  } catch (error) {
-    console.warn('Error detecting mini app environment:', error);
-    return false;
-  }
+// Platform detection utilities
+interface PlatformCapabilities {
+  supportsDownload: boolean;
+  supportsWebShare: boolean;
+  supportsClipboard: boolean;
+  isFramed: boolean;
+  platform: 'mini-app' | 'base-app' | 'web' | 'mobile-web';
 }
 
-export async function savePrescriptionAsImage(svgElement: SVGSVGElement, prescriptionId?: string): Promise<void> {
-  const isMiniApp = await isMiniAppEnvironment();
-  console.log('Save Image: Mini app environment detected:', isMiniApp);
+function detectPlatformCapabilities(): PlatformCapabilities {
+  const isInFrame = window !== window.top;
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const hasWebShare = 'share' in navigator && 'canShare' in navigator;
+  const hasClipboard = 'clipboard' in navigator && 'writeText' in navigator.clipboard;
   
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      throw new Error('Cannot create canvas context');
-    }
+  // Check for mini app environment
+  const isMiniApp = window.__ORTHOIQ_MINI_APP__ || 
+    window.location.pathname.startsWith('/mini') || 
+    window.location.pathname.startsWith('/miniapp') ||
+    (isInFrame && document.referrer && (
+      document.referrer.includes('farcaster.xyz') ||
+      document.referrer.includes('warpcast.com') ||
+      document.referrer.includes('miniapps.farcaster.xyz')
+    ));
+  
+  // Check for Base app environment
+  const isBaseApp = window.location.pathname.includes('base') || 
+    document.referrer.includes('base.org') ||
+    window.location.search.includes('base=true');
+  
+  let platform: PlatformCapabilities['platform'];
+  if (isMiniApp) {
+    platform = 'mini-app';
+  } else if (isBaseApp) {
+    platform = 'base-app';
+  } else if (isMobile) {
+    platform = 'mobile-web';
+  } else {
+    platform = 'web';
+  }
+  
+  return {
+    supportsDownload: !isMobile || platform === 'web',
+    supportsWebShare: hasWebShare,
+    supportsClipboard: hasClipboard,
+    isFramed: isInFrame,
+    platform
+  };
+}
 
-    // Fixed dimensions for social media optimization (9:16 ratio)
-    const targetWidth = 1080;
-    const targetHeight = 1920;
-    
-    // Set canvas to fixed social media dimensions
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    
-    // Get SVG actual dimensions
-    const svgRect = svgElement.getBoundingClientRect();
-    
-    // Calculate scaling to fit SVG into target dimensions while maintaining aspect ratio
-    const scaleX = targetWidth / svgRect.width;
-    const scaleY = targetHeight / svgRect.height;
-    const scale = Math.min(scaleX, scaleY, 1); // Don't upscale, only downscale if needed
-    
-    // Calculate centered position
-    const scaledWidth = svgRect.width * scale;
-    const scaledHeight = svgRect.height * scale;
-    const offsetX = (targetWidth - scaledWidth) / 2;
-    const offsetY = (targetHeight - scaledHeight) / 2;
-    
-    console.log('Canvas setup:', { targetWidth, targetHeight, scale, offsetX, offsetY });
-    
-    // Clean SVG data to prevent taint issues
-    let svgData = new XMLSerializer().serializeToString(svgElement);
-    
-    // Ensure all styles are embedded and no external resources
-    svgData = svgData.replace(/href="[^"]*"/g, ''); // Remove external href links
-    svgData = svgData.replace(/<image[^>]*>/g, ''); // Remove external images
-    
-    // Create data URL directly instead of blob to avoid cross-origin issues
-    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgData);
-    
-    // Create image and copy to clipboard
-    const img = new Image();
-    img.crossOrigin = 'anonymous'; // Prevent taint issues
-    
-    return new Promise((resolve, reject) => {
-      img.onload = async () => {
+// Helper function to detect if we're in a mini app environment
+async function isMiniAppEnvironment(): Promise<boolean> {
+  const capabilities = detectPlatformCapabilities();
+  return capabilities.platform === 'mini-app';
+}
+
+// Enhanced image generation with platform-specific strategies
+async function generateImageBlob(svgElement: SVGSVGElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: false });
+      
+      if (!ctx) {
+        throw new Error('Cannot create canvas context');
+      }
+
+      // High-quality dimensions optimized for mobile sharing
+      const targetWidth = 1080;
+      const targetHeight = 1350; // Better aspect ratio for mobile
+      
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      
+      // Get SVG dimensions
+      const svgRect = svgElement.getBoundingClientRect();
+      
+      // Calculate scaling to fit while maintaining aspect ratio
+      const scaleX = (targetWidth * 0.9) / svgRect.width; // 90% to add padding
+      const scaleY = (targetHeight * 0.9) / svgRect.height;
+      const scale = Math.min(scaleX, scaleY);
+      
+      const scaledWidth = svgRect.width * scale;
+      const scaledHeight = svgRect.height * scale;
+      const offsetX = (targetWidth - scaledWidth) / 2;
+      const offsetY = (targetHeight - scaledHeight) / 2;
+      
+      // Clean SVG data and ensure no external dependencies
+      let svgData = new XMLSerializer().serializeToString(svgElement);
+      
+      // Remove all external references that could cause taint
+      svgData = svgData.replace(/href="[^"]*"/g, '');
+      svgData = svgData.replace(/<image[^>]*>/g, '');
+      svgData = svgData.replace(/url\([^)]*\)/g, 'none');
+      
+      // Ensure proper SVG namespace and styling
+      if (!svgData.includes('xmlns="http://www.w3.org/2000/svg"')) {
+        svgData = svgData.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      
+      // Embed fonts inline to prevent external requests
+      svgData = svgData.replace(/font-family:\s*[^;,]+/g, 'font-family: Arial, sans-serif');
+      
+      const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`;
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
         try {
-          // Clear canvas with white background
-          ctx.fillStyle = 'white';
+          // White background
+          ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, targetWidth, targetHeight);
           
-          // Draw image centered and scaled
+          // Draw the prescription
           ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
           
-          // Universal download approach - works in both web and miniapp
-          console.log('Generating image download...');
-          
+          // Convert to blob
           canvas.toBlob((blob) => {
             if (blob) {
-              const downloadUrl = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = downloadUrl;
-              
-              // Generate filename with prescription ID or timestamp
-              const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
-              const identifier = prescriptionId || timestamp;
-              link.download = `OrthoIQ-Prescription-${identifier}.png`;
-              
-              // Trigger download
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(downloadUrl);
-              
-              console.log('Image download triggered successfully');
-              resolve();
+              resolve(blob);
             } else {
-              reject(new Error('Failed to generate image blob for download'));
+              reject(new Error('Failed to generate image blob'));
             }
           }, 'image/png', 0.95);
         } catch (error) {
-          reject(error);
+          reject(new Error(`Canvas drawing failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
         }
       };
       
       img.onerror = () => {
-        reject(new Error('Failed to load SVG image'));
+        reject(new Error('Failed to load SVG image - possible external resource dependencies'));
       };
       
       img.src = dataUrl;
+    } catch (error) {
+      reject(new Error(`Image generation setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+  });
+}
+
+// Platform-specific save strategies
+async function saveViaNativeShare(blob: Blob, filename: string): Promise<void> {
+  if ('share' in navigator) {
+    const file = new File([blob], filename, { type: 'image/png' });
+    
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: 'OrthoIQ Prescription',
+        text: 'My AI-generated medical prescription from OrthoIQ'
+      });
+      return;
+    }
+  }
+  throw new Error('Native sharing not supported');
+}
+
+async function saveViaDownload(blob: Blob, filename: string): Promise<void> {
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function saveViaClipboard(blob: Blob): Promise<void> {
+  if ('clipboard' in navigator && 'write' in navigator.clipboard) {
+    const item = new ClipboardItem({ 'image/png': blob });
+    await navigator.clipboard.write([item]);
+    return;
+  }
+  throw new Error('Clipboard API not supported');
+}
+
+export async function savePrescriptionAsImage(svgElement: SVGSVGElement, prescriptionId?: string): Promise<void> {
+  const capabilities = detectPlatformCapabilities();
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+  const identifier = prescriptionId || timestamp;
+  const filename = `OrthoIQ-Prescription-${identifier}.png`;
+  
+  console.log('Save Image: Platform capabilities:', capabilities);
+  
+  try {
+    // Generate the image blob
+    const blob = await generateImageBlob(svgElement);
+    console.log('Image blob generated successfully, size:', blob.size);
+    
+    // Try different strategies based on platform capabilities
+    const strategies = [];
+    
+    if (capabilities.supportsWebShare) {
+      strategies.push(() => saveViaNativeShare(blob, filename));
+    }
+    
+    if (capabilities.supportsDownload) {
+      strategies.push(() => saveViaDownload(blob, filename));
+    }
+    
+    if (capabilities.supportsClipboard) {
+      strategies.push(() => saveViaClipboard(blob));
+    }
+    
+    // Fallback: Create shareable URL
+    strategies.push(async () => {
+      const url = URL.createObjectURL(blob);
+      if (navigator.share && navigator.canShare({ url })) {
+        await navigator.share({
+          url,
+          title: 'OrthoIQ Prescription',
+          text: 'View my AI-generated medical prescription'
+        });
+      } else {
+        // Last resort: show URL to user
+        const message = `Image generated successfully! Right-click this link and "Save As" to download:\n\n${url}`;
+        if (confirm(message + '\n\nOpen link now?')) {
+          window.open(url, '_blank');
+        }
+      }
+      // Don't revoke URL immediately as user might need it
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     });
+    
+    // Try strategies in order until one succeeds
+    let lastError: Error | null = null;
+    for (const strategy of strategies) {
+      try {
+        await strategy();
+        console.log('Image save strategy succeeded');
+        return;
+      } catch (error) {
+        console.warn('Image save strategy failed:', error);
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        continue;
+      }
+    }
+    
+    // If all strategies failed
+    throw lastError || new Error('All save strategies failed');
+    
   } catch (error) {
     console.error('Error saving prescription as image:', error);
-    throw error;
+    
+    // Provide helpful error messages based on the error type
+    if (error instanceof Error) {
+      if (error.message.includes('external resource')) {
+        throw new Error('Image contains external resources that prevent saving. Please try again or contact support.');
+      } else if (error.message.includes('Canvas')) {
+        throw new Error('Unable to generate image due to browser security restrictions. Try a different browser or device.');
+      } else if (error.message.includes('not supported')) {
+        throw new Error(`Image saving is not supported on this ${capabilities.platform}. Try opening in a regular web browser.`);
+      }
+    }
+    
+    throw new Error(`Failed to save image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 // Backward compatibility alias
 export async function copyPrescriptionAsImage(svgElement: SVGSVGElement): Promise<void> {
   return savePrescriptionAsImage(svgElement);
+}
+
+// NFT-ready utilities for future implementation
+export async function generateNFTReadyImage(svgElement: SVGSVGElement, prescriptionId?: string): Promise<{
+  blob: Blob;
+  metadata: any;
+  filename: string;
+}> {
+  const blob = await generateImageBlob(svgElement);
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+  const identifier = prescriptionId || timestamp;
+  const filename = `OrthoIQ-NFT-${identifier}.png`;
+  
+  // This could be enhanced with actual prescription metadata
+  const metadata = {
+    name: `OrthoIQ Prescription #${identifier}`,
+    description: 'AI-generated orthopedic prescription ready for NFT minting',
+    image: filename,
+    attributes: [
+      { trait_type: "Generation Date", value: new Date().toISOString().split('T')[0] },
+      { trait_type: "Platform", value: "OrthoIQ" },
+      { trait_type: "Type", value: "Medical Prescription" }
+    ]
+  };
+  
+  return { blob, metadata, filename };
+}
+
+// Function to prepare prescription for IPFS upload (future use)
+export async function preparePrescriptionForIPFS(
+  svgElement: SVGSVGElement, 
+  prescriptionData: PrescriptionData,
+  prescriptionMetadata: PrescriptionMetadata
+): Promise<{
+  imageBlob: Blob;
+  metadataJson: string;
+  files: Array<{ name: string; content: Blob | string }>;
+}> {
+  const imageBlob = await generateImageBlob(svgElement);
+  const nftMetadata = generateNFTMetadata(prescriptionData, prescriptionMetadata);
+  const metadataJson = JSON.stringify(nftMetadata, null, 2);
+  
+  const files = [
+    { 
+      name: `prescription-${prescriptionMetadata.id}.png`, 
+      content: imageBlob 
+    },
+    { 
+      name: `metadata-${prescriptionMetadata.id}.json`, 
+      content: metadataJson 
+    }
+  ];
+  
+  return { imageBlob, metadataJson, files };
 }
 
 export async function exportPrescription(

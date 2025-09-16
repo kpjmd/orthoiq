@@ -47,7 +47,7 @@ function generateLogoSVG(width, height, variant = 'blue') {
 // Generate different sized logo files
 const sizes = [
   { name: 'icon.png', width: 512, height: 1024 }, // Favicon/app icon
-  { name: 'splash-image.png', width: 100, height: 200 }, // Splash screen
+  { name: 'splash-image.png', width: 200, height: 200 }, // Splash screen
   { name: 'logo.png', width: 256, height: 512 }, // General use
 ];
 

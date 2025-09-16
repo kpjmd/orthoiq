@@ -15,7 +15,7 @@
     "webhookUrl": "https://orthoiq.vercel.app/api/webhook",
     "homeUrl": "https://orthoiq.vercel.app/miniapp",
     "subtitle": "AI Orthopedic Expert",
-    "description": "Get expert orthopedic advice from AI founded by KPJMD. Premier medical assistant for bone, joint, and muscle questions.",
+    "description": "Get expert AI powered orthopedic advice with responses under MD review. Premier medical assistant for bone, joint, and muscle questions.",
     "tagline": "Premier Medical AI Assistant",
     "tags": [
       "medical",

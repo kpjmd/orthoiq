@@ -260,7 +260,11 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     if (!prescriptionMetadata) {
       console.error('No prescription metadata available for image saving');
       setShareStatus('error');
-      setTimeout(() => setShareStatus('idle'), 3000);
+      setErrorMessage('Prescription not ready for saving. Please wait for generation to complete.');
+      setTimeout(() => {
+        setShareStatus('idle');
+        setErrorMessage('');
+      }, 4000);
       return;
     }
 
@@ -269,36 +273,74 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     if (!svgElement) {
       console.error('No SVG element found for image saving');
       setShareStatus('error');
-      setTimeout(() => setShareStatus('idle'), 3000);
+      setErrorMessage('Unable to find prescription image. Please try refreshing the page.');
+      setTimeout(() => {
+        setShareStatus('idle');
+        setErrorMessage('');
+      }, 4000);
       return;
     }
 
     setIsSharing(true);
     setShareStatus('idle');
+    setErrorMessage('');
 
     try {
       await savePrescriptionAsImage(svgElement, prescriptionMetadata.id);
       
-      // Check if we're in mini app to show appropriate success message
+      // Detect platform for appropriate success message
+      const userAgent = navigator.userAgent;
+      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
       const isMiniApp = window.__ORTHOIQ_MINI_APP__ || 
         window.location.pathname.startsWith('/mini') || 
         window.location.pathname.startsWith('/miniapp');
       
-      setShareStatus(isMiniApp ? 'miniapp_success' : 'success');
-      setErrorMessage('');
-      setTimeout(() => setShareStatus('idle'), 4000);
-    } catch (error) {
-      console.error('Error saving prescription as image:', error);
-      setShareStatus('error');
+      let successMessage = 'Image saved successfully!';
+      if (isMiniApp) {
+        successMessage = 'Image shared successfully!';
+      } else if (isMobile) {
+        successMessage = 'Image ready! Check your device\'s share options or photo gallery.';
+      } else if ('clipboard' in navigator) {
+        successMessage = 'Image downloaded! Also copied to clipboard.';
+      }
       
-      // Set specific error message based on error type
-      const errorMsg = error instanceof Error ? error.message : 'Failed to save image';
-      setErrorMessage(errorMsg);
-      
+      setShareStatus('success');
+      setErrorMessage(successMessage);
       setTimeout(() => {
         setShareStatus('idle');
         setErrorMessage('');
       }, 5000);
+    } catch (error) {
+      console.error('Error saving prescription as image:', error);
+      setShareStatus('error');
+      
+      // Provide user-friendly error messages with helpful suggestions
+      let userErrorMessage = 'Failed to save image. ';
+      
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        
+        if (errorMsg.includes('external resource') || errorMsg.includes('taint')) {
+          userErrorMessage += 'The image contains elements that prevent saving due to browser security. Try the Share Link button instead.';
+        } else if (errorMsg.includes('not supported')) {
+          userErrorMessage += 'Image saving is not supported on your current platform. Use the Share Link button to share your prescription.';
+        } else if (errorMsg.includes('canvas') || errorMsg.includes('security')) {
+          userErrorMessage += 'Browser security settings prevent image saving. Try opening in a different browser or use the Share Link option.';
+        } else if (errorMsg.includes('clipboard')) {
+          userErrorMessage += 'Unable to save to device. Try using the Share Link button instead.';
+        } else {
+          userErrorMessage += `${error.message}. Please try the Share Link button as an alternative.`;
+        }
+      } else {
+        userErrorMessage += 'An unexpected error occurred. Please try the Share Link button instead.';
+      }
+      
+      setErrorMessage(userErrorMessage);
+      
+      setTimeout(() => {
+        setShareStatus('idle');
+        setErrorMessage('');
+      }, 8000); // Longer timeout for detailed error messages
     } finally {
       setIsSharing(false);
     }
@@ -357,19 +399,32 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
 
         {/* Action Buttons */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t rounded-b-xl">
-          <div className="flex justify-center items-center gap-3">
-            {shareStatus === 'success' && (
-              <span className="text-green-600 text-sm">✓ Image downloaded successfully!</span>
-            )}
-            {shareStatus === 'miniapp_success' && (
-              <span className="text-green-600 text-sm">✓ Image saved successfully!</span>
-            )}
-            {shareStatus === 'error' && (
-              <div className="text-center">
-                <span className="text-red-600 text-sm">✗ {errorMessage || 'Save failed'}</span>
-                <p className="text-xs text-gray-500 mt-1">Try using the Share Link button instead</p>
+          {/* Status Messages */}
+          {(shareStatus === 'success' || shareStatus === 'error') && (
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
+              shareStatus === 'success' 
+                ? 'bg-green-50 border border-green-200 text-green-800' 
+                : 'bg-red-50 border border-red-200 text-red-800'
+            }`}>
+              <div className="flex items-start">
+                <span className="mr-2 mt-0.5">
+                  {shareStatus === 'success' ? '✅' : '❌'}
+                </span>
+                <div className="flex-1">
+                  <p className="font-medium">
+                    {shareStatus === 'success' ? 'Success!' : 'Save Failed'}
+                  </p>
+                  {errorMessage && (
+                    <p className="mt-1 text-xs leading-relaxed">
+                      {errorMessage}
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
+          )}
+          
+          <div className="flex justify-center items-center gap-3">
             <button
               onClick={shareToSocial}
               disabled={isSharing || isGenerating || generationError !== null || !prescriptionMetadata}
