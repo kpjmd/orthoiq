@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
-import { checkRateLimit, UserTier, checkIPRateLimit } from '@/lib/rateLimit';
-import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus } from '@/lib/database';
+import { checkRateLimit, UserTier, checkIPRateLimit, checkPlatformRateLimit, Platform, ConsultationMode } from '@/lib/rateLimit';
+import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus, storeConsultation } from '@/lib/database';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
 import { validateOrthopedicContent, validateRateLimitRequest, sanitizeInput } from '@/lib/security';
-import { agentOrchestrator } from '@/lib/agentOrchestrator';
-import { ResearchSynthesisAgent } from '@/lib/agents/researchSynthesisAgent';
+import { localAgentClient } from '@/lib/local-agent-client';
 
-// Register agents on module load
-const researchAgent = new ResearchSynthesisAgent();
-agentOrchestrator.registerAgent(researchAgent);
+// Register consultation agent for multi-specialist coordination
+localAgentClient.registerConsultationAgent().catch(err => {
+  console.warn('Failed to register consultation agent:', err);
+});
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -65,13 +65,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question, fid, authUser, tier } = requestBody;
+    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser } = requestBody;
 
-    if (!question || !fid) {
-      console.warn(`[${requestId}] Missing required fields: question=${!!question}, fid=${!!fid}`);
+    if (!question) {
+      console.warn(`[${requestId}] Missing required field: question`);
       return NextResponse.json(
-        { error: 'Question and FID are required' },
+        { error: 'Question is required' },
         { status: 400 }
+      );
+    }
+
+    // Detect platform: miniapp requires FID, web uses session/IP
+    const detectedPlatform: Platform = platform || (fid && fid !== 'guest' ? 'miniapp' : 'web');
+    // For web users, use webUser.id if available, otherwise fall back to IP
+    const rateLimitIdentifier = detectedPlatform === 'miniapp'
+      ? fid
+      : (webUser?.id || `web:${clientIP}`);
+
+    if (detectedPlatform === 'miniapp' && !fid) {
+      console.warn(`[${requestId}] Mini app requires FID`);
+      return NextResponse.json(
+        { error: 'Authentication required for mini app' },
+        { status: 401 }
       );
     }
 
@@ -110,51 +125,81 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Use tier from request or default to basic
-    const userTier: UserTier = tier || 'basic';
-    console.log(`[${requestId}] Processing question for FID: ${fid}, tier: ${userTier}, length: ${sanitizedQuestion.length}`);
+    // Use tier from request or default to authenticated for miniapp, basic for web
+    const userTier: UserTier = tier || (detectedPlatform === 'miniapp' ? 'authenticated' : 'basic');
+    const consultationMode: ConsultationMode = mode === 'normal' ? 'comprehensive' : 'fast';
 
-    // Check rate limiting with database-backed tier support
+    console.log(`[${requestId}] Processing question - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Tier: ${userTier}, ID: ${rateLimitIdentifier}`);
+
+    // Check platform-aware rate limiting (with email verification for web users)
+    let rateLimitResult;
     try {
-      const rateLimitResult = await checkRateLimitDBWithTiers(fid, userTier);
-        
+      rateLimitResult = await checkPlatformRateLimit(
+        rateLimitIdentifier,
+        detectedPlatform,
+        consultationMode,
+        userTier,
+        isEmailVerified || false // Pass email verification status for web users
+      );
+
       if (!rateLimitResult.allowed) {
-        const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
-        const dailyLimit = tierLimits[userTier];
-        console.warn(`[${requestId}] Rate limit exceeded for FID: ${fid}, tier: ${userTier}`);
-        
-        const tierMessage = userTier === 'basic' 
-          ? 'basic user. Sign in with Farcaster to get 3 questions per day!'
-          : `${userTier} user`;
-          
-        return NextResponse.json(
-          { 
-            error: `Daily limit reached! You can ask ${dailyLimit} question${dailyLimit > 1 ? 's' : ''} per day as a ${tierMessage} Questions reset at midnight UTC. Come back after midnight for more questions! 🦴`,
-            resetTime: rateLimitResult.resetTime,
-            tier: userTier,
-            dailyLimit
-          },
-          { status: 429 }
-        );
+        console.warn(`[${requestId}] Rate limit exceeded - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Verified: ${isEmailVerified}`);
+
+        // Use soft notification instead of hard block
+        // Return with 200 status but include rate limit info in response
+        return NextResponse.json({
+          rateLimited: true,
+          softWarning: rateLimitResult.softWarning,
+          upgradePrompt: rateLimitResult.upgradePrompt,
+          resetTime: rateLimitResult.resetTime,
+          platform: detectedPlatform,
+          mode: consultationMode,
+          remaining: 0,
+          total: rateLimitResult.total,
+          isVerified: rateLimitResult.isVerified
+        });
       }
-      console.log(`[${requestId}] Rate limit check passed for ${userTier} user (${rateLimitResult.remaining} remaining)`);
+      console.log(`[${requestId}] Rate limit check passed - ${rateLimitResult.remaining}/${rateLimitResult.total} remaining`);
     } catch (rateLimitError) {
       console.error(`[${requestId}] Rate limit check failed:`, rateLimitError);
       // Continue with request but log the error
     }
 
-    // Get AI response
+    // Get AI response from OrthoIQ-Agents (primary) with Claude fallback
     let claudeResponse;
     try {
-      console.log(`[${requestId}] Calling Claude API...`);
-      claudeResponse = await getOrthoResponse(sanitizedQuestion);
-      console.log(`[${requestId}] Claude API response received, confidence: ${claudeResponse.confidence}`);
+      const consultationMode = mode === 'normal' ? 'normal' : 'fast'; // Default to fast mode
+      console.log(`[${requestId}] Calling OrthoIQ-Agents in ${consultationMode} mode...`);
+      claudeResponse = await getOrthoResponse(sanitizedQuestion, requestId, {
+        mode: consultationMode,
+        userId: fid,
+        isReturningUser: false, // TODO: Track returning users
+        priorConsultations: [] // TODO: Track consultation history
+      });
+
+      // Ensure response is always a string
+      if (typeof claudeResponse.response !== 'string') {
+        console.log(`[${requestId}] Formatting structured response object`);
+        claudeResponse.response = formatStructuredResponse(claudeResponse.response);
+      }
+
+      console.log(`[${requestId}] Response received, confidence: ${claudeResponse.confidence}, fromAgents: ${claudeResponse.fromAgentsSystem}`);
+
+      // Check for scope validation (out-of-scope queries) - return early
+      if (claudeResponse.isOutOfScope && claudeResponse.scopeValidation) {
+        console.log(`[${requestId}] Returning scope validation response: ${claudeResponse.scopeValidation.category}`);
+        return NextResponse.json({
+          isOutOfScope: true,
+          scopeValidation: claudeResponse.scopeValidation,
+          confidence: claudeResponse.confidence
+        });
+      }
     } catch (claudeError) {
-      console.error(`[${requestId}] Claude API call failed:`, claudeError);
+      console.error(`[${requestId}] AI system call failed:`, claudeError);
       return NextResponse.json(
-        { 
-          error: 'Failed to get AI response', 
-          details: claudeError instanceof Error ? claudeError.message : 'Unknown Claude API error'
+        {
+          error: 'Failed to get AI response',
+          details: claudeError instanceof Error ? claudeError.message : 'Unknown AI system error'
         },
         { status: 503 }
       );
@@ -193,39 +238,186 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Run agent enrichments for eligible users
+    // Extract agent coordination metadata from OrthoIQ-Agents response
     let agentEnrichments: any[] = [];
     let agentCost = 0;
-    
-    if (questionId && ['authenticated', 'medical', 'scholar', 'practitioner', 'institution'].includes(userTier)) {
-      try {
-        console.log(`[${requestId}] Running agent enrichments for ${userTier} user`);
-        
-        const agentContext = {
-          question: sanitizedQuestion,
-          fid,
-          userTier: userTier,
-          questionId,
-          metadata: { requestId, claudeResponse }
+    let agentRouting: any = null;
+    let agentPerformance: any = null;
+    let specialistConsultation: any = null;
+    let agentBadges: any[] = [];
+
+    // Extract metadata from the primary OrthoIQ-Agents consultation
+    if (claudeResponse.fromAgentsSystem) {
+      const executionTime = Date.now() - startTime;
+      console.log(`[${requestId}] Extracting agent coordination metadata from OrthoIQ-Agents response`);
+
+      if (mode === 'fast') {
+        // Fast mode: Single triage agent
+        agentBadges = [{
+          name: 'OrthoTriage Master',
+          type: 'triage',
+          active: true,
+          specialty: 'Triage and Case Coordination'
+        }];
+
+        agentRouting = {
+          selectedAgent: 'orthoiq-agents-triage',
+          routingReason: 'fast_mode_triage',
+          alternativeAgents: [],
+          networkExecuted: true
         };
 
-        // Execute agents (research synthesis will only run for eligible users)
-        const agentResult = await agentOrchestrator.executeAgents(agentContext);
-        
-        if (agentResult.enrichments.length > 0) {
-          agentEnrichments = agentResult.enrichments;
-          agentCost = agentResult.totalCost;
-          console.log(`[${requestId}] Generated ${agentEnrichments.length} enrichments, cost: $${agentCost}`);
+        agentPerformance = {
+          executionTime,
+          successRate: 1.0,
+          averageExecutionTime: executionTime,
+          totalExecutions: 1,
+          specialistCount: 1
+        };
+
+        if (claudeResponse.consultationId) {
+          specialistConsultation = {
+            consultationId: claudeResponse.consultationId,
+            participatingSpecialists: ['triage'],
+            coordinationSummary: 'Fast triage assessment complete. Full consultation processing in background.',
+            specialistCount: 1
+          };
         }
 
-        if (agentResult.errors.length > 0) {
-          console.warn(`[${requestId}] Agent errors:`, agentResult.errors);
+      } else {
+        // Normal mode: Multiple specialists
+        const specialists = claudeResponse.participatingSpecialists || [];
+
+        agentBadges = specialists.map((specialist: string) => ({
+          name: getSpecialistDisplayName(specialist),
+          type: specialist,
+          active: true,
+          specialty: getSpecialtyDescription(specialist)
+        }));
+
+        agentRouting = {
+          selectedAgent: 'orthoiq-consultation',
+          routingReason: 'multi_specialist_consultation',
+          alternativeAgents: [],
+          networkExecuted: true
+        };
+
+        agentPerformance = {
+          executionTime,
+          successRate: 1.0,
+          averageExecutionTime: executionTime,
+          totalExecutions: 1,
+          specialistCount: specialists.length
+        };
+
+        if (claudeResponse.consultationId) {
+          specialistConsultation = {
+            consultationId: claudeResponse.consultationId,
+            participatingSpecialists: specialists,
+            coordinationSummary: `Multi-specialist consultation with ${specialists.length} specialists`,
+            specialistCount: specialists.length
+          };
         }
-        
-      } catch (agentError) {
-        console.error(`[${requestId}] Agent enrichment error:`, agentError);
-        // Don't fail the main request if agents fail
+
+        // Extract individual specialist responses from raw consultation data
+        console.log(`[${requestId}] Checking rawConsultationData:`, {
+          hasRawData: !!claudeResponse.rawConsultationData,
+          hasResponses: !!claudeResponse.rawConsultationData?.responses,
+          responsesLength: claudeResponse.rawConsultationData?.responses?.length,
+          rawDataKeys: claudeResponse.rawConsultationData ? Object.keys(claudeResponse.rawConsultationData) : []
+        });
+
+        if (claudeResponse.rawConsultationData && claudeResponse.rawConsultationData.responses) {
+          console.log(`[${requestId}] Extracting ${claudeResponse.rawConsultationData.responses.length} specialist responses`);
+
+          agentEnrichments = claudeResponse.rawConsultationData.responses.map((resp: any) => {
+            // resp.response contains the specialist object with nested fields
+            const specialist = resp.response || {};
+            const specialistType = specialist.specialistType || resp.specialistType || 'specialist';
+            const specialistName = specialist.specialist || resp.specialist || getSpecialistDisplayName(specialistType);
+
+            // Extract the narrative response text from specialist.response
+            let content = specialist.response || specialist.assessment || '';
+
+            // Handle different content types properly
+            if (typeof content === 'object' && content !== null) {
+              // If it's an object, try to extract meaningful text or stringify
+              if (content.text || content.response || content.assessment) {
+                content = content.text || content.response || content.assessment;
+              } else {
+                // Format as JSON if no text field found
+                try {
+                  content = JSON.stringify(content, null, 2);
+                } catch {
+                  content = '[Complex response object]';
+                }
+              }
+            }
+
+            // Ensure content is now a string
+            if (typeof content !== 'string') {
+              content = String(content);
+            }
+
+            // Clean up any JSON code blocks that may still be present from backend
+            if (typeof content === 'string') {
+              content = content
+                .replace(/```json\s*\n/g, '')
+                .replace(/```\s*$/g, '')
+                .replace(/^```\s*/g, '');
+            }
+
+            // Add recommendations if available (nested in specialist object)
+            const recommendations = specialist.recommendations || resp.recommendations;
+            if (recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
+              content += '\n\n**Recommendations:**\n';
+              recommendations.forEach((rec: any, idx: number) => {
+                const intervention = rec.intervention || rec;
+                const timeline = rec.timeline || '';
+                content += `${idx + 1}. ${intervention}${timeline ? ` - ${timeline}` : ''}\n`;
+              });
+            }
+
+            return {
+              type: 'consultation' as const,
+              title: specialistName,
+              content: content,
+              metadata: {
+                specialist: specialistType,
+                agentType: specialistType,
+                confidence: specialist.confidence || resp.confidence || 0.85,
+                responseTime: specialist.responseTime || resp.responseTime,
+                agreementWithTriage: specialist.agreementWithTriage || resp.agreementWithTriage
+              }
+            };
+          });
+
+          console.log(`[${requestId}] Extracted ${agentEnrichments.length} specialist enrichments`);
+        }
       }
+
+      // Store consultation in database
+      if (questionId && specialistConsultation?.consultationId) {
+        try {
+          await storeConsultation({
+            consultationId: specialistConsultation.consultationId,
+            questionId: questionId,
+            fid: fid,
+            mode: (mode === 'normal' ? 'normal' : 'fast') as 'fast' | 'normal',
+            participatingSpecialists: specialistConsultation.participatingSpecialists,
+            coordinationSummary: specialistConsultation.coordinationSummary,
+            specialistCount: specialistConsultation.specialistCount,
+            totalCost: agentCost,
+            executionTime: executionTime
+          });
+          console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database`);
+        } catch (storeError) {
+          console.error(`[${requestId}] Failed to store consultation:`, storeError);
+          // Don't fail the request if storage fails
+        }
+      }
+
+      console.log(`[${requestId}] Agent metadata extracted: ${agentBadges.length} specialists, mode: ${mode}`);
     }
 
     const duration = Date.now() - startTime;
@@ -235,6 +427,14 @@ export async function POST(request: NextRequest) {
     
     apiLogger.info('Request completed successfully', { requestId, duration, confidence: claudeResponse.confidence });
 
+    // Get current network statistics (placeholder for now)
+    const networkStats = {
+      activeAgents: agentBadges.length,
+      totalCapacity: 5,
+      totalLoad: agentBadges.length,
+      messageQueueSize: 0
+    };
+    
     return NextResponse.json({
       response: claudeResponse.response,
       confidence: claudeResponse.confidence,
@@ -253,8 +453,48 @@ export async function POST(request: NextRequest) {
       // Agent enrichments
       enrichments: agentEnrichments,
       agentCost: agentCost,
-      hasResearch: agentEnrichments.some(e => e.type === 'research'),
-      userTier: userTier
+      hasResearch: agentEnrichments.some(e => e.type === 'research' || e.type === 'consultation'),
+      userTier: userTier,
+      // Specialist consultation data
+      specialistConsultation: specialistConsultation,
+      agentBadges: agentBadges,
+      hasSpecialistConsultation: specialistConsultation !== null,
+      // Raw consultation data for Intelligence Card generation
+      rawConsultationData: claudeResponse.rawConsultationData || (mode === 'fast' && specialistConsultation ? {
+        consultationId: specialistConsultation.consultationId,
+        participatingSpecialists: ['triage'],
+        responses: [{
+          response: {
+            specialistType: 'triage',
+            specialist: 'OrthoTriage Master',
+            confidence: claudeResponse.confidence || 0.85,
+            response: claudeResponse.response
+          }
+        }],
+        synthesizedRecommendations: {
+          confidenceFactors: {
+            overallConfidence: claudeResponse.confidence || 0.85,
+            interAgentAgreement: 0.85
+          }
+        }
+      } : undefined),
+      // Agent coordination fields
+      agentNetwork: {
+        activeAgents: networkStats.activeAgents,
+        totalCapacity: networkStats.totalCapacity,
+        currentLoad: networkStats.totalLoad,
+        networkUtilization: networkStats.totalCapacity > 0
+          ? (networkStats.totalLoad / networkStats.totalCapacity)
+          : 0
+      },
+      agentRouting: agentRouting,
+      agentPerformance: agentPerformance,
+      coordinationMetadata: {
+        networkId: agentRouting?.networkExecuted ? 'consultation' : 'default',
+        messageQueueDepth: networkStats.messageQueueSize,
+        taskId: `${requestId}_${questionId}`,
+        executionMode: agentRouting?.networkExecuted ? 'consultation_coordinated' : 'direct_orchestrator'
+      }
     });
 
   } catch (error) {
@@ -273,6 +513,122 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Helper function to format structured response objects into readable text
+function formatStructuredResponse(obj: any): string {
+  if (typeof obj === 'string') return obj;
+
+  // Handle structured medical response format
+  if (obj && typeof obj === 'object') {
+    const sections = [];
+
+    // ===== OrthoIQ-Agents Specialist Response Format =====
+    // Extract the main response field if present
+    if (obj.response && typeof obj.response === 'string') {
+      sections.push(obj.response);
+    }
+
+    // Format recommendations as clean bulleted list
+    if (obj.recommendations && Array.isArray(obj.recommendations)) {
+      const recommendationsText = obj.recommendations.map((rec: any) => {
+        if (typeof rec === 'string') return `• ${rec}`;
+        if (rec && typeof rec === 'object') {
+          const parts = [];
+
+          // Add intervention name
+          if (rec.intervention) {
+            parts.push(rec.intervention);
+          }
+
+          // Add priority badge
+          if (rec.priority !== undefined) {
+            const priorityLabels = ['Low', 'Medium', 'High', 'Critical'];
+            const priorityLabel = priorityLabels[Math.min(rec.priority, 3)] || `Priority ${rec.priority}`;
+            parts.push(`[${priorityLabel} Priority]`);
+          }
+
+          // Add evidence grade
+          if (rec.evidenceGrade) {
+            parts.push(`(Grade ${rec.evidenceGrade} Evidence)`);
+          }
+
+          // Add timeline if present
+          if (rec.timeline) {
+            parts.push(`Timeline: ${rec.timeline}`);
+          }
+
+          return parts.length > 0 ? `• ${parts.join(' - ')}` : '';
+        }
+        return '';
+      }).filter(Boolean).join('\n');
+
+      if (recommendationsText) {
+        sections.push(`\n**Recommendations:**\n${recommendationsText}`);
+      }
+    }
+
+    // Note: Technical metadata (timestamp, responseTime, agreementWithTriage, status,
+    // specialist, specialistType, confidence) is intentionally NOT displayed here
+
+    // ===== Legacy Medical Response Format =====
+    if (obj.diagnosis) {
+      sections.push(`**Diagnosis:**\n${obj.diagnosis}`);
+    }
+
+    if (obj.immediate_actions) {
+      sections.push(`**Immediate Actions:**\n${obj.immediate_actions}`);
+    }
+
+    if (obj.red_flags) {
+      sections.push(`**Red Flags:**\n${obj.red_flags}`);
+    }
+
+    if (obj.specialist_recommendation) {
+      sections.push(`**Specialist Recommendation:**\n${obj.specialist_recommendation}`);
+    }
+
+    if (obj.followup) {
+      sections.push(`**Follow-up:**\n${obj.followup}`);
+    }
+
+    // If it's a structured object with these fields, format them
+    if (sections.length > 0) {
+      return sections.join('\n\n');
+    }
+
+    // Otherwise, try to stringify it
+    try {
+      return JSON.stringify(obj, null, 2);
+    } catch {
+      return String(obj);
+    }
+  }
+
+  return String(obj);
+}
+
+// Helper functions for specialist display
+function getSpecialistDisplayName(specialist: string): string {
+  const names: { [key: string]: string } = {
+    'triage': 'OrthoTriage Master',
+    'painWhisperer': 'Pain Whisperer',
+    'movementDetective': 'Movement Detective',
+    'strengthSage': 'Strength Sage',
+    'mindMender': 'Mind Mender'
+  };
+  return names[specialist] || specialist;
+}
+
+function getSpecialtyDescription(specialist: string): string {
+  const descriptions: { [key: string]: string } = {
+    'triage': 'Triage and Case Coordination',
+    'painWhisperer': 'Pain Management and Assessment',
+    'movementDetective': 'Biomechanics and Movement Analysis',
+    'strengthSage': 'Functional Restoration and Rehabilitation',
+    'mindMender': 'Psychological Aspects of Recovery'
+  };
+  return descriptions[specialist] || 'Medical Specialist';
 }
 
 // Environment validation helper

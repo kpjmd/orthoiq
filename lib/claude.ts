@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ClaudeResponse } from './types';
+import { ClaudeResponse, CaseData, ConsultationRequest, ConsultationMode } from './types';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -30,10 +30,32 @@ Format your response as JSON with these fields:
 - "inquiry": A concise 10-15 word summary of the user's main question/topic
 - "keyPoints": Array of 3-4 key medical facts or findings as brief bullet points (each 60-80 characters)`;
 
-export async function getOrthoResponse(question: string): Promise<ClaudeResponse> {
+export async function getOrthoResponse(
+  question: string,
+  requestId?: string,
+  options?: {
+    mode?: ConsultationMode;
+    userId?: string;
+    isReturningUser?: boolean;
+    priorConsultations?: string[];
+  }
+): Promise<ClaudeResponse> {
+  // First, try OrthoIQ-Agents system
+  try {
+    const agentsResponse = await tryOrthoIQAgents(question, requestId, options);
+    if (agentsResponse) {
+      console.log(`[${requestId || 'unknown'}] Successfully got response from OrthoIQ-Agents`);
+      return agentsResponse;
+    }
+  } catch (agentsError) {
+    console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents failed, falling back to Claude:`, agentsError);
+  }
+
+  // Fallback to Claude AI
+  console.log(`[${requestId || 'unknown'}] Using Claude AI fallback`);
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
       temperature: 0.3,
       messages: [
@@ -52,7 +74,15 @@ export async function getOrthoResponse(question: string): Promise<ClaudeResponse
     // Try to parse JSON response
     let parsedResponse: ClaudeResponse;
     try {
-      parsedResponse = JSON.parse(content.text);
+      // Clean up potential markdown code block formatting
+      let cleanedText = content.text.trim();
+      if (cleanedText.includes('```json')) {
+        cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      } else if (cleanedText.startsWith('```') && cleanedText.endsWith('```')) {
+        cleanedText = cleanedText.replace(/^```\s*/, '').replace(/```\s*$/, '');
+      }
+      
+      parsedResponse = JSON.parse(cleanedText);
     } catch (parseError) {
       // Fallback if JSON parsing fails
       console.warn('Failed to parse Claude JSON response, using fallback');
@@ -101,7 +131,8 @@ export async function getOrthoResponse(question: string): Promise<ClaudeResponse
       isRelevant: parsedResponse.isRelevant ?? true,
       confidence: parsedResponse.confidence ?? 0.7,
       inquiry: parsedResponse.inquiry,
-      keyPoints: parsedResponse.keyPoints
+      keyPoints: parsedResponse.keyPoints,
+      fromAgentsSystem: false
     };
 
   } catch (error) {
@@ -110,7 +141,8 @@ export async function getOrthoResponse(question: string): Promise<ClaudeResponse
     return {
       response: "I apologize, but I'm unable to process your question at this time due to a technical issue. Please try again later or consult with a healthcare professional for orthopedic concerns.",
       isRelevant: false,
-      confidence: 0.0
+      confidence: 0.0,
+      fromAgentsSystem: false
     };
   }
 }
@@ -141,4 +173,544 @@ export async function filterContent(question: string): Promise<boolean> {
     // Default to allowing the question if filtering fails
     return true;
   }
+}
+
+// OrthoIQ-Agents integration function
+async function tryOrthoIQAgents(
+  question: string,
+  requestId?: string,
+  options?: {
+    mode?: ConsultationMode;
+    userId?: string;
+    isReturningUser?: boolean;
+    priorConsultations?: string[];
+  }
+): Promise<ClaudeResponse | null> {
+  const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+  const mode = options?.mode || 'fast'; // Default to fast mode
+  const AGENTS_TIMEOUT = mode === 'fast' ? 100000 : 120000; // 100s for fast, 120s for normal
+
+  try {
+    // Health check first
+    const healthResponse = await fetch(`${AGENTS_ENDPOINT}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5 second timeout for health check
+    });
+
+    if (!healthResponse.ok) {
+      console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents health check failed: ${healthResponse.status}`);
+      return null;
+    }
+
+    console.log(`[${requestId || 'unknown'}] OrthoIQ-Agents health check passed, making ${mode} mode consultation request`);
+
+    // Extract comprehensive patient information from question
+    const caseData = extractPatientDataFromQuestion(question, options);
+
+    // Build consultation request with dual-track support
+    const consultationRequest: ConsultationRequest = {
+      caseData: {
+        ...caseData,
+        // Dual-track data
+        rawQuery: question, // Original patient input for better context
+        enableDualTrack: true, // Enable dual-track processing
+        ...(options?.userId && { userId: options.userId }),
+        ...(options?.isReturningUser !== undefined && { isReturningUser: options.isReturningUser }),
+        ...(options?.priorConsultations && { priorConsultations: options.priorConsultations }),
+        // Platform context
+        platformContext: {
+          source: 'web_app',
+          version: '1.0.0'
+        }
+      },
+      requiredSpecialists: undefined, // Let OrthoIQ-Agents routing logic decide based on data completeness and confidence
+      mode
+    };
+
+    // Make consultation request
+    const consultationResponse = await fetch(`${AGENTS_ENDPOINT}/consultation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(consultationRequest),
+      signal: AbortSignal.timeout(AGENTS_TIMEOUT)
+    });
+    
+    if (!consultationResponse.ok) {
+      if (consultationResponse.status === 504) {
+        console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents consultation timed out`);
+      } else {
+        console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents consultation failed: ${consultationResponse.status}`);
+      }
+      return null;
+    }
+    
+    const result = await consultationResponse.json();
+
+    console.log(`[${requestId || 'unknown'}] OrthoIQ-Agents raw response keys:`, Object.keys(result));
+    console.log(`[${requestId || 'unknown'}] Response mode:`, result.mode, 'Success:', result.success, 'Requested mode:', mode);
+
+    if (!result.success) {
+      // Check for scope validation response (out-of-scope queries)
+      if (result.scopeValidation) {
+        console.log(`[${requestId || 'unknown'}] OrthoIQ-Agents returned scope validation: ${result.scopeValidation.category}`);
+        return {
+          response: '', // Empty - WebOrthoInterface will use scopeValidation.message
+          isRelevant: false,
+          confidence: result.scopeValidation.confidence || 0.8,
+          fromAgentsSystem: true,
+          isOutOfScope: true,
+          scopeValidation: result.scopeValidation
+        };
+      }
+      // Fall back to Claude for other failures
+      console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents returned unsuccessful result`);
+      return null;
+    }
+
+    // Handle response - OrthoIQ-Agents can return either format:
+    // 1. Direct triage response with mode='fast' and triage object (documented format)
+    // 2. Consultation object (alternative format)
+
+    if (result.mode === 'fast' && result.triage) {
+      console.log(`[${requestId || 'unknown'}] Processing direct fast mode triage response`);
+      return transformFastModeResponse(result, requestId, question);
+    } else if (result.mode === 'normal' && result.consultation) {
+      console.log(`[${requestId || 'unknown'}] Processing direct normal mode consultation response`);
+      return transformNormalModeResponse(result, requestId, question);
+    } else if (result.consultation) {
+      console.log(`[${requestId || 'unknown'}] Processing consultation response (requested mode: ${mode})`);
+      // Transform the consultation based on what we requested
+      if (mode === 'fast') {
+        // For fast mode, extract just the triage specialist
+        return transformFastModeConsultation(result, requestId, question);
+      } else {
+        // For normal mode, use the full consultation
+        return transformNormalModeResponse(result, requestId, question);
+      }
+    } else {
+      console.warn(`[${requestId || 'unknown'}] Unknown response format from OrthoIQ-Agents. Has consultation:`, !!result.consultation, 'Has triage:', !!result.triage);
+      return null;
+    }
+    
+  } catch (error) {
+    const err = error as Error;
+    if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
+      console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents request timed out`);
+    } else {
+      console.warn(`[${requestId || 'unknown'}] OrthoIQ-Agents request failed:`, err.message || 'Unknown error');
+    }
+    return null;
+  }
+}
+
+// Helper function to format structured response objects into readable text
+function formatStructuredResponseContent(obj: any): string {
+  if (typeof obj === 'string') return obj;
+
+  // Backend now returns clean markdown, so just extract the response field if it exists
+  if (obj && typeof obj === 'object' && obj.response && typeof obj.response === 'string') {
+    return obj.response;
+  }
+
+  // Fallback: convert to string
+  return String(obj);
+}
+
+// Extract patient data from question text for agents API
+function extractPatientDataFromQuestion(
+  question: string,
+  options?: {
+    userId?: string;
+    isReturningUser?: boolean;
+    priorConsultations?: string[];
+  }
+): CaseData {
+  // Extract age
+  const ageMatch = question.match(/(\d+)\s*(year|yo|y\.o|yr|years old)/i);
+  const age = ageMatch ? parseInt(ageMatch[1]) : undefined;
+
+  // Extract pain level
+  const painMatch = question.match(/pain.*?(\d+)\s*(?:\/10|out of 10)?|\b(mild|moderate|severe|extreme)\s*pain/i);
+  let painLevel: number | undefined = undefined;
+  if (painMatch) {
+    if (painMatch[1]) {
+      painLevel = parseInt(painMatch[1]);
+    } else if (painMatch[2]) {
+      const painMap: { [key: string]: number } = {
+        'mild': 3, 'moderate': 5, 'severe': 8, 'extreme': 9
+      };
+      painLevel = painMap[painMatch[2].toLowerCase()];
+    }
+  }
+
+  // Determine duration
+  let duration: string | undefined = undefined;
+  if (question.match(/acute|sudden|immediate|today|yesterday/i)) duration = 'acute';
+  else if (question.match(/chronic|months|years|long.?term/i)) duration = 'chronic';
+  else if (question.match(/weeks|sub.?acute/i)) duration = 'sub-acute';
+
+  // Extract location
+  const locationMatch = question.match(/\b(left|right|bilateral)?\s*(knee|shoulder|back|ankle|hip|wrist|elbow|neck|spine|foot|hand)\b/i);
+  const location = locationMatch ? locationMatch[0] : undefined;
+
+  // Detect athlete profile
+  const athleteMatch = question.match(/\b(runner|athlete|marathon|triathlete|cyclist|swimmer|basketball|football|soccer|tennis|golf|baseball)\b/i);
+  const activityMatch = question.match(/(\d+)\s*(miles?|km|hours?)\s*(?:per|\/)\s*week/i);
+
+  const athleteProfile = athleteMatch ? {
+    sport: athleteMatch[1],
+    ...(activityMatch && { weeklyMileage: parseInt(activityMatch[1]) })
+  } : undefined;
+
+  // Detect pain triggers and relievers
+  const triggerMatch = question.match(/(?:worse|triggered|aggravated)\s+(?:by|when|with|during)\s+([^,.]+)/i);
+  const relieverMatch = question.match(/(?:better|relieved|helped)\s+(?:by|when|with)\s+([^,.]+)/i);
+
+  // Detect movement restrictions
+  const restrictionMatch = question.match(/(?:can't|cannot|unable to|difficulty)\s+([^,.]+)/i);
+
+  // Detect psychological factors
+  const anxietyMatch = question.match(/\b(anxious|worried|scared|afraid|stress|anxiety)\b/i);
+  const anxietyLevel = anxietyMatch ? 6 : undefined;
+
+  // Determine functional limitations
+  const functionalLimitations = !!(
+    question.match(/can't walk|unable to work|difficulty sleeping|can't lift|limited range/i)
+  );
+
+  // Determine movement dysfunction
+  const movementDysfunction = !!(
+    question.match(/stiff|restricted|limited range|mobility|movement/i)
+  );
+
+  // Determine psychological factors
+  const psychologicalFactors = !!(anxietyMatch || question.match(/depression|mood|mental health/i));
+
+  // Build case data
+  const caseData: CaseData = {
+    primaryComplaint: question.split('.')[0] || question, // Use first sentence as primary complaint
+    symptoms: question,
+    ...(age && { age }),
+    ...(painLevel && { painLevel }),
+    ...(duration && { duration }),
+    ...(location && { location }),
+    ...(athleteProfile && { athleteProfile }),
+    functionalLimitations,
+    movementDysfunction,
+    ...(anxietyLevel && { anxietyLevel }),
+    psychologicalFactors,
+
+    // Specialist-specific data
+    painData: {
+      ...(location && { location }),
+      ...(painLevel && { quality: painLevel > 7 ? 'severe' : painLevel > 4 ? 'moderate' : 'mild' }),
+      ...(triggerMatch && { triggers: [triggerMatch[1].trim()] }),
+      ...(relieverMatch && { relievers: [relieverMatch[1].trim()] })
+    },
+
+    movementData: {
+      ...(restrictionMatch && { restrictions: [restrictionMatch[1].trim()] }),
+      ...(location && { patterns: [`${location} affected`] })
+    },
+
+    functionalData: {
+      ...(restrictionMatch && { limitations: [restrictionMatch[1].trim()] }),
+      goals: ['Pain reduction', 'Return to normal activities']
+    },
+
+    psychData: {
+      ...(anxietyMatch && { fearAvoidance: true }),
+      ...(anxietyMatch && { copingStrategies: [] })
+    }
+  };
+
+  return caseData;
+}
+
+// Transform Fast Mode consultation (extracts triage from consultation object)
+function transformFastModeConsultation(result: any, requestId?: string, userQuestion?: string): ClaudeResponse {
+  console.log(`[${requestId || 'unknown'}] Transforming fast mode from consultation object`);
+
+  const consultation = result.consultation;
+
+  // Find the triage specialist in the responses
+  let triageResponse = null;
+  if (consultation.responses && Array.isArray(consultation.responses)) {
+    triageResponse = consultation.responses.find((r: any) =>
+      r.response?.specialistType === 'triage' || r.response?.specialist?.toLowerCase().includes('triage')
+    );
+  }
+
+  if (!triageResponse && consultation.synthesizedRecommendations) {
+    // Use synthesized recommendations if no triage found
+    return transformNormalModeResponse(result, requestId, userQuestion);
+  }
+
+  if (!triageResponse) {
+    console.warn(`[${requestId || 'unknown'}] No triage response found in consultation`);
+    return transformNormalModeResponse(result, requestId, userQuestion);
+  }
+
+  const triage = triageResponse.response;
+  let formattedResponse = '';
+
+  // Add urgency if present
+  if (triage.urgencyLevel && (triage.urgencyLevel === 'emergency' || triage.urgencyLevel === 'urgent')) {
+    const urgencyEmoji = triage.urgencyLevel === 'emergency' ? '🚨' : '⚠️';
+    formattedResponse += `${urgencyEmoji} **${triage.urgencyLevel.toUpperCase()}**\n\n`;
+  }
+
+  // Extract response and clean any code blocks
+  if (triage.response) {
+    let responseText = typeof triage.response === 'string' ? triage.response : String(triage.response);
+    // Clean up any JSON code blocks that may still be present
+    responseText = responseText
+      .replace(/```json\s*\n/g, '')
+      .replace(/```\s*$/g, '')
+      .replace(/^```\s*/g, '');
+    formattedResponse += responseText;
+  }
+
+  // Extract key points
+  const keyPoints: string[] = [];
+  if (triage.keyFindings && Array.isArray(triage.keyFindings)) {
+    keyPoints.push(...triage.keyFindings.slice(0, 4).map((f: any) =>
+      typeof f === 'string' ? f : f.finding || ''
+    ).filter(Boolean));
+  }
+
+  // If no key points from findings, extract from response text
+  if (keyPoints.length === 0 && triage.response) {
+    const cleanText = typeof triage.response === 'string' ? triage.response : '';
+    const plainText = cleanText.replace(/\*\*/g, '').replace(/#+/g, '');
+    const sentences = plainText.split(/[.!?]+/).filter((s: string) => s.trim().length > 20);
+    keyPoints.push(...sentences.slice(0, 4).map((s: string) => s.trim()));
+  }
+
+  // Extract inquiry from user question for prescription
+  let inquiry = 'Orthopedic assessment';
+  if (userQuestion) {
+    const cleanQuestion = userQuestion.trim();
+    inquiry = cleanQuestion.length > 60
+      ? cleanQuestion.substring(0, 57).trim() + '...'
+      : cleanQuestion;
+  }
+
+  return {
+    response: formattedResponse,
+    isRelevant: true,
+    confidence: triage.confidence || consultation.triageConfidence || 0.85,
+    inquiry,
+    keyPoints,
+    consultationId: consultation.consultationId,
+    participatingSpecialists: ['triage'],
+    fromAgentsSystem: true,
+    suggestedFollowUp: triage.followUpQuestions || [],
+    triageConfidence: triage.confidence
+  };
+}
+
+// Transform Fast Mode response to ClaudeResponse format (for direct triage responses)
+function transformFastModeResponse(result: any, requestId?: string, userQuestion?: string): ClaudeResponse {
+  console.log(`[${requestId || 'unknown'}] Transforming fast mode triage response`);
+
+  const triage = result.triage;
+
+  // Backend now returns clean markdown in the response field - use it directly
+  let formattedResponse = '';
+
+  // Add urgency level if emergency/urgent
+  if (triage.urgencyLevel === 'emergency' || triage.urgencyLevel === 'urgent') {
+    const urgencyEmoji = triage.urgencyLevel === 'emergency' ? '🚨' : '⚠️';
+    formattedResponse += `${urgencyEmoji} **${triage.urgencyLevel.toUpperCase()}**\n\n`;
+  }
+
+  // Extract response and clean any code blocks
+  if (typeof triage.response === 'string') {
+    // Clean up any JSON code blocks that may still be present
+    const cleanResponse = triage.response
+      .replace(/```json\s*\n/g, '')
+      .replace(/```\s*$/g, '')
+      .replace(/^```\s*/g, '');
+    formattedResponse += cleanResponse;
+  } else {
+    // Fallback for unexpected format
+    console.warn(`[${requestId || 'unknown'}] Unexpected triage response format:`, typeof triage.response);
+    formattedResponse += String(triage.response);
+  }
+
+  // Extract key points from key findings
+  const keyPoints: string[] = [];
+  if (triage.keyFindings && Array.isArray(triage.keyFindings)) {
+    keyPoints.push(...triage.keyFindings.slice(0, 4).map((f: any) =>
+      typeof f === 'string' ? f : f.finding || ''
+    ).filter(Boolean));
+  }
+
+  // If no key points from findings, extract from response markdown
+  if (keyPoints.length === 0 && formattedResponse) {
+    const plainText = formattedResponse.replace(/\*\*/g, '').replace(/#+/g, '').replace(/[🚨⚠️]/g, '');
+    const sentences = plainText.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    keyPoints.push(...sentences.slice(0, 4).map(s => s.trim()));
+  }
+
+  // Extract inquiry from user question for prescription
+  let inquiry = 'Orthopedic assessment';
+  if (userQuestion) {
+    // Use the user's original question as the inquiry
+    const cleanQuestion = userQuestion.trim();
+    inquiry = cleanQuestion.length > 60
+      ? cleanQuestion.substring(0, 57).trim() + '...'
+      : cleanQuestion;
+  }
+
+  return {
+    response: formattedResponse,
+    isRelevant: true,
+    confidence: triage.confidence || 0.85,
+    inquiry,
+    keyPoints,
+    // Agents-specific fields
+    consultationId: result.consultationId,
+    participatingSpecialists: ['triage'],
+    fromAgentsSystem: true,
+    // Fast mode specific
+    suggestedFollowUp: triage.followUpQuestions || [],
+    triageConfidence: triage.confidence
+  };
+}
+
+// Transform Normal Mode response to ClaudeResponse format
+function transformNormalModeResponse(result: any, requestId?: string, userQuestion?: string): ClaudeResponse {
+  console.log(`[${requestId || 'unknown'}] Transforming normal mode consultation with ${result.consultation.responses?.length || 0} specialists`);
+
+  const consultation = result.consultation;
+  let combinedResponse = '';
+
+  // Use synthesized recommendations if available - backend now returns markdown
+  if (consultation.synthesizedRecommendations?.synthesis) {
+    const synthesis = consultation.synthesizedRecommendations.synthesis;
+
+    // Debug logging to check synthesis format
+    console.log(`[${requestId || 'unknown'}] Synthesis type:`, typeof synthesis);
+    console.log(`[${requestId || 'unknown'}] Synthesis preview:`, synthesis.substring ? synthesis.substring(0, 100) : synthesis);
+
+    // Clean any code blocks that may still be present
+    let cleanSynthesis = typeof synthesis === 'string' ? synthesis : String(synthesis);
+    cleanSynthesis = cleanSynthesis
+      .replace(/```json\s*\n/g, '')
+      .replace(/```\s*$/g, '')
+      .replace(/^```\s*/g, '');
+    combinedResponse = cleanSynthesis;
+
+    // Add clinical flags if present
+    if (consultation.synthesizedRecommendations.clinicalFlags?.redFlags?.length > 0) {
+      const flags = consultation.synthesizedRecommendations.clinicalFlags.redFlags;
+      if (flags.some((f: any) => f.severity === 'urgent' || f.severity === 'emergency')) {
+        combinedResponse = '🚨 **URGENT:** ' + combinedResponse;
+      }
+    }
+  } else if (consultation.responses && consultation.responses.length > 0) {
+    // Fallback: combine specialist responses
+    const specialistSections = consultation.responses.map((resp: any) => {
+      const specialist = resp.response;
+      const title = specialist.specialist || 'Specialist';
+      let content = specialist.response || '';
+      // Clean up any JSON code blocks
+      content = content
+        .replace(/```json\s*\n/g, '')
+        .replace(/```\s*$/g, '')
+        .replace(/^```\s*/g, '');
+      return `**${title}:**\n${content}`;
+    });
+    combinedResponse = specialistSections.join('\n\n');
+  }
+
+  // Extract key points from all specialists
+  const keyPoints: string[] = [];
+  if (consultation.responses) {
+    consultation.responses.forEach((resp: any) => {
+      const specialist = resp.response;
+      if (specialist.keyFindings) {
+        keyPoints.push(...specialist.keyFindings.slice(0, 2).map((f: any) =>
+          typeof f === 'string' ? f : f.finding || ''
+        ));
+      }
+    });
+  }
+
+  // Extract follow-up questions
+  let suggestedFollowUp: string[] = [];
+  if (consultation.synthesizedRecommendations?.suggestedFollowUp) {
+    suggestedFollowUp = consultation.synthesizedRecommendations.suggestedFollowUp.map((f: any) =>
+      typeof f === 'string' ? f : f.question || ''
+    );
+  } else {
+    suggestedFollowUp = result.suggestedFollowUp || [];
+  }
+
+  // Extract inquiry from user question for prescription
+  let inquiry = 'Multi-specialist orthopedic consultation';
+  if (userQuestion) {
+    const cleanQuestion = userQuestion.trim();
+    inquiry = cleanQuestion.length > 60
+      ? cleanQuestion.substring(0, 57).trim() + '...'
+      : cleanQuestion;
+  }
+
+  return {
+    response: combinedResponse,
+    isRelevant: true,
+    confidence: result.triageConfidence || 0.9,
+    inquiry,
+    keyPoints: keyPoints.slice(0, 4),
+    // Agents-specific fields
+    dataCompleteness: result.dataCompleteness,
+    suggestedFollowUp,
+    triageConfidence: result.triageConfidence,
+    specialistCoverage: result.specialistCoverage,
+    participatingSpecialists: consultation.participatingSpecialists || [],
+    consultationId: consultation.consultationId,
+    fromAgentsSystem: true,
+    rawConsultationData: consultation // Preserve raw consultation data for specialist extraction
+  };
+}
+
+// Helper function to get specialist display names
+function getSpecialistDisplayName(specialist: string): string {
+  const names: { [key: string]: string } = {
+    'triage': 'Triage Assessment',
+    'pain_whisperer': 'Pain Management',
+    'movement_detective': 'Movement Analysis', 
+    'strength_sage': 'Rehabilitation',
+    'mind_mender': 'Psychological Support'
+  };
+  return names[specialist] || specialist.charAt(0).toUpperCase() + specialist.slice(1);
+}
+
+// Helper function to format response content
+function formatResponseContent(content: any): string {
+  if (typeof content === 'string') return content;
+  
+  if (content && typeof content === 'object') {
+    // Handle structured response objects
+    const sections = [];
+    
+    if (content.assessment) sections.push(content.assessment);
+    if (content.recommendations) sections.push(content.recommendations);
+    if (content.findings) sections.push(content.findings);
+    
+    if (sections.length > 0) return sections.join(' ');
+    
+    // Fallback to JSON stringify
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch {
+      return String(content);
+    }
+  }
+  
+  return String(content);
 }

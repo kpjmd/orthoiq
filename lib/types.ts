@@ -26,6 +26,29 @@ export interface ClaudeResponse {
   confidence: number;
   inquiry?: string;
   keyPoints?: string[];
+  // OrthoIQ-Agents integration fields
+  dataCompleteness?: number;
+  suggestedFollowUp?: string[];
+  triageConfidence?: number;
+  specialistCoverage?: {
+    [specialist: string]: boolean;
+  };
+  participatingSpecialists?: string[];
+  consultationId?: string;
+  fromAgentsSystem?: boolean;
+  rawConsultationData?: any; // Preserve raw consultation data for specialist extraction
+  // Scope validation for out-of-scope queries
+  isOutOfScope?: boolean;
+  scopeValidation?: {
+    category: string;
+    message: {
+      title: string;
+      message: string;
+      suggestion: string;
+    };
+    detectedCondition: string;
+    confidence: number;
+  };
 }
 
 
@@ -39,6 +62,22 @@ export interface PrescriptionData {
   userEmail?: string;
   inquiry?: string;
   keyPoints?: string[];
+  enhancedData?: {
+    primaryDiagnosis?: string;
+    diagnosisConfidence?: number;
+    agentConsensus?: number;
+    topSpecialistInsights?: Array<{
+      specialist: string;
+      keyInsight: string;
+      confidence: number;
+    }>;
+    topRecommendations?: Array<{
+      intervention: string;
+      frequency?: string;
+      provider?: string;
+    }>;
+    evidenceGrade?: string;
+  };
 }
 
 export interface PrescriptionMetadata {
@@ -259,4 +298,330 @@ export interface ResearchSubscription {
   goldUsed: number;
   resetDate: Date;
   isActive: boolean;
+}
+
+// OrthoIQ-Agents Integration Types
+export type ConsultationMode = 'fast' | 'normal';
+
+export interface ConsultationRequest {
+  caseData: CaseData;
+  requiredSpecialists?: SpecialistType[];
+  mode?: ConsultationMode;
+}
+
+export type SpecialistType = 'triage' | 'painWhisperer' | 'movementDetective' | 'strengthSage' | 'mindMender';
+
+export interface CaseData {
+  // Dual-track data
+  rawQuery?: string;
+  enableDualTrack?: boolean;
+  userId?: string;
+  isReturningUser?: boolean;
+  priorConsultations?: string[];
+  requestResearch?: boolean;
+  uploadedImages?: string[];
+
+  // Athlete profile
+  athleteProfile?: {
+    sport?: string;
+    experience?: string;
+    weeklyMileage?: number;
+  };
+
+  // Platform metadata
+  platformContext?: {
+    source?: string;
+    version?: string;
+  };
+
+  // Traditional case data
+  primaryComplaint: string;
+  symptoms?: string;
+  painLevel?: number;
+  duration?: string;
+  location?: string;
+  age?: number;
+
+  // Specialist-specific data
+  painData?: {
+    location?: string;
+    quality?: string;
+    triggers?: string[];
+    relievers?: string[];
+  };
+  movementData?: {
+    restrictions?: string[];
+    patterns?: string[];
+  };
+  functionalData?: {
+    limitations?: string[];
+    goals?: string[];
+  };
+  psychData?: {
+    fearAvoidance?: boolean;
+    copingStrategies?: string[];
+  };
+
+  // Quick flags
+  functionalLimitations?: boolean;
+  movementDysfunction?: boolean;
+  anxietyLevel?: number;
+  psychologicalFactors?: boolean;
+}
+
+export interface SpecialistAssessment {
+  primaryFindings: string[];
+  confidence: number;
+  dataQuality: number;
+  clinicalImportance: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface StructuredRecommendation {
+  intervention: string;
+  priority: number;
+  evidenceGrade: 'A' | 'B' | 'C';
+  contraindications: string[];
+  timeline: string;
+  expectedOutcome: string;
+}
+
+export interface KeyFinding {
+  finding: string;
+  confidence: number;
+  clinicalRelevance: 'low' | 'medium' | 'high';
+  requiresMDReview: boolean;
+}
+
+export interface InterAgentQuestion {
+  targetAgent: string;
+  question: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface SpecialistResponse {
+  specialist: string;
+  specialistType: SpecialistType;
+  assessment: SpecialistAssessment;
+  response: string;
+  recommendations: StructuredRecommendation[];
+  keyFindings: KeyFinding[];
+  questionsForAgents: InterAgentQuestion[];
+  followUpQuestions: string[];
+  agreementWithTriage: 'full' | 'partial' | 'disagree' | 'self';
+  confidence: number;
+  responseTime: number;
+  timestamp: string;
+  status: 'success' | 'failed';
+}
+
+export interface TreatmentPhase {
+  name: string;
+  timeframe: string;
+  goals: string[];
+  interventions: Array<{
+    intervention: string;
+    frequency: string;
+    provider: string;
+  }>;
+  progressMarkers: string[];
+}
+
+export interface ClinicalFlag {
+  flag: string;
+  severity: 'routine' | 'semi-urgent' | 'urgent' | 'emergency';
+  detectedBy: string;
+  recommendedAction: string;
+}
+
+export interface ConfidenceFactors {
+  dataCompleteness: number;
+  interAgentAgreement: number;
+  evidenceQuality: number;
+  overallConfidence: number;
+}
+
+export interface DiagnosisHypothesis {
+  primary: string;
+  differential: string[];
+  confidence: number;
+  agentConsensus: number;
+}
+
+export interface SpecialistInsight {
+  specialist: string;
+  keyInsight: string;
+  confidence: number;
+}
+
+export interface EvidenceBase {
+  recommendationStrength: string;
+  evidenceGrade: string;
+  references: string[];
+}
+
+export interface TrackingMetric {
+  metric: string;
+  baseline: string;
+  target: string;
+  timeframe: string;
+}
+
+export interface PrescriptionDataEnhanced {
+  diagnosisHypothesis: DiagnosisHypothesis;
+  specialistInsights: SpecialistInsight[];
+  evidenceBase: EvidenceBase;
+  trackingMetrics: TrackingMetric[];
+}
+
+export interface SuggestedFollowUp {
+  question: string;
+  purpose: string;
+  expectedImpact: 'low' | 'medium' | 'high';
+  targetedSpecialist: string;
+}
+
+export interface FeedbackPrompts {
+  immediate: {
+    question: string;
+    type: string;
+  };
+  milestones: Array<{
+    day: number;
+    prompt: string;
+    metrics: string[];
+  }>;
+}
+
+export interface SynthesizedRecommendations {
+  synthesis: string;
+  treatmentPlan: {
+    phase1: TreatmentPhase;
+    phase2: TreatmentPhase;
+    phase3: TreatmentPhase;
+  };
+  clinicalFlags: {
+    redFlags: ClinicalFlag[];
+    requiresImmediateMD: boolean;
+    urgencyLevel: string;
+    safeToProceed: boolean;
+  };
+  confidenceFactors: ConfidenceFactors;
+  prescriptionData: PrescriptionDataEnhanced;
+  suggestedFollowUp: SuggestedFollowUp[];
+  feedbackPrompts: FeedbackPrompts;
+}
+
+export interface InterAgentDialogue {
+  fromAgent: string;
+  toAgent: string;
+  question: string;
+  response: string;
+  impactOnDiagnosis: boolean;
+}
+
+export interface Disagreement {
+  topic: string;
+  agents: string[];
+  positions: string[];
+  resolution: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface EmergentFinding {
+  finding: string;
+  discoveredBy: string[];
+  novelty: 'expected' | 'interesting' | 'unusual';
+}
+
+export interface CoordinationMetadata {
+  interAgentDialogue: InterAgentDialogue[];
+  disagreements: Disagreement[];
+  emergentFindings: EmergentFinding[];
+}
+
+export interface NormalModeConsultation {
+  responses: Array<{ response: SpecialistResponse }>;
+  synthesizedRecommendations: SynthesizedRecommendations;
+  coordinationMetadata: CoordinationMetadata;
+  participatingSpecialists: string[];
+  consultationId: string;
+  totalResponseTime: number;
+  timestamp: string;
+}
+
+export interface FastModeTriageResponse {
+  specialist: string;
+  specialistType: 'triage';
+  assessment: SpecialistAssessment;
+  response: string;
+  recommendations: StructuredRecommendation[];
+  keyFindings: KeyFinding[];
+  questionsForAgents: InterAgentQuestion[];
+  followUpQuestions: string[];
+  urgencyLevel: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
+  specialistRecommendations: string[];
+  caseId: string;
+  confidence: number;
+  responseTime: number;
+  timestamp: string;
+  status: 'success';
+}
+
+export interface ConsultationResponseNormal {
+  success: boolean;
+  mode: 'normal';
+  consultation: NormalModeConsultation;
+  dataCompleteness: number;
+  suggestedFollowUp: string[];
+  triageConfidence: number;
+  specialistCoverage: {
+    triage: boolean;
+    painWhisperer: boolean;
+    movementDetective: boolean;
+    strengthSage: boolean;
+    mindMender: boolean;
+  };
+  fromCache: boolean;
+  responseTime: number;
+  timestamp: string;
+}
+
+export interface ConsultationResponseFast {
+  success: boolean;
+  mode: 'fast';
+  triage: FastModeTriageResponse;
+  status: 'processing';
+  message: string;
+  consultationId: string;
+  responseTime: number;
+  timestamp: string;
+}
+
+export type ConsultationResponse = ConsultationResponseNormal | ConsultationResponseFast;
+
+// Feedback System Types
+export interface FeedbackRequest {
+  consultationId: string;
+  patientId: string;
+  feedback: {
+    userSatisfaction: number;
+    outcomeSuccess: boolean;
+    mdReview?: {
+      approved: boolean;
+      reviewerName: string;
+      reviewDate: string;
+      specialistAccuracy: {
+        pain: number;
+        movement: number;
+        strength: number;
+        mind: number;
+      };
+    };
+    followUpDataProvided?: {
+      painReduction: number;
+      functionalImprovement: number;
+      adherenceRate: number;
+      timeToRecovery: number;
+    };
+  };
 }
