@@ -703,7 +703,332 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_research_nfts_mint_status ON research_nfts(mint_status);
     `;
 
-    console.log('Database initialized successfully with Neon (including agent and research tables)');
+    // OrthoIQ-Agents Integration: Consultations table
+    await sql`
+      CREATE TABLE IF NOT EXISTS consultations (
+        id SERIAL PRIMARY KEY,
+        consultation_id VARCHAR(255) UNIQUE NOT NULL,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        fid VARCHAR(255) NOT NULL,
+        mode VARCHAR(20) DEFAULT 'fast' CHECK (mode IN ('fast', 'normal')),
+        participating_specialists JSONB DEFAULT '[]'::jsonb,
+        coordination_summary TEXT,
+        specialist_count INTEGER DEFAULT 0,
+        total_cost DECIMAL(10,4) DEFAULT 0.0000,
+        execution_time INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_consultation_id ON consultations(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_fid ON consultations(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_question_id ON consultations(question_id);
+    `;
+
+    // Add is_private column for tracking page privacy control (Phase 2)
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;
+    `;
+
+    // OrthoIQ-Agents Integration: Consultation feedback table
+    await sql`
+      CREATE TABLE IF NOT EXISTS consultation_feedback (
+        id SERIAL PRIMARY KEY,
+        consultation_id VARCHAR(255) REFERENCES consultations(consultation_id) ON DELETE CASCADE,
+        patient_id VARCHAR(255) NOT NULL,
+        user_satisfaction INTEGER CHECK (user_satisfaction >= 1 AND user_satisfaction <= 10),
+        outcome_success BOOLEAN,
+        md_review_approved BOOLEAN,
+        md_reviewer_name VARCHAR(255),
+        md_review_date DATE,
+        specialist_accuracy JSONB DEFAULT '{}'::jsonb,
+        improvement_notes TEXT,
+        pain_reduction INTEGER,
+        functional_improvement DECIMAL(3,2),
+        adherence_rate DECIMAL(3,2),
+        time_to_recovery INTEGER,
+        completed_phases JSONB DEFAULT '[]'::jsonb,
+        token_rewards JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultation_feedback_consultation_id ON consultation_feedback(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultation_feedback_patient_id ON consultation_feedback(patient_id);
+    `;
+
+    // OrthoIQ-Agents Integration: Feedback milestones table
+    await sql`
+      CREATE TABLE IF NOT EXISTS feedback_milestones (
+        id SERIAL PRIMARY KEY,
+        milestone_id VARCHAR(255) UNIQUE NOT NULL,
+        consultation_id VARCHAR(255) REFERENCES consultations(consultation_id) ON DELETE CASCADE,
+        patient_id VARCHAR(255) NOT NULL,
+        milestone_day INTEGER NOT NULL,
+        pain_level INTEGER CHECK (pain_level >= 0 AND pain_level <= 10),
+        functional_score INTEGER CHECK (functional_score >= 0 AND functional_score <= 100),
+        adherence DECIMAL(3,2) CHECK (adherence >= 0 AND adherence <= 1),
+        completed_interventions JSONB DEFAULT '[]'::jsonb,
+        new_symptoms JSONB DEFAULT '[]'::jsonb,
+        concern_flags JSONB DEFAULT '[]'::jsonb,
+        overall_progress VARCHAR(20) CHECK (overall_progress IN ('improving', 'stable', 'worsening')),
+        satisfaction_so_far INTEGER CHECK (satisfaction_so_far >= 0 AND satisfaction_so_far <= 10),
+        difficulties_encountered JSONB DEFAULT '[]'::jsonb,
+        milestone_achieved BOOLEAN,
+        progress_status VARCHAR(20) CHECK (progress_status IN ('on_track', 'needs_attention', 'concerning')),
+        token_reward INTEGER DEFAULT 0,
+        reassessment_triggered BOOLEAN DEFAULT FALSE,
+        adjusted_recommendations JSONB DEFAULT '[]'::jsonb,
+        next_milestone_day INTEGER,
+        encouragement TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_feedback_milestones_consultation_id ON feedback_milestones(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_feedback_milestones_patient_id ON feedback_milestones(patient_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_feedback_milestones_milestone_day ON feedback_milestones(milestone_day);
+    `;
+
+    // User preferences table for storing consultation mode preferences and user settings
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        fid VARCHAR(255) PRIMARY KEY,
+        preferred_mode VARCHAR(10) DEFAULT 'fast' CHECK (preferred_mode IN ('fast', 'normal')),
+        preferred_platform VARCHAR(10) DEFAULT 'miniapp' CHECK (preferred_platform IN ('miniapp', 'web')),
+        consultation_count INTEGER DEFAULT 0,
+        last_consultation_id VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_preferences_fid ON user_preferences(fid);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_preferences_last_consultation ON user_preferences(last_consultation_id);
+    `;
+
+    // Platform handoff table for web-to-miniapp transitions
+    await sql`
+      CREATE TABLE IF NOT EXISTS platform_handoffs (
+        id SERIAL PRIMARY KEY,
+        handoff_id VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255),
+        fid VARCHAR(255),
+        consultation_id VARCHAR(255),
+        handoff_link TEXT,
+        claimed BOOLEAN DEFAULT FALSE,
+        claimed_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '7 days')
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_platform_handoffs_handoff_id ON platform_handoffs(handoff_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_platform_handoffs_email ON platform_handoffs(email);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_platform_handoffs_consultation_id ON platform_handoffs(consultation_id);
+    `;
+
+    // Phase 3: Admin Dashboard - Add new columns to consultations table
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'standard';
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS consensus_percentage DECIMAL(5,4);
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS total_token_stake DECIMAL(10,2);
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS md_reviewed BOOLEAN DEFAULT false;
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS md_approved BOOLEAN;
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS md_clinical_accuracy INTEGER;
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS md_feedback_notes TEXT;
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS md_reviewed_at TIMESTAMP WITH TIME ZONE;
+    `;
+
+    // Add indexes for performance
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_tier ON consultations(tier);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_md_reviewed ON consultations(md_reviewed);
+    `;
+
+    // Phase 3: High-quality fast consultation flagging for MD review
+    await sql`
+      ALTER TABLE consultations
+      ADD COLUMN IF NOT EXISTS requires_md_review BOOLEAN DEFAULT false;
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_requires_md_review
+      ON consultations(requires_md_review)
+      WHERE requires_md_review = true;
+    `;
+
+    // Phase 3: Create tracking_page_views table for return visit metrics
+    await sql`
+      CREATE TABLE IF NOT EXISTS tracking_page_views (
+        id SERIAL PRIMARY KEY,
+        case_id VARCHAR(255) NOT NULL,
+        consultation_id VARCHAR(255),
+        fid VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_tracking_page_views_case_id ON tracking_page_views(case_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_tracking_page_views_consultation_id ON tracking_page_views(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_tracking_page_views_created_at ON tracking_page_views(created_at);
+    `;
+
+    // Phase 3: Create qr_scans table for engagement metrics
+    await sql`
+      CREATE TABLE IF NOT EXISTS qr_scans (
+        id SERIAL PRIMARY KEY,
+        case_id VARCHAR(255) NOT NULL,
+        consultation_id VARCHAR(255),
+        scanned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_qr_scans_case_id ON qr_scans(case_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_qr_scans_consultation_id ON qr_scans(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_qr_scans_scanned_at ON qr_scans(scanned_at);
+    `;
+
+    // Web Users table for email-authenticated web app users
+    await sql`
+      CREATE TABLE IF NOT EXISTS web_users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email VARCHAR(255) UNIQUE NOT NULL,
+        email_verified BOOLEAN DEFAULT false,
+        verification_token VARCHAR(255),
+        verification_expires_at TIMESTAMP WITH TIME ZONE,
+        daily_question_count INTEGER DEFAULT 0,
+        last_question_date DATE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP WITH TIME ZONE
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_users_verification_token ON web_users(verification_token);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_users_email ON web_users(email);
+    `;
+
+    // Web Sessions table for persistent 90-day sessions (milestone journey support)
+    await sql`
+      CREATE TABLE IF NOT EXISTS web_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_token VARCHAR(255) UNIQUE NOT NULL,
+        web_user_id UUID NOT NULL REFERENCES web_users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_sessions_token ON web_sessions(session_token);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_sessions_user_id ON web_sessions(web_user_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_sessions_expires ON web_sessions(expires_at);
+    `;
+
+    // Extend existing tables with web_user_id for web user support (nullable for backward compat)
+    await sql`
+      ALTER TABLE questions ADD COLUMN IF NOT EXISTS web_user_id UUID REFERENCES web_users(id);
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS web_user_id UUID REFERENCES web_users(id);
+    `;
+
+    await sql`
+      ALTER TABLE feedback_milestones ADD COLUMN IF NOT EXISTS web_user_id UUID REFERENCES web_users(id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_questions_web_user_id ON questions(web_user_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_web_user_id ON consultations(web_user_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_feedback_milestones_web_user_id ON feedback_milestones(web_user_id);
+    `;
+
+    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, and web user auth tables)');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -1517,7 +1842,7 @@ export async function cleanupOldData(daysToKeep: number = 30) {
 
 // Share data functions
 export async function createShare(
-  shareType: 'response' | 'artwork' | 'prescription',
+  shareType: 'response' | 'artwork' | 'prescription' | 'intelligence-card',
   question: string,
   response: string,
   confidence: number = 0.0,
@@ -2875,16 +3200,742 @@ export async function getUserResearchQuota(fid: string): Promise<{
 
 export async function updateResearchUsage(fid: string, tier: 'bronze' | 'silver' | 'gold'): Promise<void> {
   const sql = getSql();
-  
+
   try {
     const column = `${tier}_used`;
     await sql`
-      UPDATE research_subscriptions 
+      UPDATE research_subscriptions
       SET ${sql(column)} = ${sql(column)} + 1, updated_at = CURRENT_TIMESTAMP
       WHERE fid = ${fid} AND is_active = true
     `;
   } catch (error) {
     console.error('Error updating research usage:', error);
     throw error;
+  }
+}
+
+// OrthoIQ-Agents Integration: Store consultation metadata
+export async function storeConsultation(data: {
+  consultationId: string;
+  questionId: number;
+  fid: string;
+  mode: 'fast' | 'normal';
+  participatingSpecialists: string[];
+  coordinationSummary?: string;
+  specialistCount: number;
+  totalCost?: number;
+  executionTime?: number;
+}): Promise<void> {
+  const sql = getSql();
+
+  try {
+    await sql`
+      INSERT INTO consultations (
+        consultation_id, question_id, fid, mode, participating_specialists,
+        coordination_summary, specialist_count, total_cost, execution_time
+      ) VALUES (
+        ${data.consultationId},
+        ${data.questionId},
+        ${data.fid},
+        ${data.mode},
+        ${JSON.stringify(data.participatingSpecialists)},
+        ${data.coordinationSummary || null},
+        ${data.specialistCount},
+        ${data.totalCost || 0},
+        ${data.executionTime || null}
+      )
+    `;
+    console.log(`Stored consultation ${data.consultationId} for question ${data.questionId}`);
+  } catch (error) {
+    console.error('Error storing consultation:', error);
+    throw error;
+  }
+}
+
+// OrthoIQ-Agents Integration: Store consultation feedback
+export async function storeConsultationFeedback(data: {
+  consultationId: string;
+  patientId: string;
+  userSatisfaction?: number;
+  outcomeSuccess?: boolean;
+  mdReviewApproved?: boolean;
+  mdReviewerName?: string;
+  mdReviewDate?: string;
+  specialistAccuracy?: Record<string, number>;
+  improvementNotes?: string;
+  painReduction?: number;
+  functionalImprovement?: number;
+  adherenceRate?: number;
+  timeToRecovery?: number;
+  completedPhases?: string[];
+  tokenRewards?: Array<{agent: string; reward: number; accuracy: number}>;
+}): Promise<number> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      INSERT INTO consultation_feedback (
+        consultation_id, patient_id, user_satisfaction, outcome_success,
+        md_review_approved, md_reviewer_name, md_review_date, specialist_accuracy,
+        improvement_notes, pain_reduction, functional_improvement, adherence_rate,
+        time_to_recovery, completed_phases, token_rewards
+      ) VALUES (
+        ${data.consultationId},
+        ${data.patientId},
+        ${data.userSatisfaction || null},
+        ${data.outcomeSuccess || null},
+        ${data.mdReviewApproved || null},
+        ${data.mdReviewerName || null},
+        ${data.mdReviewDate || null},
+        ${JSON.stringify(data.specialistAccuracy || {})},
+        ${data.improvementNotes || null},
+        ${data.painReduction || null},
+        ${data.functionalImprovement || null},
+        ${data.adherenceRate || null},
+        ${data.timeToRecovery || null},
+        ${JSON.stringify(data.completedPhases || [])},
+        ${JSON.stringify(data.tokenRewards || [])}
+      )
+      RETURNING id
+    `;
+
+    const feedbackId = result[0].id;
+    console.log(`Stored consultation feedback ${feedbackId} for consultation ${data.consultationId}`);
+    return feedbackId;
+  } catch (error) {
+    console.error('Error storing consultation feedback:', error);
+    throw error;
+  }
+}
+
+// OrthoIQ-Agents Integration: Store milestone feedback
+export async function storeMilestoneFeedback(data: {
+  milestoneId: string;
+  consultationId: string;
+  patientId: string;
+  milestoneDay: number;
+  painLevel?: number;
+  functionalScore?: number;
+  adherence?: number;
+  completedInterventions?: string[];
+  newSymptoms?: string[];
+  concernFlags?: string[];
+  overallProgress?: 'improving' | 'stable' | 'worsening';
+  satisfactionSoFar?: number;
+  difficultiesEncountered?: string[];
+  milestoneAchieved?: boolean;
+  progressStatus?: 'on_track' | 'needs_attention' | 'concerning';
+  tokenReward?: number;
+  reassessmentTriggered?: boolean;
+  adjustedRecommendations?: any[];
+  nextMilestoneDay?: number;
+  encouragement?: string;
+}): Promise<number> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      INSERT INTO feedback_milestones (
+        milestone_id, consultation_id, patient_id, milestone_day,
+        pain_level, functional_score, adherence, completed_interventions,
+        new_symptoms, concern_flags, overall_progress, satisfaction_so_far,
+        difficulties_encountered, milestone_achieved, progress_status,
+        token_reward, reassessment_triggered, adjusted_recommendations,
+        next_milestone_day, encouragement
+      ) VALUES (
+        ${data.milestoneId},
+        ${data.consultationId},
+        ${data.patientId},
+        ${data.milestoneDay},
+        ${data.painLevel || null},
+        ${data.functionalScore || null},
+        ${data.adherence || null},
+        ${JSON.stringify(data.completedInterventions || [])},
+        ${JSON.stringify(data.newSymptoms || [])},
+        ${JSON.stringify(data.concernFlags || [])},
+        ${data.overallProgress || null},
+        ${data.satisfactionSoFar || null},
+        ${JSON.stringify(data.difficultiesEncountered || [])},
+        ${data.milestoneAchieved || false},
+        ${data.progressStatus || null},
+        ${data.tokenReward || 0},
+        ${data.reassessmentTriggered || false},
+        ${JSON.stringify(data.adjustedRecommendations || [])},
+        ${data.nextMilestoneDay || null},
+        ${data.encouragement || null}
+      )
+      RETURNING id
+    `;
+
+    const milestoneRecordId = result[0].id;
+    console.log(`Stored milestone feedback ${milestoneRecordId} for consultation ${data.consultationId}`);
+    return milestoneRecordId;
+  } catch (error) {
+    console.error('Error storing milestone feedback:', error);
+    throw error;
+  }
+}
+
+// OrthoIQ-Agents Integration: Get consultation by ID
+export async function getConsultation(consultationId: string): Promise<any | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT * FROM consultations WHERE consultation_id = ${consultationId}
+    `;
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Error getting consultation:', error);
+    return null;
+  }
+}
+
+// OrthoIQ-Agents Integration: Get milestones for a consultation
+export async function getConsultationMilestones(consultationId: string): Promise<any[]> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT * FROM feedback_milestones
+      WHERE consultation_id = ${consultationId}
+      ORDER BY milestone_day ASC
+    `;
+
+    return result;
+  } catch (error) {
+    console.error('Error getting consultation milestones:', error);
+    return [];
+  }
+}
+
+// OrthoIQ-Agents Integration: Update consultation privacy setting
+export async function updateConsultationPrivacy(
+  consultationId: string,
+  isPrivate: boolean
+): Promise<void> {
+  const sql = getSql();
+
+  try {
+    await sql`
+      UPDATE consultations
+      SET is_private = ${isPrivate}
+      WHERE consultation_id = ${consultationId}
+    `;
+    console.log(`Updated consultation ${consultationId} privacy to ${isPrivate}`);
+  } catch (error) {
+    console.error('Error updating consultation privacy:', error);
+    throw error;
+  }
+}
+
+// User Preferences: Get user preferences by FID
+export async function getUserPreferences(fid: string): Promise<any | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT * FROM user_preferences
+      WHERE fid = ${fid}
+      LIMIT 1
+    `;
+
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('Error getting user preferences:', error);
+    return null;
+  }
+}
+
+// User Preferences: Update or create user preferences
+export async function updateUserPreferences(fid: string, preferences: {
+  preferred_mode?: 'fast' | 'normal';
+  preferred_platform?: 'miniapp' | 'web';
+  last_consultation_id?: string;
+}): Promise<void> {
+  const sql = getSql();
+
+  try {
+    const existing = await getUserPreferences(fid);
+
+    if (existing) {
+      // Update existing preferences
+      await sql`
+        UPDATE user_preferences
+        SET
+          preferred_mode = COALESCE(${preferences.preferred_mode || null}, preferred_mode),
+          preferred_platform = COALESCE(${preferences.preferred_platform || null}, preferred_platform),
+          last_consultation_id = COALESCE(${preferences.last_consultation_id || null}, last_consultation_id),
+          consultation_count = consultation_count + ${preferences.last_consultation_id ? 1 : 0},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE fid = ${fid}
+      `;
+    } else {
+      // Create new preferences
+      await sql`
+        INSERT INTO user_preferences (
+          fid, preferred_mode, preferred_platform, last_consultation_id, consultation_count
+        ) VALUES (
+          ${fid},
+          ${preferences.preferred_mode || 'fast'},
+          ${preferences.preferred_platform || 'miniapp'},
+          ${preferences.last_consultation_id || null},
+          ${preferences.last_consultation_id ? 1 : 0}
+        )
+      `;
+    }
+
+    console.log(`Updated user preferences for FID ${fid}`);
+  } catch (error) {
+    console.error('Error updating user preferences:', error);
+    throw error;
+  }
+}
+
+// User Preferences: Get user consultation history
+export async function getUserConsultations(fid: string, limit: number = 10): Promise<any[]> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT
+        c.*,
+        COUNT(fm.id) as milestone_count,
+        MAX(fm.milestone_day) as latest_milestone
+      FROM consultations c
+      LEFT JOIN feedback_milestones fm ON c.consultation_id = fm.consultation_id
+      WHERE c.fid = ${fid}
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+      LIMIT ${limit}
+    `;
+
+    return result;
+  } catch (error) {
+    console.error('Error getting user consultations:', error);
+    return [];
+  }
+}
+
+// Platform Handoff: Create a handoff link for web-to-miniapp transitions
+export async function createPlatformHandoff(data: {
+  email?: string;
+  fid?: string;
+  consultationId?: string;
+}): Promise<string> {
+  const sql = getSql();
+
+  try {
+    const handoffId = `handoff_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    const miniappUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'https://orthoiq.app';
+    const handoffLink = `${miniappUrl}?handoff=${handoffId}${data.consultationId ? `&consultation=${data.consultationId}` : ''}`;
+
+    await sql`
+      INSERT INTO platform_handoffs (
+        handoff_id, email, fid, consultation_id, handoff_link
+      ) VALUES (
+        ${handoffId},
+        ${data.email || null},
+        ${data.fid || null},
+        ${data.consultationId || null},
+        ${handoffLink}
+      )
+    `;
+
+    console.log(`Created platform handoff ${handoffId}`);
+    return handoffLink;
+  } catch (error) {
+    console.error('Error creating platform handoff:', error);
+    throw error;
+  }
+}
+
+// Platform Handoff: Claim a handoff (marks as used)
+export async function claimPlatformHandoff(handoffId: string, fid: string): Promise<any | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      UPDATE platform_handoffs
+      SET
+        claimed = true,
+        claimed_at = CURRENT_TIMESTAMP,
+        fid = ${fid}
+      WHERE handoff_id = ${handoffId}
+        AND claimed = false
+        AND expires_at > CURRENT_TIMESTAMP
+      RETURNING *
+    `;
+
+    if (result.length > 0) {
+      console.log(`Claimed platform handoff ${handoffId} by FID ${fid}`);
+      return result[0];
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error claiming platform handoff:', error);
+    return null;
+  }
+}
+
+// Platform Handoff: Get handoff details
+export async function getPlatformHandoff(handoffId: string): Promise<any | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT * FROM platform_handoffs
+      WHERE handoff_id = ${handoffId}
+        AND expires_at > CURRENT_TIMESTAMP
+      LIMIT 1
+    `;
+
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('Error getting platform handoff:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Web User Authentication Functions
+// ============================================
+
+export interface WebUser {
+  id: string;
+  email: string;
+  email_verified: boolean;
+  verification_token: string | null;
+  verification_expires_at: Date | null;
+  daily_question_count: number;
+  last_question_date: Date | null;
+  created_at: Date;
+  last_login: Date | null;
+}
+
+export interface WebSession {
+  id: string;
+  session_token: string;
+  web_user_id: string;
+  expires_at: Date;
+  created_at: Date;
+  last_active: Date;
+}
+
+// Create a new web user with email
+export async function createWebUser(email: string): Promise<WebUser | null> {
+  const sql = getSql();
+
+  try {
+    const verificationToken = `verify_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    const result = await sql`
+      INSERT INTO web_users (email, verification_token, verification_expires_at)
+      VALUES (${email}, ${verificationToken}, ${expiresAt})
+      ON CONFLICT (email) DO UPDATE SET
+        verification_token = ${verificationToken},
+        verification_expires_at = ${expiresAt}
+      RETURNING *
+    `;
+
+    console.log(`Created/updated web user for email: ${email}`);
+    return result[0] as WebUser;
+  } catch (error) {
+    console.error('Error creating web user:', error);
+    return null;
+  }
+}
+
+// Get web user by email
+export async function getWebUserByEmail(email: string): Promise<WebUser | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT * FROM web_users WHERE email = ${email} LIMIT 1
+    `;
+
+    return result.length > 0 ? (result[0] as WebUser) : null;
+  } catch (error) {
+    console.error('Error getting web user by email:', error);
+    return null;
+  }
+}
+
+// Get web user by ID
+export async function getWebUserById(id: string): Promise<WebUser | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT * FROM web_users WHERE id = ${id} LIMIT 1
+    `;
+
+    return result.length > 0 ? (result[0] as WebUser) : null;
+  } catch (error) {
+    console.error('Error getting web user by ID:', error);
+    return null;
+  }
+}
+
+// Verify web user by token (magic link verification)
+export async function verifyWebUser(token: string): Promise<WebUser | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      UPDATE web_users
+      SET
+        email_verified = true,
+        verification_token = NULL,
+        verification_expires_at = NULL,
+        last_login = CURRENT_TIMESTAMP
+      WHERE verification_token = ${token}
+        AND verification_expires_at > CURRENT_TIMESTAMP
+        AND email_verified = false
+      RETURNING *
+    `;
+
+    if (result.length > 0) {
+      console.log(`Verified web user: ${result[0].email}`);
+      return result[0] as WebUser;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error verifying web user:', error);
+    return null;
+  }
+}
+
+// Update web user last login
+export async function updateWebUserLogin(id: string): Promise<void> {
+  const sql = getSql();
+
+  try {
+    await sql`
+      UPDATE web_users
+      SET last_login = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+    `;
+  } catch (error) {
+    console.error('Error updating web user login:', error);
+  }
+}
+
+// Increment daily question count for web user
+export async function incrementDailyQuestionCount(id: string): Promise<{ count: number; isNewDay: boolean }> {
+  const sql = getSql();
+
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Check if it's a new day
+    const user = await getWebUserById(id);
+    const lastDate = user?.last_question_date ? new Date(user.last_question_date).toISOString().split('T')[0] : null;
+    const isNewDay = lastDate !== today;
+
+    if (isNewDay) {
+      // Reset count for new day
+      await sql`
+        UPDATE web_users
+        SET daily_question_count = 1, last_question_date = ${today}
+        WHERE id = ${id}
+      `;
+      return { count: 1, isNewDay: true };
+    } else {
+      // Increment existing count
+      const result = await sql`
+        UPDATE web_users
+        SET daily_question_count = daily_question_count + 1
+        WHERE id = ${id}
+        RETURNING daily_question_count
+      `;
+      return { count: result[0]?.daily_question_count || 1, isNewDay: false };
+    }
+  } catch (error) {
+    console.error('Error incrementing daily question count:', error);
+    return { count: 0, isNewDay: false };
+  }
+}
+
+// Reset daily question counts (called by cron job)
+export async function resetDailyQuestionCounts(): Promise<number> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      UPDATE web_users
+      SET daily_question_count = 0
+      WHERE last_question_date < CURRENT_DATE
+      RETURNING id
+    `;
+
+    console.log(`Reset daily question counts for ${result.length} users`);
+    return result.length;
+  } catch (error) {
+    console.error('Error resetting daily question counts:', error);
+    return 0;
+  }
+}
+
+// ============================================
+// Web Session Management Functions
+// ============================================
+
+// Create a new web session (90 days for milestone journey)
+export async function createWebSession(webUserId: string): Promise<WebSession | null> {
+  const sql = getSql();
+
+  try {
+    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${Math.random().toString(36).substring(2, 15)}`;
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
+
+    const result = await sql`
+      INSERT INTO web_sessions (session_token, web_user_id, expires_at)
+      VALUES (${sessionToken}, ${webUserId}, ${expiresAt})
+      RETURNING *
+    `;
+
+    console.log(`Created web session for user: ${webUserId}`);
+    return result[0] as WebSession;
+  } catch (error) {
+    console.error('Error creating web session:', error);
+    return null;
+  }
+}
+
+// Get web session by token
+export async function getWebSessionByToken(token: string): Promise<(WebSession & { user: WebUser }) | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT
+        ws.*,
+        wu.id as user_id,
+        wu.email as user_email,
+        wu.email_verified as user_email_verified,
+        wu.daily_question_count as user_daily_question_count,
+        wu.last_question_date as user_last_question_date,
+        wu.created_at as user_created_at,
+        wu.last_login as user_last_login
+      FROM web_sessions ws
+      JOIN web_users wu ON ws.web_user_id = wu.id
+      WHERE ws.session_token = ${token}
+        AND ws.expires_at > CURRENT_TIMESTAMP
+      LIMIT 1
+    `;
+
+    if (result.length === 0) return null;
+
+    const row = result[0];
+    return {
+      id: row.id,
+      session_token: row.session_token,
+      web_user_id: row.web_user_id,
+      expires_at: row.expires_at,
+      created_at: row.created_at,
+      last_active: row.last_active,
+      user: {
+        id: row.user_id,
+        email: row.user_email,
+        email_verified: row.user_email_verified,
+        verification_token: null,
+        verification_expires_at: null,
+        daily_question_count: row.user_daily_question_count,
+        last_question_date: row.user_last_question_date,
+        created_at: row.user_created_at,
+        last_login: row.user_last_login
+      }
+    };
+  } catch (error) {
+    console.error('Error getting web session by token:', error);
+    return null;
+  }
+}
+
+// Update session last active timestamp
+export async function updateSessionActivity(sessionId: string): Promise<void> {
+  const sql = getSql();
+
+  try {
+    await sql`
+      UPDATE web_sessions
+      SET last_active = CURRENT_TIMESTAMP
+      WHERE id = ${sessionId}
+    `;
+  } catch (error) {
+    console.error('Error updating session activity:', error);
+  }
+}
+
+// Delete expired sessions (called by cron job)
+export async function deleteExpiredSessions(): Promise<number> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      DELETE FROM web_sessions
+      WHERE expires_at < CURRENT_TIMESTAMP
+      RETURNING id
+    `;
+
+    console.log(`Deleted ${result.length} expired sessions`);
+    return result.length;
+  } catch (error) {
+    console.error('Error deleting expired sessions:', error);
+    return 0;
+  }
+}
+
+// Delete all sessions for a user (logout from all devices)
+export async function deleteUserSessions(webUserId: string): Promise<number> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      DELETE FROM web_sessions
+      WHERE web_user_id = ${webUserId}
+      RETURNING id
+    `;
+
+    console.log(`Deleted ${result.length} sessions for user: ${webUserId}`);
+    return result.length;
+  } catch (error) {
+    console.error('Error deleting user sessions:', error);
+    return 0;
+  }
+}
+
+// Get web user's question count for rate limiting
+export async function getWebUserQuestionStatus(id: string): Promise<{ count: number; limit: number; remaining: number; isVerified: boolean }> {
+  const sql = getSql();
+
+  try {
+    const user = await getWebUserById(id);
+    if (!user) {
+      return { count: 0, limit: 1, remaining: 1, isVerified: false };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const lastDate = user.last_question_date ? new Date(user.last_question_date).toISOString().split('T')[0] : null;
+
+    // Reset count if it's a new day
+    const count = lastDate === today ? user.daily_question_count : 0;
+    const limit = user.email_verified ? 10 : 1; // Verified: 10/day, Unverified: 1/day
+    const remaining = Math.max(0, limit - count);
+
+    return { count, limit, remaining, isVerified: user.email_verified };
+  } catch (error) {
+    console.error('Error getting web user question status:', error);
+    return { count: 0, limit: 1, remaining: 1, isVerified: false };
   }
 }
