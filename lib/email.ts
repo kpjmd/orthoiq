@@ -1,7 +1,17 @@
 import { Resend } from 'resend';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialize Resend client to avoid build errors when API key is missing
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resendClient) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY environment variable is not set');
+    }
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 // Email configuration
 const FROM_EMAIL = process.env.FROM_EMAIL || 'OrthoIQ <onboarding@resend.dev>';
@@ -27,7 +37,7 @@ export async function sendMagicLinkEmail(
   const magicLink = `${APP_URL}/auth/verify?token=${token}`;
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: 'Sign in to OrthoIQ',
@@ -116,7 +126,7 @@ The OrthoIQ Team
  */
 export async function sendWelcomeEmail(email: string): Promise<EmailResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: 'Welcome to OrthoIQ - Your Recovery Journey Begins',
@@ -219,7 +229,7 @@ export async function sendMilestoneEmail(
   const milestoneType = milestoneDay === 14 ? 'pain level' : milestoneDay === 28 ? 'functional progress' : 'movement quality';
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: `Week ${weekNumber} Check-in: How is your recovery?`,
@@ -323,7 +333,7 @@ export async function sendRateLimitWarningEmail(
   limit: number
 ): Promise<EmailResult> {
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: 'OrthoIQ: Daily Question Limit Reached',
