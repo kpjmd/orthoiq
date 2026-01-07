@@ -13,9 +13,10 @@ interface PrescriptionModalProps {
   fid: string;
   inquiry?: string;
   keyPoints?: string[];
+  rawConsultationData?: any;
 }
 
-export default function PrescriptionModal({ isOpen, onClose, question, response, fid, inquiry, keyPoints }: PrescriptionModalProps) {
+export default function PrescriptionModal({ isOpen, onClose, question, response, fid, inquiry, keyPoints, rawConsultationData }: PrescriptionModalProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error' | 'miniapp_success'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -43,7 +44,23 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
     if (!stableCaseId.current) {
       stableCaseId.current = `modal-${Date.now()}`;
     }
-    
+
+    // Extract curated prescription data from comprehensive mode consultation
+    let enhancedData: any = undefined;
+    if (rawConsultationData?.synthesizedRecommendations?.prescriptionData) {
+      const prescData = rawConsultationData.synthesizedRecommendations.prescriptionData;
+      const synthRec = rawConsultationData.synthesizedRecommendations;
+
+      enhancedData = {
+        primaryDiagnosis: prescData.diagnosisHypothesis?.primary,
+        diagnosisConfidence: prescData.diagnosisHypothesis?.confidence,
+        agentConsensus: prescData.diagnosisHypothesis?.agentConsensus,
+        topSpecialistInsights: prescData.specialistInsights?.slice(0, 2) || [],
+        topRecommendations: synthRec.treatmentPlan?.phase1?.interventions?.slice(0, 2) || [],
+        evidenceGrade: prescData.evidenceBase?.evidenceGrade
+      };
+    }
+
     return {
       userQuestion: question,
       claudeResponse: response,
@@ -52,9 +69,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       caseId: stableCaseId.current,
       timestamp: stableTimestamp.current,
       inquiry: inquiry,
-      keyPoints: keyPoints
+      keyPoints: keyPoints,
+      enhancedData: enhancedData
     };
-  }, [question, response, fid, inquiry, keyPoints]);
+  }, [question, response, fid, inquiry, keyPoints, rawConsultationData]);
 
   // Callback to receive metadata from PrescriptionGenerator
   const handleMetadataGenerated = useCallback((metadata: PrescriptionMetadata) => {
@@ -291,8 +309,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       // Detect platform for appropriate success message
       const userAgent = navigator.userAgent;
       const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-      const isMiniApp = window.__ORTHOIQ_MINI_APP__ || 
-        window.location.pathname.startsWith('/mini') || 
+      const isMiniApp = window.__ORTHOIQ_MINI_APP__ ||
         window.location.pathname.startsWith('/miniapp');
       
       let successMessage = 'Image saved successfully!';

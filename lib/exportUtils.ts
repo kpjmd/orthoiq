@@ -1,4 +1,5 @@
 import { PrescriptionData, PrescriptionMetadata } from './types';
+import { IntelligenceCardData, getTierConfig, generateIntelligenceCardNFTMetadata } from './intelligenceCardUtils';
 
 export interface ExportOptions {
   format: 'png' | 'svg' | 'instagram' | 'linkedin' | 'twitter' | 'farcaster';
@@ -443,8 +444,7 @@ function detectPlatformCapabilities(): PlatformCapabilities {
   const hasClipboard = 'clipboard' in navigator && 'writeText' in navigator.clipboard;
   
   // Check for mini app environment
-  const isMiniApp = window.__ORTHOIQ_MINI_APP__ || 
-    window.location.pathname.startsWith('/mini') || 
+  const isMiniApp = window.__ORTHOIQ_MINI_APP__ ||
     window.location.pathname.startsWith('/miniapp') ||
     (isInFrame && document.referrer && (
       document.referrer.includes('farcaster.xyz') ||
@@ -814,4 +814,46 @@ export async function exportPrescription(
     default:
       throw new Error(`Unsupported export format: ${options.format}`);
   }
+}
+
+// Intelligence Card Export Functions
+export interface IntelligenceCardExportOptions {
+  format: 'png' | 'svg';
+  quality?: number;
+}
+
+export async function exportIntelligenceCard(
+  svgElement: SVGSVGElement,
+  cardData: IntelligenceCardData,
+  options: IntelligenceCardExportOptions
+): Promise<void> {
+  const tierConfig = getTierConfig(cardData.tier);
+  const filename = `orthoiq-intelligence-card-${cardData.caseId}`;
+
+  switch (options.format) {
+    case 'png':
+      await downloadAsPNG(svgElement, filename, options.quality || 1);
+      break;
+
+    case 'svg':
+      await downloadAsSVG(svgElement, filename);
+      break;
+
+    default:
+      throw new Error(`Unsupported export format: ${options.format}`);
+  }
+}
+
+export function generateIntelligenceCardShareText(cardData: IntelligenceCardData): string {
+  const tierConfig = getTierConfig(cardData.tier);
+
+  return `🧠 OrthoIQ Intelligence Card
+
+📊 ${cardData.participatingCount} AI Specialists • ${cardData.consensusPercentage}% Consensus
+💰 ${cardData.totalStake.toFixed(1)} tokens staked
+🎯 ${tierConfig.label} Tier
+
+${cardData.primaryPrediction.text}
+
+Track predictions: orthoiq.app/track/${cardData.caseId}`;
 }

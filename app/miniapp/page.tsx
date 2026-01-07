@@ -53,6 +53,43 @@ interface ResponseData {
   correctionsText?: string;
   inquiry?: string;
   keyPoints?: string[];
+  questionId?: number;
+  enrichments?: any[];
+  hasResearch?: boolean;
+  userTier?: string;
+  // Agent coordination fields
+  specialistConsultation?: {
+    consultationId: string;
+    participatingSpecialists: string[];
+    coordinationSummary: string;
+    specialistCount: number;
+  };
+  agentBadges?: Array<{
+    name: string;
+    type: string;
+    active: boolean;
+    specialty: string;
+  }>;
+  hasSpecialistConsultation?: boolean;
+  agentRouting?: {
+    selectedAgent: string;
+    routingReason: string;
+    alternativeAgents: string[];
+    networkExecuted: boolean;
+  };
+  agentPerformance?: {
+    executionTime: number;
+    successRate: number;
+    averageExecutionTime: number;
+    totalExecutions: number;
+    specialistCount: number;
+  };
+  agentNetwork?: {
+    activeAgents: number;
+    totalCapacity: number;
+    currentLoad: number;
+    networkUtilization: number;
+  };
 }
 
 function MiniAppContent() {
@@ -66,6 +103,9 @@ function MiniAppContent() {
   const [error, setError] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number; resetTime?: Date; tier?: UserTier} | null>(null);
+  const [consultationMode, setConsultationMode] = useState<'fast' | 'normal'>('fast');
+  const [userPreferences, setUserPreferences] = useState<any>(null);
+  const [isReturningUser, setIsReturningUser] = useState(false);
 
   const getUserTier = useCallback((): UserTier => {
     // Prioritize authUser from Quick Auth
@@ -188,10 +228,13 @@ function MiniAppContent() {
         // Signal that the app is ready
         ensureReady();
         
-        // Load rate limit info - always use Farcaster FID
+        // Load rate limit info and user preferences - always use Farcaster FID
         if (context?.user?.fid) {
-          console.log('MiniApp: Loading rate limit status for FID:', context.user.fid);
-          await loadRateLimitStatus(context.user.fid.toString(), getUserTier());
+          console.log('MiniApp: Loading rate limit status and preferences for FID:', context.user.fid);
+          await Promise.all([
+            loadRateLimitStatus(context.user.fid.toString(), getUserTier()),
+            loadUserPreferences(context.user.fid.toString())
+          ]);
         }
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
@@ -226,10 +269,12 @@ function MiniAppContent() {
     };
   }, [getUserTier, authUser]);
 
-  // Update rate limit info when authentication status changes
+  // Update rate limit info and preferences when authentication status changes
   useEffect(() => {
     if (isSDKLoaded && context?.user?.fid) {
-      loadRateLimitStatus(context.user.fid.toString(), getUserTier());
+      const fid = context.user.fid.toString();
+      loadRateLimitStatus(fid, getUserTier());
+      loadUserPreferences(fid);
     }
   }, [isAuthenticated, authUser, context, getUserTier, isSDKLoaded]);
 
@@ -250,12 +295,52 @@ function MiniAppContent() {
     }
   };
 
+  const loadUserPreferences = async (fid: string) => {
+    try {
+      const res = await fetch(`/api/user/preferences?fid=${fid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserPreferences(data);
+
+        // Set consultation mode from preferences
+        if (data.preferred_mode) {
+          setConsultationMode(data.preferred_mode);
+        }
+
+        // Check if returning user
+        setIsReturningUser(!data.is_new_user && data.consultation_count > 0);
+
+        console.log('MiniApp: Loaded user preferences:', data);
+      }
+    } catch (err) {
+      console.warn('Failed to load user preferences:', err);
+    }
+  };
+
+  const saveUserPreference = async (fid: string, preferredMode: 'fast' | 'normal') => {
+    try {
+      await fetch('/api/user/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid, preferred_mode: preferredMode })
+      });
+      console.log('MiniApp: Saved user preference:', preferredMode);
+    } catch (err) {
+      console.warn('Failed to save user preference:', err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
-    
-    // Use Farcaster FID if available, otherwise use guest
-    const fid = context?.user?.fid || 'guest';
+
+    // Mini app requires Farcaster authentication - no guest mode
+    const fid = context?.user?.fid;
+
+    if (!fid) {
+      setError('Authentication required. Please refresh the app and try again.');
+      return;
+    }
 
     setIsLoading(true);
     setError('');
@@ -263,10 +348,14 @@ function MiniAppContent() {
     setCurrentQuestion(question.trim());
 
     try {
+      // Create AbortController with 120 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
       const res = await fetch('/api/claude', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           question: question.trim(),
           fid: typeof fid === 'number' ? fid.toString() : fid,
           authUser: authUser ? {
@@ -275,9 +364,13 @@ function MiniAppContent() {
             displayName: authUser.displayName,
             tier: getUserTier()
           } : null,
-          tier: getUserTier()
+          tier: getUserTier(),
+          mode: consultationMode
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const contentType = res.headers.get('content-type');
       
@@ -314,7 +407,18 @@ function MiniAppContent() {
         additionsText: data.additionsText,
         correctionsText: data.correctionsText,
         inquiry: data.inquiry,
-        keyPoints: data.keyPoints
+        keyPoints: data.keyPoints,
+        questionId: data.questionId,
+        enrichments: data.enrichments || [],
+        hasResearch: data.hasResearch || false,
+        userTier: data.userTier || 'basic',
+        // Agent coordination data
+        specialistConsultation: data.specialistConsultation,
+        agentBadges: data.agentBadges || [],
+        hasSpecialistConsultation: data.hasSpecialistConsultation || false,
+        agentRouting: data.agentRouting,
+        agentPerformance: data.agentPerformance,
+        agentNetwork: data.agentNetwork
       });
       
       setQuestion('');
@@ -338,15 +442,16 @@ function MiniAppContent() {
 
   const handleRate = async (rating: number) => {
     if (!currentQuestion) return;
-    
-    const fid = context?.user?.fid || 'guest';
+
+    const fid = context?.user?.fid;
+    if (!fid) return; // Skip rating if not authenticated
 
     try {
       await fetch('/api/rate-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fid: typeof fid === 'number' ? fid.toString() : fid,
+          fid: fid.toString(),
           question: currentQuestion,
           rating
         })
@@ -358,8 +463,7 @@ function MiniAppContent() {
 
 
   const getRemainingQuestions = () => {
-    // If no Farcaster context, allow unlimited questions (guest mode)
-    if (!context?.user?.fid) return 5; // Default guest allowance
+    // Mini app requires authentication - no guest mode
     return rateLimitInfo ? rateLimitInfo.remaining : 0;
   };
 
@@ -522,8 +626,35 @@ function MiniAppContent() {
               additionsText={responseData.additionsText}
               correctionsText={responseData.correctionsText}
               question={currentQuestion}
-              fid={context?.user?.fid ? context.user.fid.toString() : (authUser?.fid?.toString() || 'guest')}
+              fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
               caseId={`miniapp-${Date.now()}`}
+              inquiry={responseData.inquiry}
+              keyPoints={responseData.keyPoints}
+              questionId={responseData.questionId?.toString()}
+              isAuthenticated={!!context?.user?.fid || !!authUser?.fid}
+              enrichments={responseData.enrichments || []}
+              hasResearch={responseData.hasResearch || false}
+              userTier={responseData.userTier || getUserTier()}
+              agentCoordination={responseData.agentNetwork ? {
+                activeAgents: responseData.agentNetwork.activeAgents,
+                totalAgents: responseData.agentNetwork.totalCapacity,
+                coordinationType: responseData.agentRouting?.networkExecuted ? 'parallel' : 'sequential',
+                networkStatus: responseData.agentRouting?.selectedAgent === 'orthoiq-consultation' ? 'active' : 'degraded',
+                performance: responseData.agentPerformance ? {
+                  successRate: responseData.agentPerformance.successRate,
+                  avgResponseTime: responseData.agentPerformance.averageExecutionTime
+                } : undefined,
+                currentLoad: responseData.agentNetwork.currentLoad,
+                maxLoad: responseData.agentNetwork.totalCapacity,
+                taskRoutes: responseData.agentRouting ? [{
+                  from: 'miniapp-user',
+                  to: responseData.agentRouting.selectedAgent,
+                  reason: responseData.agentRouting.routingReason
+                }] : undefined
+              } : undefined}
+              specialistConsultation={responseData.specialistConsultation}
+              agentBadges={responseData.agentBadges || []}
+              hasSpecialistConsultation={responseData.hasSpecialistConsultation || false}
             />
             
             {/* Action Menu */}
@@ -547,7 +678,7 @@ function MiniAppContent() {
           onClose={() => setShowPrescriptionModal(false)}
           question={currentQuestion}
           response={responseData?.response || ''}
-          fid={context?.user?.fid ? context.user.fid.toString() : (authUser?.fid?.toString() || 'guest')}
+          fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
           inquiry={responseData?.inquiry}
           keyPoints={responseData?.keyPoints}
         />

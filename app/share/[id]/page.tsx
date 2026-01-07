@@ -75,7 +75,7 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
           action: {
             type: 'launch_frame',
             name: 'OrthoIQ',
-            url: 'https://orthoiq.vercel.app/mini'
+            url: 'https://orthoiq.vercel.app/miniapp'
           }
         }
       })
@@ -229,7 +229,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
         {/* Call to Action */}
         <div className="text-center">
           <a
-            href="/mini"
+            href="/miniapp"
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             <OrthoIQLogo size="small" variant="blue" className="mr-2" />

@@ -90,6 +90,12 @@ export default function ResearchEnrichment({ enrichment, questionId, fid }: Rese
   };
 
   const formatContent = (content: string) => {
+    // Add defensive type checking
+    if (!content || typeof content !== 'string') {
+      console.warn('ResearchEnrichment: Invalid content type:', typeof content, content);
+      return [<p key="error" className={`${colors.text} mb-2 text-red-600`}>Content unavailable</p>];
+    }
+
     // Convert markdown-like formatting to JSX
     return content.split('\n').map((line, index) => {
       if (line.startsWith('# ')) {
@@ -184,7 +190,14 @@ export default function ResearchEnrichment({ enrichment, questionId, fid }: Rese
       {!isExpanded && (
         <div className="p-4">
           <p className={`${colors.text} text-sm line-clamp-2`}>
-            {enrichment.content.split('\n').find(line => line.trim() && !line.startsWith('#'))?.substring(0, 150)}...
+            {(() => {
+              if (!enrichment.content || typeof enrichment.content !== 'string') {
+                console.warn('ResearchEnrichment preview: Invalid content type:', typeof enrichment.content, enrichment.content);
+                return 'Content unavailable';
+              }
+              const previewLine = enrichment.content.split('\n').find(line => line.trim() && !line.startsWith('#'));
+              return previewLine ? previewLine.substring(0, 150) + '...' : 'No preview available';
+            })()} 
           </p>
         </div>
       )}

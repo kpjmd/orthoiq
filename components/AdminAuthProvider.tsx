@@ -36,37 +36,17 @@ export function useAdminAuth() {
 function AdminAuthContent({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated, profile } = useProfile();
-  
+
+  // Start with null - same on server and client to avoid hydration mismatch
   const [user, setUser] = useState<AdminUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start true to show loading
+  const [hasMounted, setHasMounted] = useState(false);
 
+  // Hydrate from localStorage after mount (client-side only)
   useEffect(() => {
-    if (isAuthenticated && profile && profile.fid) {
-      const adminUser: AdminUser = {
-        fid: profile.fid,
-        username: profile.username,
-        displayName: profile.displayName,
-        pfpUrl: profile.pfpUrl,
-        isVerified: true // Auth Kit provides verified users
-      };
-      
-      setUser(adminUser);
-      setError(null);
-      
-      // Store in localStorage for persistence
-      localStorage.setItem('admin_user', JSON.stringify(adminUser));
-      
-      console.log('Admin Auth: Farcaster authentication successful for FID:', profile.fid);
-    } else if (!isAuthenticated) {
-      setUser(null);
-      localStorage.removeItem('admin_user');
-    }
-  }, [isAuthenticated, profile]);
-
-  // Load persisted user on mount
-  useEffect(() => {
+    setHasMounted(true);
     const savedUser = localStorage.getItem('admin_user');
-    if (savedUser && !isAuthenticated) {
+    if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
@@ -75,7 +55,32 @@ function AdminAuthContent({ children }: { children: ReactNode }) {
         localStorage.removeItem('admin_user');
       }
     }
-  }, [isAuthenticated]);
+    setIsLoading(false);
+  }, []);
+
+  // Sync Farcaster auth state (only after mount)
+  useEffect(() => {
+    if (!hasMounted) return;
+
+    if (isAuthenticated && profile && profile.fid) {
+      const adminUser: AdminUser = {
+        fid: profile.fid,
+        username: profile.username,
+        displayName: profile.displayName,
+        pfpUrl: profile.pfpUrl,
+        isVerified: true // Auth Kit provides verified users
+      };
+
+      setUser(adminUser);
+      setError(null);
+
+      // Store in localStorage for persistence
+      localStorage.setItem('admin_user', JSON.stringify(adminUser));
+
+      console.log('Admin Auth: Farcaster authentication successful for FID:', profile.fid);
+    }
+    // Don't clear user on !isAuthenticated - localStorage is source of truth for persistence
+  }, [isAuthenticated, profile, hasMounted]);
 
   const handleSignOut = () => {
     // Clear local state
@@ -90,7 +95,7 @@ function AdminAuthContent({ children }: { children: ReactNode }) {
   const value: AdminAuthContextType = {
     user,
     isAuthenticated: !!user,
-    isLoading,
+    isLoading: !hasMounted || isLoading, // Loading until mounted and localStorage checked
     signOut: handleSignOut,
     error,
   };

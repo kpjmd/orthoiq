@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { agentOrchestrator } from '@/lib/agentOrchestrator';
-import { ResearchSynthesisAgent } from '@/lib/agents/researchSynthesisAgent';
+// Research synthesis agent temporarily disabled - focus on specialist consultation
+// import { ResearchSynthesisAgent } from '@/lib/agents/researchSynthesisAgent';
 import { getUserResearchQuota, updateResearchUsage, storeResearchSynthesis } from '@/lib/database';
 import { checkRateLimitDBWithTiers } from '@/lib/database';
 import { ResearchRarity } from '@/lib/types';
 
-// Register the research synthesis agent
-const researchAgent = new ResearchSynthesisAgent();
-agentOrchestrator.registerAgent(researchAgent);
+// Register the research synthesis agent - temporarily disabled
+// const researchAgent = new ResearchSynthesisAgent();
+// agentOrchestrator.registerAgent(researchAgent);
 
 export async function POST(request: NextRequest) {
   try {

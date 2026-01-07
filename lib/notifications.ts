@@ -48,7 +48,7 @@ export async function sendNotification(fid: string, notification: NotificationDa
             notificationId,
             title: notification.title,
             body: notification.body,
-            targetUrl: notification.targetUrl || '/mini',
+            targetUrl: notification.targetUrl || '/miniapp',
             tokens: [token.token]
           })
         });
@@ -116,7 +116,7 @@ export async function sendResponseReviewNotification(data: ResponseReviewNotific
   const notification: NotificationData = {
     title,
     body,
-    targetUrl: `/mini?questionId=${data.questionId}`,
+    targetUrl: `/miniapp?questionId=${data.questionId}`,
     imageUrl: 'https://orthoiq.vercel.app/icon.png'
   };
 
@@ -130,7 +130,7 @@ export async function sendRateLimitResetNotification(fid: string, tier: UserTier
   const notification: NotificationData = {
     title: '🔄 Questions Reset',
     body: `Your daily question limit has reset! You can now ask ${dailyLimit} new question${dailyLimit > 1 ? 's' : ''}.`,
-    targetUrl: '/mini',
+    targetUrl: '/miniapp',
     imageUrl: 'https://orthoiq.vercel.app/icon.png'
   };
 

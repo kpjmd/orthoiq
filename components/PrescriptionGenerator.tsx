@@ -276,16 +276,19 @@ export default function PrescriptionGenerator({
           <line x1="40" y1="220" x2={size - 40} y2="220" stroke="#e5e7eb" strokeWidth="1" />
           
           <text x="60" y="270" className="prescription-rx">℞</text>
-          
-          <text x="120" y="255" className="prescription-header">CHIEF INQUIRY</text>
+
+          <text x="120" y="255" className="prescription-header">
+            {data.enhancedData?.primaryDiagnosis ? 'DIAGNOSIS' : 'CHIEF INQUIRY'}
+          </text>
           {(() => {
-            const inquiry = parsedResponse.chiefComplaint;
+            // Use primary diagnosis for comprehensive mode, or chief complaint for fast mode
+            const inquiry = data.enhancedData?.primaryDiagnosis || parsedResponse.chiefComplaint;
             const maxCharsPerLine = 50; // Shorter than synopsis to account for left margin
             const maxLines = 3;
             const words = inquiry.split(' ');
             const lines = [];
             let currentLine = '';
-            
+
             for (const word of words) {
               const testLine = currentLine ? `${currentLine} ${word}` : word;
               if (testLine.length <= maxCharsPerLine) {
@@ -298,11 +301,11 @@ export default function PrescriptionGenerator({
                 if (lines.length >= maxLines) break;
               }
             }
-            
+
             if (currentLine && lines.length < maxLines) {
               lines.push(currentLine);
             }
-            
+
             // If text was truncated, add ellipsis to last line
             if (words.join(' ').length > lines.join(' ').length) {
               const lastLine = lines[lines.length - 1];
@@ -312,7 +315,7 @@ export default function PrescriptionGenerator({
                 lines[lines.length - 1] = lastLine + '...';
               }
             }
-            
+
             return lines.map((line, lineIndex) => (
               <text key={lineIndex} x="120" y={275 + (lineIndex * 14)} className="prescription-text">
                 {line}
@@ -322,62 +325,92 @@ export default function PrescriptionGenerator({
           
           {/* Synopsis - Combined Assessment and Recommendations */}
           <text x="60" y="315" className="prescription-header">SYNOPSIS</text>
-          {[...parsedResponse.assessment.slice(0, 2), ...parsedResponse.recommendations.slice(0, 2)].map((item, index) => {
-            const maxCharsPerLine = 65;
-            const maxLines = 2;
-            const words = item.split(' ');
-            const lines = [];
-            let currentLine = '';
-            
-            for (const word of words) {
-              const testLine = currentLine ? `${currentLine} ${word}` : word;
-              if (testLine.length <= maxCharsPerLine) {
-                currentLine = testLine;
-              } else {
-                if (currentLine) {
-                  lines.push(currentLine);
-                  currentLine = word;
+          {(() => {
+            // Build synopsis items based on available data
+            let synopsisItems: string[] = [];
+
+            if (data.enhancedData?.topSpecialistInsights && data.enhancedData.topSpecialistInsights.length > 0) {
+              // Comprehensive mode: Show specialist insights
+              data.enhancedData.topSpecialistInsights.forEach(insight => {
+                if (insight?.specialist && insight?.keyInsight) {
+                  synopsisItems.push(`${insight.specialist}: ${insight.keyInsight}`);
                 }
-                if (lines.length >= maxLines) break;
+              });
+            }
+
+            if (data.enhancedData?.topRecommendations && data.enhancedData.topRecommendations.length > 0) {
+              // Comprehensive mode: Show phase 1 interventions
+              data.enhancedData.topRecommendations.forEach(rec => {
+                if (rec?.intervention) {
+                  synopsisItems.push(rec.intervention);
+                }
+              });
+            }
+
+            // Fallback to legacy parsing if no enhanced data
+            if (synopsisItems.length === 0) {
+              synopsisItems = [...parsedResponse.assessment.slice(0, 2), ...parsedResponse.recommendations.slice(0, 2)]
+                .filter(item => item && typeof item === 'string' && item.trim().length > 0);
+            }
+
+            // Render synopsis items
+            return synopsisItems.slice(0, 4).map((item, index) => {
+              const maxCharsPerLine = 65;
+              const maxLines = 2;
+              const words = item.split(' ');
+              const lines = [];
+              let currentLine = '';
+
+              for (const word of words) {
+                const testLine = currentLine ? `${currentLine} ${word}` : word;
+                if (testLine.length <= maxCharsPerLine) {
+                  currentLine = testLine;
+                } else {
+                  if (currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                  }
+                  if (lines.length >= maxLines) break;
+                }
               }
-            }
-            
-            if (currentLine && lines.length < maxLines) {
-              lines.push(currentLine);
-            }
-            
-            // If text was truncated, add ellipsis to last line
-            if (words.join(' ').length > lines.join(' ').length) {
-              const lastLine = lines[lines.length - 1];
-              if (lastLine && lastLine.length > maxCharsPerLine - 3) {
-                lines[lines.length - 1] = lastLine.substring(0, maxCharsPerLine - 3) + '...';
-              } else if (lastLine) {
-                lines[lines.length - 1] = lastLine + '...';
+
+              if (currentLine && lines.length < maxLines) {
+                lines.push(currentLine);
               }
-            }
-            
-            return (
-              <g key={index}>
-                <circle cx="75" cy={335 + (index * 35)} r="2" fill={index < 2 ? theme.primaryColor : theme.accentColor} />
-                {lines.map((line, lineIndex) => (
-                  <text key={lineIndex} x="85" y={340 + (index * 35) + (lineIndex * 14)} className="prescription-text">
-                    {line}
-                  </text>
-                ))}
-              </g>
-            );
-          })}
+
+              // If text was truncated, add ellipsis to last line
+              if (words.join(' ').length > lines.join(' ').length) {
+                const lastLine = lines[lines.length - 1];
+                if (lastLine && lastLine.length > maxCharsPerLine - 3) {
+                  lines[lines.length - 1] = lastLine.substring(0, maxCharsPerLine - 3) + '...';
+                } else if (lastLine) {
+                  lines[lines.length - 1] = lastLine + '...';
+                }
+              }
+
+              return (
+                <g key={index}>
+                  <circle cx="75" cy={335 + (index * 35)} r="2" fill={index < 2 ? theme.primaryColor : theme.accentColor} />
+                  {lines.map((line, lineIndex) => (
+                    <text key={lineIndex} x="85" y={340 + (index * 35) + (lineIndex * 14)} className="prescription-text">
+                      {line}
+                    </text>
+                  ))}
+                </g>
+              );
+            });
+          })()}
           
           {/* Confidence Score - Moved after Synopsis */}
-          <rect 
-            x={size - 180} 
-            y="475" 
-            width="140" 
-            height="60" 
-            fill="#f8fafc" 
-            stroke="#e2e8f0" 
-            strokeWidth="1" 
-            rx="5" 
+          <rect
+            x={size - 180}
+            y="475"
+            width="140"
+            height={data.enhancedData?.agentConsensus ? "75" : "60"}
+            fill="#f8fafc"
+            stroke="#e2e8f0"
+            strokeWidth="1"
+            rx="5"
           />
           <text x={size - 110} y="495" textAnchor="middle" className="prescription-small">
             AI CONFIDENCE
@@ -385,19 +418,29 @@ export default function PrescriptionGenerator({
           <text x={size - 110} y="515" textAnchor="middle" className="prescription-header">
             {Math.round(data.confidence * 100)}%
           </text>
+          {data.enhancedData?.agentConsensus && (
+            <text x={size - 110} y="535" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
+              Agent Consensus: {Math.round(data.enhancedData.agentConsensus * 100)}%
+            </text>
+          )}
+          {data.enhancedData?.evidenceGrade && !data.enhancedData?.agentConsensus && (
+            <text x={size - 110} y="535" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
+              Evidence: Grade {data.enhancedData.evidenceGrade}
+            </text>
+          )}
           
           {/* Rarity Badge - Moved to avoid overlap */}
-          <rect 
-            x={size - 180} 
-            y="540" 
-            width="140" 
-            height="20" 
-            fill={theme.primaryColor + "20"} 
-            stroke={theme.primaryColor} 
-            strokeWidth="1" 
-            rx="10" 
+          <rect
+            x={size - 180}
+            y={data.enhancedData?.agentConsensus ? "555" : "540"}
+            width="140"
+            height="20"
+            fill={theme.primaryColor + "20"}
+            stroke={theme.primaryColor}
+            strokeWidth="1"
+            rx="10"
           />
-          <text x={size - 110} y="555" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
+          <text x={size - 110} y={data.enhancedData?.agentConsensus ? "570" : "555"} textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
             {prescriptionMetadata.rarity === 'ultra-rare' && '✨'}
             {prescriptionMetadata.rarity === 'rare' && '⭐'}
             {prescriptionMetadata.rarity === 'uncommon' && '💫'}

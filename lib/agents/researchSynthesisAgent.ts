@@ -37,6 +37,16 @@ export class ResearchSynthesisAgent implements Agent {
 
   async execute(context: AgentContext): Promise<AgentResult> {
     try {
+      // Handle health checks quickly to prevent timeouts
+      if (context.question === 'health_check') {
+        return {
+          success: true,
+          data: 'healthy',
+          enrichments: [],
+          cost: 0
+        };
+      }
+
       console.log(`ResearchSynthesisAgent processing: ${context.question.substring(0, 100)}...`);
 
       // Analyze the question to extract research parameters
@@ -105,16 +115,30 @@ export class ResearchSynthesisAgent implements Agent {
     Focus on evidence-based parameters for PubMed search.`;
 
     try {
-      const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Claude API timeout')), 10000)
+      );
+      
+      const apiPromise = anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 500,
         temperature: 0.1,
         messages: [{ role: 'user', content: prompt }]
       });
+      
+      const response = await Promise.race([apiPromise, timeoutPromise]) as Anthropic.Messages.Message;
 
       const content = response.content[0];
       if (content.type === 'text') {
-        const parsed = JSON.parse(content.text);
+        // Clean up potential markdown code block formatting
+        let cleanedText = content.text.trim();
+        if (cleanedText.includes('```json')) {
+          cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+        } else if (cleanedText.startsWith('```') && cleanedText.endsWith('```')) {
+          cleanedText = cleanedText.replace(/^```\s*/, '').replace(/```\s*$/, '');
+        }
+        
+        const parsed = JSON.parse(cleanedText);
         
         return {
           condition: parsed.condition || analysis.conditions[0] || 'orthopedic condition',
@@ -245,16 +269,30 @@ Focus on practical implications for ${query.condition} affecting ${query.bodyPar
 Maintain educational tone - this is information, not medical advice.`;
 
     try {
-      const response = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Claude API timeout')), 10000)
+      );
+      
+      const apiPromise = anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
         temperature: 0.2,
         messages: [{ role: 'user', content: prompt }]
       });
+      
+      const response = await Promise.race([apiPromise, timeoutPromise]) as Anthropic.Messages.Message;
 
       const content = response.content[0];
       if (content.type === 'text') {
-        const parsed = JSON.parse(content.text);
+        // Clean up potential markdown code block formatting
+        let cleanedText = content.text.trim();
+        if (cleanedText.includes('```json')) {
+          cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+        } else if (cleanedText.startsWith('```') && cleanedText.endsWith('```')) {
+          cleanedText = cleanedText.replace(/^```\s*/, '').replace(/```\s*$/, '');
+        }
+        
+        const parsed = JSON.parse(cleanedText);
         
         return {
           id: `research_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,

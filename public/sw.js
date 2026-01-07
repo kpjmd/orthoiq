@@ -2,7 +2,7 @@
 const CACHE_NAME = 'orthoiq-v2-fresh';
 const STATIC_ASSETS = [
   '/',
-  '/mini',
+  '/miniapp',
   '/manifest.json',
   '/icon.png',
   '/og-image.png'
@@ -59,11 +59,27 @@ self.addEventListener('fetch', (event) => {
   // Handle API requests differently - always try network first
   if (event.request.url.includes('/api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        // If API fails, return a basic offline response
+      fetch(event.request).catch((error) => {
+        // Only show offline message for true network failures
+        // TypeError with 'Failed to fetch' indicates network is unavailable
+        if (error.name === 'TypeError' && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+          console.log('OrthoIQ Service Worker: True network failure detected for API request');
+          return new Response(JSON.stringify({
+            error: 'You appear to be offline. Please check your connection and try again.',
+            offline: true
+          }), {
+            status: 503,
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+        }
+        // For other errors (timeouts, server errors), let them pass through
+        // Don't mark as "offline" since network is working
+        console.log('OrthoIQ Service Worker: API error (not offline):', error.message);
         return new Response(JSON.stringify({
-          error: 'You appear to be offline. Please check your connection and try again.',
-          offline: true
+          error: 'Service temporarily unavailable. Please try again.',
+          offline: false
         }), {
           status: 503,
           headers: {
@@ -84,8 +100,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Cache the fresh response
-          if (response && response.status === 200 && response.type === 'basic') {
+          // Cache the fresh response (only GET requests)
+          if (response && response.status === 200 && response.type === 'basic' && event.request.method === 'GET') {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME)
               .then((cache) => {
@@ -124,8 +140,8 @@ self.addEventListener('fetch', (event) => {
         // Otherwise fetch from network
         console.log('OrthoIQ Service Worker: Fetching static asset from network:', event.request.url);
         return fetch(event.request).then((response) => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          // Don't cache non-successful responses or non-GET requests
+          if (!response || response.status !== 200 || response.type !== 'basic' || event.request.method !== 'GET') {
             return response;
           }
 

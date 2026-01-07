@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata() {
   const baseUrl = process.env.NEXT_PUBLIC_HOST || 
-                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : process.env.NEXT_PUBLIC_HOST || "http://localhost:3001");
   
   let frameMetadata = {};
   try {
@@ -58,7 +58,7 @@ export async function generateMetadata() {
           "action": {
             "type": "launch_frame",
             "name": "OrthoIQ",
-            "url": "https://orthoiq.vercel.app/mini",
+            "url": "https://orthoiq.vercel.app/miniapp",
             "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
             "splashBackgroundColor": "#1e3a8a"
           }
@@ -73,7 +73,7 @@ export async function generateMetadata() {
           "action": {
             "type": "launch_frame",
             "name": "OrthoIQ",
-            "url": "https://orthoiq.vercel.app/mini",
+            "url": "https://orthoiq.vercel.app/miniapp",
             "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
             "splashBackgroundColor": "#1e3a8a"
           }
@@ -135,23 +135,23 @@ export default function HomePage() {
               // For Mini Apps, use isInMiniApp() if SDK is available
               if (window.__FARCASTER_SDK__) {
                 console.log('SDK available, checking isInMiniApp()...');
-                (window.__FARCASTER_SDK__ as any).isInMiniApp().then((inMiniApp: boolean) => {
+                window.__FARCASTER_SDK__.isInMiniApp().then(function(inMiniApp) {
                   console.log('- SDK isInMiniApp result:', inMiniApp);
                   if (inMiniApp && window.location.pathname === '/') {
-                    console.log('SDK confirmed Mini App context, redirecting to /mini');
-                    window.location.href = '/mini?miniApp=true';
+                    console.log('SDK confirmed Mini App context, redirecting to /miniapp');
+                    window.location.href = '/miniapp?miniApp=true';
                   }
-                }).catch((err: Error) => {
+                }).catch(function(err) {
                   console.error('SDK isInMiniApp check failed:', err);
                   // Fallback to frame detection
                   if (isInFrame && (isFarcasterFrame || !referrer)) {
-                    console.log('Fallback: redirecting to /mini based on frame detection');
-                    window.location.href = '/mini?miniApp=true';
+                    console.log('Fallback: redirecting to /miniapp based on frame detection');
+                    window.location.href = '/miniapp?miniApp=true';
                   }
                 });
               } else if (isInFrame && (isFarcasterFrame || !referrer)) {
                 console.log('No SDK available, using frame detection for redirect');
-                window.location.href = '/mini?miniApp=true';
+                window.location.href = '/miniapp?miniApp=true';
               }
               
             } catch (error) {

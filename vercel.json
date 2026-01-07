@@ -1,7 +1,7 @@
 {
   "functions": {
     "app/api/claude/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 120
     },
     "app/frames/route.tsx": {
       "maxDuration": 30
@@ -20,12 +20,26 @@
     },
     "app/api/notifications/reset-daily/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/cleanup-sessions/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/send-milestone-emails/route.ts": {
+      "maxDuration": 120
     }
   },
   "crons": [
     {
       "path": "/api/notifications/reset-daily",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-sessions",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/send-milestone-emails",
+      "schedule": "0 9 * * *"
     }
   ],
   "rewrites": [

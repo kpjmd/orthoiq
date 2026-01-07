@@ -67,8 +67,8 @@ export default function RootLayout({
               // Hybrid & SSR-friendly Mini App detection
               (function() {
                 const url = new URL(window.location.href);
-                const isMiniApp = 
-                  url.pathname.startsWith('/mini') ||
+                const isMiniApp =
+                  url.pathname.startsWith('/miniapp') ||
                   url.searchParams.get('miniApp') === 'true';
                 
                 if (isMiniApp) {

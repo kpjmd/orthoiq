@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         success = await sendNotification(fid, {
           title,
           body,
-          targetUrl: '/mini'
+          targetUrl: '/miniapp'
         });
         message = `Custom notification sent to FID ${fid}`;
         break;

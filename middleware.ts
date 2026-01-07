@@ -11,11 +11,11 @@ export function middleware(request: NextRequest) {
   const cspValue = "frame-ancestors 'self' https://farcaster.xyz https://*.farcaster.xyz https://*.warpcast.com https://warpcast.com https://client.warpcast.com https://miniapps.farcaster.xyz;";
 
   // Check if this is a Mini App request or frames request
-  const isMiniAppRequest = pathname.startsWith('/mini') || pathname.startsWith('/miniapp') || searchParams.get('miniApp') === 'true';
+  const isMiniAppRequest = pathname.startsWith('/miniapp') || searchParams.get('miniApp') === 'true';
   const isFramesRequest = pathname.startsWith('/frames');
-  
-  // Apply CSP for root, mini, miniapp, and frames routes (Farcaster compatible)
-  if (pathname === '/' || pathname.startsWith('/mini') || pathname.startsWith('/miniapp') || pathname.startsWith('/frames') || isMiniAppRequest) {
+
+  // Apply CSP for root, miniapp, and frames routes (Farcaster compatible)
+  if (pathname === '/' || pathname.startsWith('/miniapp') || pathname.startsWith('/frames') || isMiniAppRequest) {
     response.headers.set('Content-Security-Policy', cspValue);
     response.headers.delete('X-Frame-Options'); // Remove conflicting header
     
@@ -53,9 +53,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match root, mini, and miniapp routes specifically
+    // Match root and miniapp routes specifically
     '/',
-    '/mini/:path*',
     '/miniapp/:path*',
     // Also match all other paths to debug
     '/((?!_next|api|favicon.ico).*)',
