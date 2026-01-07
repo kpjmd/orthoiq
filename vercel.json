@@ -32,14 +32,6 @@
     {
       "path": "/api/notifications/reset-daily",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-sessions",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/send-milestone-emails",
-      "schedule": "0 9 * * *"
     }
   ],
   "rewrites": [
