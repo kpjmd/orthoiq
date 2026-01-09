@@ -365,7 +365,8 @@ function MiniAppContent() {
             tier: getUserTier()
           } : null,
           tier: getUserTier(),
-          mode: consultationMode
+          mode: consultationMode,
+          platform: 'miniapp'
         }),
         signal: controller.signal,
       });
@@ -500,29 +501,15 @@ function MiniAppContent() {
           <p className="text-lg opacity-90">Premier Medical AI on Farcaster</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
           <div className="mt-3 space-y-2">
-            {/* Authentication Status */}
-            <div className="flex justify-center">
-              <SignInButton />
-            </div>
+            {/* User Welcome */}
+            {context?.user && (
+              <div className="text-sm">
+                Welcome, {context.user.displayName || context.user.username || `FID ${context.user.fid}`}
+              </div>
+            )}
             
             {/* User Info */}
             <div className="space-y-1">
-              <p className="text-xs opacity-60">
-                Questions remaining today: {getRemainingQuestions()}
-                {rateLimitInfo?.total && ` of ${rateLimitInfo.total}`}
-              </p>
-              {getRemainingQuestions() === 0 && rateLimitInfo?.resetTime && (
-                <p className="text-xs opacity-60">
-                  Resets at midnight UTC in: <CountdownTimer 
-                    targetTime={rateLimitInfo.resetTime} 
-                    onComplete={() => {
-                      if (context?.user?.fid) {
-                        loadRateLimitStatus(context.user.fid.toString(), getUserTier());
-                      }
-                    }} 
-                  />
-                </p>
-              )}
               <div className="flex items-center justify-center space-x-2">
                 <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
                   {getUserTier().charAt(0).toUpperCase() + getUserTier().slice(1)} User
@@ -566,13 +553,13 @@ function MiniAppContent() {
               placeholder="e.g., What should I do for knee pain after running?"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={3}
-              disabled={isLoading || getRemainingQuestions() === 0}
+              disabled={isLoading}
             />
           </div>
           
           <button
             type="submit"
-            disabled={isLoading || !question.trim() || getRemainingQuestions() === 0}
+            disabled={isLoading || !question.trim()}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
           >
             {isLoading ? (
@@ -583,8 +570,6 @@ function MiniAppContent() {
                 </svg>
                 Getting AI Response...
               </span>
-            ) : getRemainingQuestions() === 0 ? (
-              'Daily limit reached - Resets at midnight UTC'
             ) : (
               'Get AI Answer'
             )}
@@ -664,8 +649,7 @@ function MiniAppContent() {
               onAskAnother={handleAskAnother}
               onViewArtwork={() => setShowPrescriptionModal(true)}
               onRate={handleRate}
-              canAskAnother={getRemainingQuestions() > 0}
-              questionsRemaining={getRemainingQuestions()}
+              canAskAnother={true}
               inquiry={responseData.inquiry}
               keyPoints={responseData.keyPoints}
             />

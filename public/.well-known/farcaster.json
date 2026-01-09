@@ -27,7 +27,7 @@
     "ogTitle": "OrthoIQ - AI Orthopedic Expert",
     "ogImageUrl": "https://orthoiq.vercel.app/og-image.png",
     "heroImageUrl": "https://orthoiq.vercel.app/embed-image.png",
-    "castShareUrl": "https://farcaster.xyz/miniapps/12zkRyhWt8Az/orthoiq---ai-orthopedic-expert",
+    "castShareUrl": "https://orthoiq.vercel.app/miniapp",
     "ogDescription": "Get your orthopedic questions answers here, powered by Claude AI. Responses reviewed by MD.",
     "screenshotUrls": [
       "https://orthoiq.vercel.app/orthoiq-screenshot.jpg"
