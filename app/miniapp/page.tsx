@@ -10,6 +10,7 @@ import NotificationPermissions from '@/components/NotificationPermissions';
 import { useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
 import OrthoIQLogo from '@/components/OrthoIQLogo';
+import AgentLoadingCards from '@/components/AgentLoadingCards';
 import { UserTier } from '@/lib/rateLimit';
 
 // Farcaster SDK Context Types
@@ -536,12 +537,97 @@ function MiniAppContent() {
 
       <div className="p-6 max-w-2xl mx-auto">
         {/* Notification Permissions */}
-        <NotificationPermissions 
-          fid={context?.user?.fid?.toString()} 
+        <NotificationPermissions
+          fid={context?.user?.fid?.toString()}
         />
+
+        {/* Consultation Mode Toggle */}
+        <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Consultation Mode</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setConsultationMode('fast');
+                if (context?.user?.fid) {
+                  saveUserPreference(context.user.fid.toString(), 'fast');
+                }
+              }}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                consultationMode === 'fast'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="text-lg mb-1">⚡</div>
+              <div className="font-medium text-sm">Fast Triage</div>
+              <div className="text-xs text-gray-500">~17 seconds</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConsultationMode('normal');
+                if (context?.user?.fid) {
+                  saveUserPreference(context.user.fid.toString(), 'normal');
+                }
+              }}
+              className={`p-3 rounded-lg border-2 transition-all ${
+                consultationMode === 'normal'
+                  ? 'border-purple-500 bg-purple-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="text-lg mb-1">🏥</div>
+              <div className="font-medium text-sm">Multi-Specialist</div>
+              <div className="text-xs text-gray-500">~60 seconds</div>
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            {consultationMode === 'fast'
+              ? 'Quick assessment from triage specialist'
+              : 'Full consultation with 5 AI specialists'}
+          </p>
+        </div>
 
         {/* Question Form */}
         <form onSubmit={handleSubmit} className="mb-6">
+          {/* Question Tips */}
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start gap-2">
+              <span className="text-blue-600">💡</span>
+              <div className="text-xs text-blue-800">
+                <p className="font-medium mb-1">For best results, include:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+                  <li>Your age</li>
+                  <li>Pain level (1-10)</li>
+                  <li>How long you&apos;ve had symptoms</li>
+                  <li>What makes it better or worse</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Example Questions */}
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2">Try an example:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "28yo with ankle pain after basketball",
+                "55yo knee pain when climbing stairs",
+                "Shoulder pain after lifting weights"
+              ].map((example, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setQuestion(example)}
+                  className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition-colors"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-4">
             <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-2">
               What orthopedic question can I help you with?
@@ -575,6 +661,16 @@ function MiniAppContent() {
             )}
           </button>
         </form>
+
+        {/* Agent Loading Display */}
+        {isLoading && (
+          <div className="mb-6">
+            <AgentLoadingCards
+              isLoading={isLoading}
+              mode={consultationMode === 'normal' ? 'normal' : 'fast'}
+            />
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -624,7 +720,7 @@ function MiniAppContent() {
                 activeAgents: responseData.agentNetwork.activeAgents,
                 totalAgents: responseData.agentNetwork.totalCapacity,
                 coordinationType: responseData.agentRouting?.networkExecuted ? 'parallel' : 'sequential',
-                networkStatus: responseData.agentRouting?.selectedAgent === 'orthoiq-consultation' ? 'active' : 'degraded',
+                networkStatus: (responseData.agentNetwork.activeAgents > 0 && responseData.agentRouting?.networkExecuted) ? 'active' : 'degraded',
                 performance: responseData.agentPerformance ? {
                   successRate: responseData.agentPerformance.successRate,
                   avgResponseTime: responseData.agentPerformance.averageExecutionTime
