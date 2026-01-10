@@ -91,6 +91,8 @@ interface ResponseData {
     currentLoad: number;
     networkUtilization: number;
   };
+  // Raw consultation data for Intelligence Card generation
+  rawConsultationData?: any;
 }
 
 function MiniAppContent() {
@@ -420,7 +422,9 @@ function MiniAppContent() {
         hasSpecialistConsultation: data.hasSpecialistConsultation || false,
         agentRouting: data.agentRouting,
         agentPerformance: data.agentPerformance,
-        agentNetwork: data.agentNetwork
+        agentNetwork: data.agentNetwork,
+        // Raw consultation data for Intelligence Card generation
+        rawConsultationData: data
       });
       
       setQuestion('');
@@ -499,7 +503,7 @@ function MiniAppContent() {
             <OrthoIQLogo size="medium" variant="blue" className="text-white" />
             <h1 className="text-3xl font-bold">OrthoIQ</h1>
           </div>
-          <p className="text-lg opacity-90">Premier Medical AI on Farcaster</p>
+          <p className="text-lg opacity-90">AI Orthopedic Expert</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
           <div className="mt-3 space-y-2">
             {/* User Welcome */}
@@ -517,18 +521,17 @@ function MiniAppContent() {
                 </div>
                 {getUserTier() === 'medical' && (
                   <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-800 bg-opacity-50">
-                    ✅ Verified
+                    ✅ Verified MD
                   </div>
                 )}
-                {(isAuthenticated && authUser) ? (
-                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-700 bg-opacity-50">
-                    ✅ Authenticated
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-700 bg-opacity-50">
-                    👤 Basic User
-                  </div>
-                )}
+                <a
+                  href="/stats"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-indigo-800 bg-opacity-50 hover:bg-opacity-70 transition-colors"
+                >
+                  📊 Stats
+                </a>
               </div>
             </div>
           </div>
@@ -591,21 +594,82 @@ function MiniAppContent() {
 
         {/* Question Form */}
         <form onSubmit={handleSubmit} className="mb-6">
-          {/* Question Tips */}
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-start gap-2">
-              <span className="text-blue-600">💡</span>
-              <div className="text-xs text-blue-800">
-                <p className="font-medium mb-1">For best results, include:</p>
-                <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+          {/* Expandable Question Tips */}
+          <details className="mb-4 group">
+            <summary className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg cursor-pointer list-none flex items-center justify-between hover:from-purple-100 hover:to-indigo-100 transition-colors">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">💡</span>
+                <span className="text-sm font-semibold text-purple-900">Tips for Better Results</span>
+                <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">Advanced</span>
+              </div>
+              <svg className="w-5 h-5 text-purple-500 transform group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+
+            <div className="mt-2 p-4 bg-white border border-purple-200 rounded-lg space-y-4">
+              {/* Basic Tips */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs font-medium text-blue-800 mb-2">For best results, include:</p>
+                <ul className="list-disc list-inside text-xs text-blue-700 space-y-0.5">
                   <li>Your age</li>
                   <li>Pain level (1-10)</li>
                   <li>How long you&apos;ve had symptoms</li>
                   <li>What makes it better or worse</li>
                 </ul>
               </div>
+
+              {/* Mind Mender Triggers */}
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="text-lg">🧠</span>
+                  <h4 className="font-semibold text-red-900 text-sm">Mind Mender Specialist</h4>
+                </div>
+                <p className="text-xs text-red-700 mb-2">For psychological aspects of recovery. Add keywords like:</p>
+                <div className="flex flex-wrap gap-1">
+                  {['anxious', 'worried', 'scared', 'nervous', 'depressed', 'chronic pain', 'months of pain', "can't sleep", 'previous injury', 're-injury fear', 'return to sport', 'athlete', 'competition anxiety', 'post-surgery'].map(keyword => (
+                    <button
+                      key={keyword}
+                      type="button"
+                      onClick={() => setQuestion(prev => prev ? `${prev}, ${keyword}` : keyword)}
+                      className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full hover:bg-red-200 transition-colors"
+                    >
+                      {keyword}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Other Specialists */}
+              <div className="grid grid-cols-1 gap-2">
+                <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg flex items-center space-x-2">
+                  <span>💫</span>
+                  <div>
+                    <span className="font-semibold text-purple-900 text-xs">Pain Whisperer</span>
+                    <span className="text-xs text-purple-700 ml-1">- pain patterns, radiating, numbness</span>
+                  </div>
+                </div>
+                <div className="p-2 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2">
+                  <span>🔍</span>
+                  <div>
+                    <span className="font-semibold text-green-900 text-xs">Movement Detective</span>
+                    <span className="text-xs text-green-700 ml-1">- biomechanics, posture, gait</span>
+                  </div>
+                </div>
+                <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center space-x-2">
+                  <span>💪</span>
+                  <div>
+                    <span className="font-semibold text-amber-900 text-xs">Strength Sage</span>
+                    <span className="text-xs text-amber-700 ml-1">- rehab, strength, restoration</span>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center italic">
+                In multi-specialist mode, all 5 agents analyze your case
+              </p>
             </div>
-          </div>
+          </details>
 
           {/* Example Questions */}
           <div className="mb-4">
@@ -736,6 +800,7 @@ function MiniAppContent() {
               specialistConsultation={responseData.specialistConsultation}
               agentBadges={responseData.agentBadges || []}
               hasSpecialistConsultation={responseData.hasSpecialistConsultation || false}
+              rawConsultationData={responseData.rawConsultationData}
             />
             
             {/* Action Menu */}
@@ -767,10 +832,58 @@ function MiniAppContent() {
         <div className="text-center text-xs text-gray-500 mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="font-medium text-yellow-800 mb-1">⚠️ Medical Disclaimer</p>
           <p>
-            This AI provides educational information only and should not replace professional medical advice. 
+            This AI provides educational information only and should not replace professional medical advice.
             Always consult with a qualified healthcare provider for medical concerns, diagnosis, or treatment decisions.
           </p>
         </div>
+
+        {/* Platform Information */}
+        <details className="mt-4 group">
+          <summary className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg cursor-pointer list-none flex items-center justify-between hover:from-indigo-100 hover:to-blue-100 transition-colors">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">🤖</span>
+              <span className="text-sm font-semibold text-indigo-900">About OrthoIQ AI Platform</span>
+            </div>
+            <svg className="w-5 h-5 text-indigo-500 transform group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+
+          <div className="mt-2 p-4 bg-white border border-indigo-200 rounded-lg space-y-3 text-sm text-gray-700">
+            <div className="flex items-start space-x-3">
+              <span className="text-lg">🏥</span>
+              <div>
+                <p className="font-semibold text-gray-900">Multi-Agent AI System</p>
+                <p className="text-xs text-gray-600">5 specialized AI agents collaborate to analyze your orthopedic concerns from different perspectives.</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <span className="text-lg">🪙</span>
+              <div>
+                <p className="font-semibold text-gray-900">Prediction Market</p>
+                <p className="text-xs text-gray-600">Agents stake tokens on their predictions and earn rewards for accuracy, driving continuous improvement.</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <span className="text-lg">👨‍⚕️</span>
+              <div>
+                <p className="font-semibold text-gray-900">MD Oversight</p>
+                <p className="text-xs text-gray-600">All AI responses can be reviewed and validated by licensed physicians for added confidence.</p>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-gray-200">
+              <a
+                href="/stats"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 flex items-center justify-center space-x-1"
+              >
+                <span>📊</span>
+                <span>View Network Statistics & Agent Leaderboard</span>
+              </a>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   );

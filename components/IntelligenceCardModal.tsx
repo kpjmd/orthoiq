@@ -17,6 +17,7 @@ interface IntelligenceCardModalProps {
   userFeedback?: any;
   mdReview?: any;
   fid: string;
+  isMiniApp?: boolean;
 }
 
 export default function IntelligenceCardModal({
@@ -25,7 +26,8 @@ export default function IntelligenceCardModal({
   rawConsultationData,
   userFeedback,
   mdReview,
-  fid
+  fid,
+  isMiniApp = false
 }: IntelligenceCardModalProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -281,7 +283,7 @@ export default function IntelligenceCardModal({
 
           {/* Card container */}
           <div className="flex justify-center mb-6">
-            <IntelligenceCard data={cardData} size="medium" animated={true} />
+            <IntelligenceCard data={cardData} size="medium" animated={true} isMiniApp={isMiniApp} />
           </div>
 
           {/* Action buttons */}

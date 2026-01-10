@@ -773,6 +773,7 @@ export default function ResponseCard({
           onClose={() => setShowIntelligenceCardModal(false)}
           rawConsultationData={rawConsultationData}
           fid={fid}
+          isMiniApp={isMiniApp}
         />
       )}
 

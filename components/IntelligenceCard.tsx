@@ -15,6 +15,7 @@ interface IntelligenceCardProps {
   data: IntelligenceCardData;
   size?: 'small' | 'medium' | 'large';
   animated?: boolean;
+  isMiniApp?: boolean;
 }
 
 // SVG dimensions
@@ -650,7 +651,8 @@ function CardFooter({
 export function IntelligenceCard({
   data,
   size = 'medium',
-  animated = true
+  animated = true,
+  isMiniApp = false
 }: IntelligenceCardProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -668,6 +670,9 @@ export function IntelligenceCard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Hide QR for miniapp or mobile
+  const shouldHideQR = isMiniApp || isMobile;
+
   const tierConfig = getTierConfig(data.tier);
 
   // Calculate dynamic Y offsets based on agent count
@@ -676,7 +681,7 @@ export function IntelligenceCard({
   const verificationY = predictionY + 82;
   const qrY = verificationY + 77;
   // Adjust footer Y based on whether QR is shown
-  const footerY = isMobile ? verificationY + 77 : qrY + 65;
+  const footerY = shouldHideQR ? verificationY + 77 : qrY + 65;
 
   // Calculate dynamic card height based on content
   // Footer requires ~45px, add padding
@@ -786,11 +791,11 @@ export function IntelligenceCard({
         yOffset={verificationY}
       />
 
-      {/* QR Section - hidden on mobile */}
+      {/* QR Section - hidden on mobile and miniapp */}
       <QRSection
         caseId={data.caseId}
         yOffset={qrY}
-        isMobile={isMobile}
+        isMobile={shouldHideQR}
       />
 
       {/* Footer */}
