@@ -110,9 +110,20 @@ export default function PublicStatsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 to-purple-600 text-white p-8">
-        <div className="max-w-6xl mx-auto text-center">
-          <h1 className="text-4xl font-bold mb-4">OrthoIQ Network Statistics</h1>
-          <p className="text-xl opacity-90">Transparent AI agent performance metrics</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-4">
+            <Link
+              href="/miniapp"
+              className="inline-flex items-center px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full text-sm transition-colors"
+            >
+              ← Back to App
+            </Link>
+            <div className="w-24"></div> {/* Spacer for centering */}
+          </div>
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">OrthoIQ Network Statistics</h1>
+            <p className="text-xl opacity-90">Transparent AI agent performance metrics</p>
+          </div>
         </div>
       </div>
 
@@ -255,9 +266,8 @@ export default function PublicStatsPage() {
         <div className="text-center text-sm text-gray-500 py-6">
           <p>Statistics update in real-time based on consultation data and agent performance.</p>
           <p className="mt-2">
-            For more information, visit{' '}
-            <Link href="/" className="text-blue-600 hover:text-blue-800">
-              OrthoIQ
+            <Link href="/miniapp" className="text-blue-600 hover:text-blue-800">
+              ← Return to OrthoIQ
             </Link>
           </p>
         </div>
