@@ -190,6 +190,10 @@ async function tryOrthoIQAgents(
   const mode = options?.mode || 'fast'; // Default to fast mode
   const AGENTS_TIMEOUT = mode === 'fast' ? 100000 : 120000; // 100s for fast, 120s for normal
 
+  // Debug: Log the endpoint being used to verify env var is correct
+  console.log(`[${requestId || 'unknown'}] [OrthoIQ] AGENTS_ENDPOINT resolved to: ${AGENTS_ENDPOINT}`);
+  console.log(`[${requestId || 'unknown'}] [OrthoIQ] ORTHOIQ_AGENTS_URL env var: ${process.env.ORTHOIQ_AGENTS_URL || 'NOT SET - using default'}`);
+
   try {
     // Health check first
     const healthResponse = await fetch(`${AGENTS_ENDPOINT}/health`, {
