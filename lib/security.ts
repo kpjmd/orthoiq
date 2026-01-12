@@ -3,7 +3,7 @@
 export interface SecurityCheck {
   isValid: boolean;
   reason?: string;
-  category?: 'spam' | 'inappropriate' | 'medical-emergency' | 'non-orthopedic';
+  category?: 'spam' | 'inappropriate' | 'medical-emergency';
 }
 
 // Enhanced content filtering for orthopedic relevance
@@ -58,39 +58,7 @@ export function validateOrthopedicContent(question: string): SecurityCheck {
       };
     }
   }
-  
-  // Check for orthopedic relevance
-  const orthopedicKeywords = [
-    // Bones and joints
-    'bone', 'fracture', 'break', 'joint', 'knee', 'shoulder', 'hip', 'ankle', 'wrist',
-    'elbow', 'spine', 'back', 'neck', 'foot', 'hand', 'finger', 'toe',
-    
-    // Muscles and soft tissue
-    'muscle', 'tendon', 'ligament', 'cartilage', 'strain', 'sprain', 'tear',
-    
-    // Sports medicine
-    'sports', 'injury', 'athletic', 'running', 'basketball', 'football', 'tennis',
-    
-    // Symptoms
-    'pain', 'ache', 'swelling', 'stiff', 'mobility', 'range of motion',
-    
-    // Treatments
-    'physical therapy', 'rehabilitation', 'exercise', 'stretching', 'ice', 'heat',
-    'orthopedic', 'orthopaedic', 'musculoskeletal'
-  ];
-  
-  const hasOrthopedicContent = orthopedicKeywords.some(keyword => 
-    cleanQuestion.includes(keyword)
-  );
-  
-  if (!hasOrthopedicContent && cleanQuestion.length > 20) {
-    return {
-      isValid: false,
-      reason: 'I specialize in orthopedic and sports medicine questions only. Please ask about topics like bone/joint injuries, muscle problems, sports injuries, physical therapy, or related medical concerns.',
-      category: 'non-orthopedic'
-    };
-  }
-  
+
   return { isValid: true };
 }
 
