@@ -121,27 +121,6 @@ export async function POST(request: NextRequest) {
       console.warn(`[${requestId}] orthoiq-agents backend unavailable:`, backendError);
     }
 
-    // Also submit to the feedback endpoint for training data
-    try {
-      await fetch(`${AGENTS_ENDPOINT}/feedback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          consultationId,
-          feedbackType: 'md_review',
-          mdReview: {
-            approved,
-            clinicalAccuracy,
-            notes: feedbackNotes,
-            reviewerFid
-          }
-        }),
-        signal: AbortSignal.timeout(5000)
-      });
-    } catch (feedbackError) {
-      console.warn(`[${requestId}] Could not submit to feedback endpoint:`, feedbackError);
-    }
-
     return NextResponse.json({
       success: true,
       consultationId,
