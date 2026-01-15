@@ -34,7 +34,7 @@ export async function sendMagicLinkEmail(
   email: string,
   token: string
 ): Promise<EmailResult> {
-  const magicLink = `${APP_URL}/auth/verify?token=${token}`;
+  const magicLink = `${APP_URL}/api/auth/verify-magic-link?token=${token}`;
 
   try {
     const { data, error } = await getResendClient().emails.send({

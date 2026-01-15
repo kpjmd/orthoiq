@@ -124,7 +124,7 @@ const formatStructuredResponse = (obj: any): string => {
 };
 
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
-  const { user, isAuthenticated, isVerified, signOut, upgradeToEmail, isLoading: authLoading } = useWebAuth();
+  const { user, isAuthenticated, isVerified, signOut, upgradeToEmail, isLoading: authLoading, magicLinkSent } = useWebAuth();
   const [question, setQuestion] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [responseData, setResponseData] = useState<ResponseData | null>(null);
@@ -136,6 +136,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const [showUpgradeForm, setShowUpgradeForm] = useState(false);
   const [upgradeEmail, setUpgradeEmail] = useState('');
   const [upgradeError, setUpgradeError] = useState('');
+  const [upgradeSentEmail, setUpgradeSentEmail] = useState('');
   const [consultationMode, setConsultationMode] = useState<'fast' | 'normal'>('fast');
 
   // Web tracking state - limits: 1 for guest, 10 for verified email
@@ -384,12 +385,22 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
     try {
       setUpgradeError('');
-      await upgradeToEmail(upgradeEmail);
-      setShowUpgradeForm(false);
-      setUpgradeEmail('');
+      const result = await upgradeToEmail(upgradeEmail);
+      if (result.success) {
+        setUpgradeSentEmail(upgradeEmail);
+      } else {
+        setUpgradeError(result.message);
+      }
     } catch (err) {
       setUpgradeError(err instanceof Error ? err.message : 'Upgrade failed');
     }
+  };
+
+  const handleCloseUpgradeForm = () => {
+    setShowUpgradeForm(false);
+    setUpgradeEmail('');
+    setUpgradeError('');
+    setUpgradeSentEmail('');
   };
 
   const getRemainingQuestions = () => {
@@ -1007,56 +1018,84 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         {showUpgradeForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold mb-4">Add Email to Your Account</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Adding an email helps us remember your preferences and question history.
-              </p>
-              
-              <form onSubmit={handleUpgradeToEmail}>
-                <div className="mb-4">
-                  <label htmlFor="upgrade-email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="upgrade-email"
-                    value={upgradeEmail}
-                    onChange={(e) => setUpgradeEmail(e.target.value)}
-                    placeholder="your.email@example.com"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={authLoading}
-                    required
-                  />
-                </div>
-
-                {upgradeError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-800 text-sm">{upgradeError}</p>
+              {magicLinkSent && upgradeSentEmail ? (
+                <>
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Check your email</h3>
+                    <p className="text-sm text-gray-600">
+                      We sent a magic link to
+                    </p>
+                    <p className="text-blue-600 font-medium text-sm">{upgradeSentEmail}</p>
                   </div>
-                )}
 
-                <div className="flex gap-3">
+                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-gray-600 text-center">
+                      Click the link in your email to verify. The link expires in 15 minutes.
+                    </p>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => {
-                      setShowUpgradeForm(false);
-                      setUpgradeEmail('');
-                      setUpgradeError('');
-                    }}
-                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                    disabled={authLoading}
+                    onClick={handleCloseUpgradeForm}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    Cancel
+                    Got it
                   </button>
-                  <button
-                    type="submit"
-                    disabled={authLoading || !upgradeEmail.trim()}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {authLoading ? 'Adding...' : 'Add Email'}
-                  </button>
-                </div>
-              </form>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-semibold mb-4">Add Email to Your Account</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Get 10 questions/day with a verified email address.
+                  </p>
+
+                  <form onSubmit={handleUpgradeToEmail}>
+                    <div className="mb-4">
+                      <label htmlFor="upgrade-email" className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        id="upgrade-email"
+                        value={upgradeEmail}
+                        onChange={(e) => setUpgradeEmail(e.target.value)}
+                        placeholder="your.email@example.com"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={authLoading}
+                        required
+                      />
+                    </div>
+
+                    {upgradeError && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-red-800 text-sm">{upgradeError}</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCloseUpgradeForm}
+                        className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                        disabled={authLoading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={authLoading || !upgradeEmail.trim()}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {authLoading ? 'Sending...' : 'Send Magic Link'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         )}
