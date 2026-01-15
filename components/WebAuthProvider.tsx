@@ -45,57 +45,54 @@ export function WebAuthProvider({ children }: { children: ReactNode }) {
   const checkSession = useCallback(async () => {
     setIsLoading(true);
     try {
-      // First check localStorage for session token
+      // Check localStorage for session token
       const savedUser = localStorage.getItem('orthoiq_web_user');
       const sessionToken = localStorage.getItem('orthoiq_session_token');
 
-      if (sessionToken) {
-        // Validate session with backend
-        const response = await fetch('/api/auth/session', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${sessionToken}`
-          }
-        });
+      // Always call session API with credentials to check both cookie and header auth
+      // This handles magic link flow (cookie) and returning users (localStorage)
+      const response = await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'include', // Important: include cookies for magic link flow
+        headers: sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {}
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          const verifiedUser: WebUser = {
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.email?.split('@')[0],
-            authType: 'verified',
-            emailVerified: data.user.emailVerified,
-            dailyQuestionCount: data.user.dailyQuestionCount,
-            sessionToken: sessionToken
-          };
-          setUser(verifiedUser);
-          localStorage.setItem('orthoiq_web_user', JSON.stringify(verifiedUser));
-        } else {
-          // Session invalid, clear local storage
-          localStorage.removeItem('orthoiq_session_token');
-          localStorage.removeItem('orthoiq_web_user');
+      if (response.ok) {
+        const data = await response.json();
 
-          // Don't restore any saved user when session token is invalid
-          // User must re-authenticate
-          if (savedUser) {
-            localStorage.removeItem('orthoiq_web_user');
-          }
+        // Store session token from response (in case it came from cookie)
+        if (data.sessionToken) {
+          localStorage.setItem('orthoiq_session_token', data.sessionToken);
         }
-      } else if (savedUser) {
-        // Only restore verified email users, not guests or pending
-        // Guests must re-select "Continue as Guest" on each visit
-        try {
-          const parsedUser = JSON.parse(savedUser);
-          if (parsedUser.authType === 'verified' && parsedUser.emailVerified === true) {
-            setUser(parsedUser);
-          } else {
-            // Clear stale guest/pending sessions - require fresh auth selection
+
+        const verifiedUser: WebUser = {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.email?.split('@')[0],
+          authType: 'verified',
+          emailVerified: data.user.emailVerified,
+          dailyQuestionCount: data.user.dailyQuestionCount,
+          sessionToken: data.sessionToken || sessionToken
+        };
+        setUser(verifiedUser);
+        setMagicLinkSent(false); // Clear magic link sent state after successful verification
+        localStorage.setItem('orthoiq_web_user', JSON.stringify(verifiedUser));
+      } else {
+        // Session invalid, clear local storage
+        localStorage.removeItem('orthoiq_session_token');
+        localStorage.removeItem('orthoiq_web_user');
+
+        // Check if we have a saved verified user (stale session)
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser);
+            // Don't restore - require fresh auth
+            if (parsedUser.authType !== 'guest') {
+              localStorage.removeItem('orthoiq_web_user');
+            }
+          } catch {
             localStorage.removeItem('orthoiq_web_user');
           }
-        } catch (error) {
-          console.error('Failed to parse saved user:', error);
-          localStorage.removeItem('orthoiq_web_user');
         }
       }
     } catch (error) {
