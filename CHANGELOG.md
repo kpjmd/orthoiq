@@ -1,5 +1,30 @@
 # OrthoIQ Changelog
 
+## [1.5.0] - 2026-01-15: Resend Email Authentication Live in Production
+
+### Added
+- **Production Email Authentication with Resend**
+  - Custom domain `orthoiq.io` verified with Resend for sending magic link emails
+  - Magic link authentication fully functional in production
+  - "Check your email" UX screen after email entry with resend option
+  - Session handling via httpOnly cookies with localStorage fallback
+
+### Fixed
+- **Magic Link 404 Error**: Changed email link from `/auth/verify` to `/api/auth/verify-magic-link`
+- **Returning User Token Validation**: Removed `email_verified = false` check allowing users to re-authenticate
+- **Check Email Screen Persistence**: AuthSection now shows sign-in screen for pending verification users
+- **Session Cookie Handling**: `/api/auth/session` now reads from cookie first (for magic link flow), then Authorization header
+
+### Environment Variables Added to Production (Vercel)
+- `RESEND_API_KEY` - Resend API key for email delivery
+- `FROM_EMAIL` - Set to `OrthoIQ <noreply@orthoiq.io>`
+
+### Known Issues
+- Guest users can sign out and back in to reset their 1/1 question limit (should persist for 24 hours)
+- Email authenticated users receive "Invalid user identifier format" error when attempting consultations
+
+---
+
 ## [Unreleased] - 2026-01-02: Authentication & Intelligence Card Enhancements
 
 ### Added
