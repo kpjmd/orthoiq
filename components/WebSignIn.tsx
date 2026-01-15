@@ -5,11 +5,14 @@ import { useWebAuth } from './WebAuthProvider';
 import OrthoIQLogo from './OrthoIQLogo';
 
 export default function WebSignIn() {
-  const { signInWithEmail, signInAsGuest, isLoading, magicLinkSent } = useWebAuth();
+  const { signInWithEmail, signInAsGuest, isLoading, magicLinkSent, user } = useWebAuth();
   const [email, setEmail] = useState('');
   const [sentEmail, setSentEmail] = useState('');
   const [error, setError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(false);
+
+  // Use email from user context if available (handles page refresh case)
+  const displayEmail = sentEmail || user?.email || '';
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,11 +30,11 @@ export default function WebSignIn() {
   };
 
   const handleResend = async () => {
-    if (resendCooldown) return;
+    if (resendCooldown || !displayEmail) return;
     try {
       setError('');
       setResendCooldown(true);
-      const result = await signInWithEmail(sentEmail);
+      const result = await signInWithEmail(displayEmail);
       if (!result.success) {
         setError(result.message);
       }
@@ -55,7 +58,7 @@ export default function WebSignIn() {
   };
 
   // Show "Check your email" screen after magic link is sent
-  if (magicLinkSent && sentEmail) {
+  if (magicLinkSent && displayEmail) {
     return (
       <div className="bg-white rounded-lg shadow-lg border p-8 max-w-md mx-auto">
         <div className="text-center mb-6">
@@ -70,7 +73,7 @@ export default function WebSignIn() {
           <p className="text-gray-600">
             We sent a magic link to
           </p>
-          <p className="text-blue-600 font-medium mt-1">{sentEmail}</p>
+          <p className="text-blue-600 font-medium mt-1">{displayEmail}</p>
         </div>
 
         <div className="bg-gray-50 rounded-lg p-4 mb-6">

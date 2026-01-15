@@ -3686,6 +3686,7 @@ export async function getWebUserById(id: string): Promise<WebUser | null> {
 }
 
 // Verify web user by token (magic link verification)
+// Works for both new users and returning users re-authenticating
 export async function verifyWebUser(token: string): Promise<WebUser | null> {
   const sql = getSql();
 
@@ -3699,7 +3700,6 @@ export async function verifyWebUser(token: string): Promise<WebUser | null> {
         last_login = CURRENT_TIMESTAMP
       WHERE verification_token = ${token}
         AND verification_expires_at > CURRENT_TIMESTAMP
-        AND email_verified = false
       RETURNING *
     `;
 
