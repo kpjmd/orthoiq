@@ -1028,7 +1028,23 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_feedback_milestones_web_user_id ON feedback_milestones(web_user_id);
     `;
 
-    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, and web user auth tables)');
+    // Web Rate Limits table for persistent rate limiting (survives server restarts)
+    await sql`
+      CREATE TABLE IF NOT EXISTS web_rate_limits (
+        session_id VARCHAR(255) PRIMARY KEY,
+        count INTEGER DEFAULT 0,
+        reset_time TIMESTAMP WITH TIME ZONE NOT NULL,
+        is_verified BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_rate_limits_reset_time ON web_rate_limits(reset_time);
+    `;
+
+    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, and web rate limits tables)');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -3937,5 +3953,148 @@ export async function getWebUserQuestionStatus(id: string): Promise<{ count: num
   } catch (error) {
     console.error('Error getting web user question status:', error);
     return { count: 0, limit: 1, remaining: 1, isVerified: false };
+  }
+}
+
+// ==================== WEB RATE LIMITS (Database-backed) ====================
+
+export interface WebRateLimitEntry {
+  session_id: string;
+  count: number;
+  reset_time: Date;
+  is_verified: boolean;
+}
+
+/**
+ * Get the current rate limit entry for a session ID
+ * Returns null if no entry exists or if reset time has passed
+ */
+export async function getWebRateLimit(sessionId: string): Promise<WebRateLimitEntry | null> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      SELECT session_id, count, reset_time, is_verified
+      FROM web_rate_limits
+      WHERE session_id = ${sessionId}
+        AND reset_time > NOW()
+    `;
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    return {
+      session_id: result[0].session_id,
+      count: result[0].count,
+      reset_time: new Date(result[0].reset_time),
+      is_verified: result[0].is_verified
+    };
+  } catch (error) {
+    console.error('Error getting web rate limit:', error);
+    return null;
+  }
+}
+
+/**
+ * Increment the rate limit count for a session ID
+ * Creates a new entry if none exists or if reset time has passed
+ * Returns the updated entry
+ */
+export async function incrementWebRateLimit(
+  sessionId: string,
+  isVerified: boolean = false
+): Promise<WebRateLimitEntry> {
+  const sql = getSql();
+  const resetTime = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+  try {
+    // Use upsert to create or update the entry
+    const result = await sql`
+      INSERT INTO web_rate_limits (session_id, count, reset_time, is_verified, updated_at)
+      VALUES (${sessionId}, 1, ${resetTime}, ${isVerified}, NOW())
+      ON CONFLICT (session_id) DO UPDATE SET
+        count = CASE
+          WHEN web_rate_limits.reset_time <= NOW() THEN 1
+          ELSE web_rate_limits.count + 1
+        END,
+        reset_time = CASE
+          WHEN web_rate_limits.reset_time <= NOW() THEN ${resetTime}
+          ELSE web_rate_limits.reset_time
+        END,
+        is_verified = ${isVerified},
+        updated_at = NOW()
+      RETURNING session_id, count, reset_time, is_verified
+    `;
+
+    return {
+      session_id: result[0].session_id,
+      count: result[0].count,
+      reset_time: new Date(result[0].reset_time),
+      is_verified: result[0].is_verified
+    };
+  } catch (error) {
+    console.error('Error incrementing web rate limit:', error);
+    // Return a default entry on error (fail open for better UX)
+    return {
+      session_id: sessionId,
+      count: 1,
+      reset_time: resetTime,
+      is_verified: isVerified
+    };
+  }
+}
+
+/**
+ * Check rate limit status without incrementing
+ * Returns the current count and remaining questions
+ */
+export async function checkWebRateLimitStatus(
+  sessionId: string,
+  isVerified: boolean = false
+): Promise<{ count: number; remaining: number; total: number; resetTime: Date | null }> {
+  const VERIFIED_LIMIT = 10;
+  const UNVERIFIED_LIMIT = 1;
+  const limit = isVerified ? VERIFIED_LIMIT : UNVERIFIED_LIMIT;
+
+  const entry = await getWebRateLimit(sessionId);
+
+  if (!entry) {
+    // No entry or expired - user has full limit
+    return {
+      count: 0,
+      remaining: limit,
+      total: limit,
+      resetTime: null
+    };
+  }
+
+  const remaining = Math.max(0, limit - entry.count);
+
+  return {
+    count: entry.count,
+    remaining,
+    total: limit,
+    resetTime: entry.reset_time
+  };
+}
+
+/**
+ * Clean up expired rate limit entries (optional maintenance function)
+ */
+export async function cleanupExpiredRateLimits(): Promise<number> {
+  const sql = getSql();
+
+  try {
+    const result = await sql`
+      DELETE FROM web_rate_limits
+      WHERE reset_time <= NOW()
+      RETURNING session_id
+    `;
+
+    return result.length;
+  } catch (error) {
+    console.error('Error cleaning up expired rate limits:', error);
+    return 0;
   }
 }

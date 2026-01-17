@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser } = requestBody;
+    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser, webSessionId } = requestBody;
 
     if (!question) {
       console.warn(`[${requestId}] Missing required field: question`);
@@ -77,10 +77,12 @@ export async function POST(request: NextRequest) {
 
     // Detect platform: miniapp requires FID, web uses session/IP
     const detectedPlatform: Platform = platform || (fid && fid !== 'guest' ? 'miniapp' : 'web');
-    // For web users, use webUser.id if available, otherwise fall back to IP
+    // For web users: always prefer webSessionId (persistent across sign-out/in), then webUser.id, then IP
     const rateLimitIdentifier = detectedPlatform === 'miniapp'
       ? fid
-      : (webUser?.id || `web:${clientIP}`);
+      : webSessionId || webUser?.id || `web:${clientIP}`;
+
+    console.log(`[${requestId}] Rate limit identifier: ${rateLimitIdentifier}, webSessionId: ${webSessionId}, webUser.id: ${webUser?.id}, authType: ${webUser?.authType}`);
 
     if (detectedPlatform === 'miniapp' && !fid) {
       console.warn(`[${requestId}] Mini app requires FID`);

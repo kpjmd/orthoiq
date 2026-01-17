@@ -3,6 +3,12 @@
 // Web verified users: 10/day
 // Web unverified users: 1/day
 
+import {
+  getWebRateLimit,
+  incrementWebRateLimit,
+  checkWebRateLimitStatus
+} from './database';
+
 interface RateLimitEntry {
   count: number;
   resetTime: Date;
@@ -11,11 +17,10 @@ interface RateLimitEntry {
   mode?: 'fast' | 'comprehensive';
 }
 
-// In-memory storage (will reset on server restart)
+// In-memory storage for legacy rate limiting (miniapp backward compatibility)
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Separate store for web users (daily limits based on verification status)
-const webLimitStore = new Map<string, { count: number; resetTime: Date; isVerified: boolean }>();
+// Note: Web rate limits are now stored in the database (survives server restarts)
 
 export type UserTier = 'basic' | 'authenticated' | 'medical';
 export type Platform = 'miniapp' | 'web';
@@ -71,36 +76,19 @@ export async function checkPlatformRateLimit(
   return checkWebRateLimitWithVerification(identifier, isEmailVerified);
 }
 
-// Web rate limiting based on email verification status
+// Web rate limiting based on email verification status (DATABASE-BACKED)
 async function checkWebRateLimitWithVerification(
   identifier: string,
   isVerified: boolean
 ): Promise<RateLimitResult> {
-  const now = new Date();
-  const key = `web:${identifier}`;
   const dailyLimit = isVerified ? WEB_VERIFIED_DAILY_LIMIT : WEB_UNVERIFIED_DAILY_LIMIT;
 
-  // Get existing entry
-  let entry = webLimitStore.get(key);
+  // Get current rate limit from database
+  const currentEntry = await getWebRateLimit(identifier);
+  const currentCount = currentEntry?.count ?? 0;
 
-  // If no entry exists or reset time has passed, create/reset entry
-  if (!entry || now >= entry.resetTime) {
-    entry = {
-      count: 0,
-      resetTime: new Date(now.getTime() + RESET_INTERVAL_MS),
-      isVerified
-    };
-    webLimitStore.set(key, entry);
-  }
-
-  // Update verification status if changed
-  if (entry.isVerified !== isVerified) {
-    entry.isVerified = isVerified;
-    webLimitStore.set(key, entry);
-  }
-
-  // Check if limit exceeded
-  if (entry.count >= dailyLimit) {
+  // Check if limit exceeded BEFORE incrementing
+  if (currentCount >= dailyLimit) {
     // Soft notification messages
     let softWarning: string;
     let upgradePrompt: string | undefined;
@@ -115,7 +103,7 @@ async function checkWebRateLimitWithVerification(
 
     return {
       allowed: false,
-      resetTime: entry.resetTime,
+      resetTime: currentEntry?.reset_time,
       remaining: 0,
       total: dailyLimit,
       platform: 'web',
@@ -125,11 +113,9 @@ async function checkWebRateLimitWithVerification(
     };
   }
 
-  // Increment count and allow request
-  entry.count++;
-  webLimitStore.set(key, entry);
-
-  const remaining = dailyLimit - entry.count;
+  // Increment count in database and allow request
+  const updatedEntry = await incrementWebRateLimit(identifier, isVerified);
+  const remaining = dailyLimit - updatedEntry.count;
 
   // Near limit warning
   let softWarning: string | undefined;
@@ -139,7 +125,7 @@ async function checkWebRateLimitWithVerification(
 
   return {
     allowed: true,
-    resetTime: entry.resetTime,
+    resetTime: updatedEntry.reset_time,
     remaining,
     total: dailyLimit,
     platform: 'web',
@@ -148,7 +134,7 @@ async function checkWebRateLimitWithVerification(
   };
 }
 
-// Get rate limit status without incrementing
+// Get rate limit status without incrementing (DATABASE-BACKED)
 export async function getPlatformRateLimitStatus(
   identifier: string,
   platform: Platform,
@@ -167,27 +153,15 @@ export async function getPlatformRateLimitStatus(
     };
   }
 
-  // Web: Check status without incrementing
-  const now = new Date();
-  const key = `web:${identifier}`;
+  // Web: Check status from database without incrementing
   const dailyLimit = isEmailVerified ? WEB_VERIFIED_DAILY_LIMIT : WEB_UNVERIFIED_DAILY_LIMIT;
-  const entry = webLimitStore.get(key);
+  const dbStatus = await checkWebRateLimitStatus(identifier, isEmailVerified);
 
-  if (!entry || now >= entry.resetTime) {
-    return {
-      allowed: true,
-      remaining: dailyLimit,
-      total: dailyLimit,
-      platform: 'web',
-      isVerified: isEmailVerified
-    };
-  }
-
-  const remaining = Math.max(0, dailyLimit - entry.count);
+  const remaining = Math.max(0, dailyLimit - dbStatus.count);
 
   return {
     allowed: remaining > 0,
-    resetTime: entry.resetTime,
+    resetTime: dbStatus.resetTime ?? undefined,
     remaining,
     total: dailyLimit,
     platform: 'web',
@@ -317,20 +291,14 @@ export async function checkIPRateLimit(ip: string): Promise<RateLimitResult> {
 }
 
 // Clean up expired entries periodically
+// Note: Web rate limits are now cleaned up via database (see cleanupExpiredRateLimits in database.ts)
 setInterval(() => {
   const now = new Date();
 
-  // Clean up user rate limits
+  // Clean up user rate limits (legacy in-memory for miniapp backward compatibility)
   for (const [key, entry] of rateLimitStore.entries()) {
     if (now >= entry.resetTime) {
       rateLimitStore.delete(key);
-    }
-  }
-
-  // Clean up web rate limits
-  for (const [key, entry] of webLimitStore.entries()) {
-    if (now >= entry.resetTime) {
-      webLimitStore.delete(key);
     }
   }
 

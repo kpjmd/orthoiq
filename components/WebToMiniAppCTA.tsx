@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   questionsRemaining: number;
-  isHardLimit: boolean; // True when hit 3-question limit
+  isHardLimit: boolean; // True when daily question limit is reached
+  totalLimit?: number;  // Total daily limit (1 for guest, 10 for verified)
   onDismiss?: () => void;
 }
 
-export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, onDismiss }: Props) {
+export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, totalLimit = 1, onDismiss }: Props) {
   const REFERRAL_LINK = 'https://farcaster.xyz/~/code/HPGS71';
 
   return (
@@ -46,7 +47,7 @@ export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, onDis
                   You&apos;ve Hit the Web Limit
                 </h2>
                 <p className="text-red-700 font-medium">
-                  All 3 free web questions used!
+                  {totalLimit === 1 ? 'Your free question has been used!' : `All ${totalLimit} daily questions used!`}
                 </p>
               </>
             ) : (
@@ -89,7 +90,7 @@ export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, onDis
               <li className="flex items-start">
                 <span className="text-green-600 mr-2 mt-0.5">✅</span>
                 <span className="text-sm text-gray-800">
-                  <strong>Prescription NFT artwork</strong> with mint capability
+                  <strong>Intelligence Card</strong> with shareable insights
                 </span>
               </li>
             </ul>

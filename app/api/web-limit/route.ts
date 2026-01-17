@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hashIP } from '@/lib/webTracking';
 import { getPlatformRateLimitStatus } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get session ID from headers
+    // Get session ID and email verification status from headers
     const sessionId = request.headers.get('x-session-id');
+    const isEmailVerified = request.headers.get('x-email-verified') === 'true';
 
     if (!sessionId) {
       return NextResponse.json(
@@ -14,28 +14,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get client IP and hash it
-    const clientIP = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                     request.headers.get('x-real-ip') ||
-                     'unknown';
-    const ipHash = hashIP(clientIP);
+    // Use session ID as identifier (matches /api/claude format)
+    const identifier = sessionId;
 
-    // Create unique identifier combining session and IP
-    const identifier = `${sessionId}:${ipHash}`;
+    // Default limit: 1 for unverified, 10 for verified
+    const defaultLimit = isEmailVerified ? 10 : 1;
 
     // Get web usage status (doesn't increment)
     const rateLimit = await getPlatformRateLimitStatus(
       identifier,
       'web',
       'fast',
-      'basic'
+      'basic',
+      isEmailVerified  // Pass email verification status
     );
 
     return NextResponse.json({
-      questionsAsked: (rateLimit.total || 3) - (rateLimit.remaining || 3),
-      questionsRemaining: rateLimit.remaining || 3,
+      questionsAsked: (rateLimit.total || defaultLimit) - (rateLimit.remaining ?? defaultLimit),
+      questionsRemaining: rateLimit.remaining ?? defaultLimit,
       isLimitReached: !rateLimit.allowed,
-      total: rateLimit.total || 3
+      total: rateLimit.total || defaultLimit,
+      isVerified: isEmailVerified
     });
   } catch (error) {
     console.error('Error fetching web limit:', error);

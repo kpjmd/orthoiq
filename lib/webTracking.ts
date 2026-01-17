@@ -57,14 +57,19 @@ export function hashIP(ip: string): string {
 
 /**
  * Get web session usage from API
+ * @param isEmailVerified - Whether the user has verified their email (affects limit: 1 vs 10)
  */
-export async function getWebSessionUsage(): Promise<WebUsageResult> {
+export async function getWebSessionUsage(isEmailVerified: boolean = false): Promise<WebUsageResult> {
+  // Default limit based on verification status
+  const defaultLimit = isEmailVerified ? 10 : 1;
+
   try {
     const sessionId = generateSessionId();
     const response = await fetch('/api/web-limit', {
       method: 'GET',
       headers: {
-        'x-session-id': sessionId
+        'x-session-id': sessionId,
+        'x-email-verified': isEmailVerified ? 'true' : 'false'
       }
     });
 
@@ -72,7 +77,7 @@ export async function getWebSessionUsage(): Promise<WebUsageResult> {
       console.error('Failed to fetch web usage:', response.statusText);
       return {
         questionsAsked: 0,
-        questionsRemaining: 3,
+        questionsRemaining: defaultLimit,
         isLimitReached: false
       };
     }
@@ -83,7 +88,7 @@ export async function getWebSessionUsage(): Promise<WebUsageResult> {
     console.error('Error fetching web session usage:', error);
     return {
       questionsAsked: 0,
-      questionsRemaining: 3,
+      questionsRemaining: defaultLimit,
       isLimitReached: false
     };
   }

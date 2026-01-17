@@ -156,11 +156,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     confidence: number;
   } | null>(null);
 
-  // Initialize session and fetch web usage on mount
+  // Initialize session and fetch web usage on mount and when verification changes
   useEffect(() => {
     generateSessionId(); // Ensures session ID exists
     fetchWebUsage();
-  }, []);
+  }, [isVerified]);
 
   // Update question limits based on verification status
   useEffect(() => {
@@ -176,7 +176,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   // Fetch web usage from API
   const fetchWebUsage = async () => {
     try {
-      const usage = await getWebSessionUsage();
+      const usage = await getWebSessionUsage(isVerified);
       setWebUsage(usage);
 
       // Show soft CTA after first question (if not dismissed)
@@ -215,6 +215,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     console.log(`[WebOrthoInterface] Sending request with tier: ${userTier}, user:`, user);
 
     try {
+      // Get session ID before fetch call to avoid SSR/hydration issues
+      const sessionId = generateSessionId();
+
       // Create AbortController with 120 second timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -229,7 +232,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           isWebUser: true,
           webUser: user,
           mode: consultationMode,
-          platform: 'web' // Explicitly set platform for rate limiting
+          platform: 'web', // Explicitly set platform for rate limiting
+          webSessionId: sessionId // Persistent session ID for guest rate limiting
         }),
         signal: controller.signal,
       });
@@ -525,6 +529,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           <WebToMiniAppCTA
             questionsRemaining={webUsage.questionsRemaining}
             isHardLimit={webUsage.isLimitReached}
+            totalLimit={isVerified ? 10 : 1}
             onDismiss={!webUsage.isLimitReached ? () => {
               setShowCTA(false);
               setCTADismissed(true);

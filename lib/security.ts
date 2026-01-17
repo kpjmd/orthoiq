@@ -72,10 +72,11 @@ export function validateRateLimitRequest(fid: string): SecurityCheck {
   // Validate FID format (numeric for Farcaster, or web user prefixes)
   const isNumeric = /^\d+$/.test(fid);
   const isWebUser = /^(guest_|email_|web-)\d+$/.test(fid);
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fid);
   const isDemoUser = fid === 'demo-user';
   const isWebGuest = fid === 'web-guest';
-  
-  if (!isNumeric && !isWebUser && !isDemoUser && !isWebGuest) {
+
+  if (!isNumeric && !isWebUser && !isDemoUser && !isWebGuest && !isUUID) {
     return {
       isValid: false,
       reason: 'Invalid user identifier format.',
