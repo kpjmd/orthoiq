@@ -24,7 +24,7 @@
     "app/api/cron/cleanup-sessions/route.ts": {
       "maxDuration": 60
     },
-    "app/api/cron/send-milestone-emails/route.ts": {
+    "app/api/cron/send-milestone-notifications/route.ts": {
       "maxDuration": 120
     }
   },
@@ -32,6 +32,10 @@
     {
       "path": "/api/notifications/reset-daily",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/send-milestone-notifications",
+      "schedule": "0 9 * * *"
     }
   ],
   "rewrites": [

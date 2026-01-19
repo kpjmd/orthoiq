@@ -426,7 +426,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           {isAuthenticated && user && (
             <div className="mt-3">
               <p className="text-xs opacity-60">
-                Welcome, {user.name}! Questions remaining today: {getRemainingQuestions()} of {dailyQuestions.limit}
+                Welcome, {user.name}! Questions remaining today: {webUsage.questionsRemaining} of {dailyQuestions.limit}
               </p>
               <div className="flex items-center justify-center gap-2 mt-2">
                 <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">

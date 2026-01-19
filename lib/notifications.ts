@@ -126,11 +126,38 @@ export async function sendResponseReviewNotification(data: ResponseReviewNotific
 export async function sendRateLimitResetNotification(fid: string, tier: UserTier): Promise<boolean> {
   const tierLimits = { basic: 1, authenticated: 3, medical: 10 };
   const dailyLimit = tierLimits[tier];
-  
+
   const notification: NotificationData = {
     title: '🔄 Questions Reset',
     body: `Your daily question limit has reset! You can now ask ${dailyLimit} new question${dailyLimit > 1 ? 's' : ''}.`,
     targetUrl: '/miniapp',
+    imageUrl: 'https://orthoiq.vercel.app/icon.png'
+  };
+
+  return await sendNotification(fid, notification);
+}
+
+export async function sendMilestoneNotification(
+  fid: string,
+  consultationId: string,
+  milestoneDay: number
+): Promise<boolean> {
+  const weekNumber = Math.floor(milestoneDay / 7);
+
+  // Customize message based on milestone
+  let focus = 'recovery progress';
+  if (milestoneDay === 14) {
+    focus = 'pain level and initial progress';
+  } else if (milestoneDay === 28) {
+    focus = 'functional improvements';
+  } else if (milestoneDay === 56) {
+    focus = 'long-term recovery and movement quality';
+  }
+
+  const notification: NotificationData = {
+    title: `Week ${weekNumber} Check-in: How are you doing?`,
+    body: `Time for your ${weekNumber}-week follow-up! Share your ${focus} to help track your recovery journey.`,
+    targetUrl: `/miniapp?track=${consultationId}`,
     imageUrl: 'https://orthoiq.vercel.app/icon.png'
   };
 
