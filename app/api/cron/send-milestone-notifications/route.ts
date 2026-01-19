@@ -47,10 +47,8 @@ export async function GET(request: NextRequest) {
         // Find web users with verified emails
         const dueEmailConsultations = await sql`
           SELECT
-            c.id as consultation_id,
-            c.case_id,
-            c.consultation_id as consultation_id_str,
-            c.question,
+            c.id,
+            c.consultation_id,
             c.created_at,
             wu.id as web_user_id,
             wu.email
@@ -82,7 +80,7 @@ export async function GET(request: NextRequest) {
           try {
             await sendMilestoneEmail(
               consultation.email,
-              consultation.case_id || consultation.consultation_id_str || consultation.consultation_id.toString(),
+              consultation.consultation_id,
               milestoneDay
             );
 
@@ -93,7 +91,7 @@ export async function GET(request: NextRequest) {
                 ${consultation.web_user_id.toString()},
                 ${'Week ' + weekNumber + ' Check-in'},
                 ${'Milestone follow-up email sent'},
-                ${'/track/' + (consultation.case_id || consultation.consultation_id_str || consultation.consultation_id)},
+                ${'/track/' + consultation.consultation_id},
                 true,
                 NOW()
               )
@@ -114,11 +112,9 @@ export async function GET(request: NextRequest) {
         // Find Farcaster users with notification tokens enabled
         const dueFarcasterConsultations = await sql`
           SELECT
-            c.id as consultation_id,
-            c.case_id,
-            c.consultation_id as consultation_id_str,
+            c.id,
+            c.consultation_id,
             c.fid,
-            c.question,
             c.created_at
           FROM consultations c
           WHERE c.fid IS NOT NULL
@@ -153,7 +149,7 @@ export async function GET(request: NextRequest) {
           try {
             const sent = await sendMilestoneNotification(
               consultation.fid,
-              consultation.case_id || consultation.consultation_id_str || consultation.consultation_id.toString(),
+              consultation.consultation_id,
               milestoneDay
             );
 
