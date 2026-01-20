@@ -1,5 +1,21 @@
 # OrthoIQ Changelog
 
+## [1.5.1] - 2026-01-19: Web User Milestone Notifications Fix
+
+### Fixed
+- **Web User Consultation Linking**: Consultations created by verified email users now properly populate the `web_user_id` column in the database
+  - Updated `storeConsultation()` function to accept optional `webUserId` parameter
+  - Modified `/api/claude` route to pass authenticated user's ID when creating consultations
+  - Enables milestone notification cron job to correctly identify and notify email-authenticated users at 2, 4, and 8 week milestones
+  - Previous consultations remain unlinked (NULL `web_user_id`); new consultations from verified users will receive milestone emails
+
+### Technical Details
+- Modified files: `lib/database.ts`, `app/api/claude/route.ts`
+- The `consultations.web_user_id` column (added in previous migration) is now properly utilized
+- Milestone cron job (`/api/cron/send-milestone-notifications`) uses `INNER JOIN` on `web_user_id` to find eligible users
+
+---
+
 ## [1.5.0] - 2026-01-15: Resend Email Authentication Live in Production
 
 ### Added
