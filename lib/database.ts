@@ -3235,6 +3235,7 @@ export async function storeConsultation(data: {
   consultationId: string;
   questionId: number;
   fid: string;
+  webUserId?: string;
   mode: 'fast' | 'normal';
   participatingSpecialists: string[];
   coordinationSummary?: string;
@@ -3247,12 +3248,13 @@ export async function storeConsultation(data: {
   try {
     await sql`
       INSERT INTO consultations (
-        consultation_id, question_id, fid, mode, participating_specialists,
+        consultation_id, question_id, fid, web_user_id, mode, participating_specialists,
         coordination_summary, specialist_count, total_cost, execution_time
       ) VALUES (
         ${data.consultationId},
         ${data.questionId},
         ${data.fid},
+        ${data.webUserId || null},
         ${data.mode},
         ${JSON.stringify(data.participatingSpecialists)},
         ${data.coordinationSummary || null},

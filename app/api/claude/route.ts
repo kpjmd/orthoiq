@@ -405,6 +405,7 @@ export async function POST(request: NextRequest) {
             consultationId: specialistConsultation.consultationId,
             questionId: questionId,
             fid: fid,
+            webUserId: webUser?.id,
             mode: (mode === 'normal' ? 'normal' : 'fast') as 'fast' | 'normal',
             participatingSpecialists: specialistConsultation.participatingSpecialists,
             coordinationSummary: specialistConsultation.coordinationSummary,
