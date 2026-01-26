@@ -188,6 +188,22 @@ export default function ResponseCard({
   const cardData = useMemo(() => {
     if (rawConsultationData && feedbackSubmitted) {
       console.log('[ResponseCard] Generating card data from:', rawConsultationData);
+
+      // Validate data structure before mapping
+      const hasValidData = (
+        (Array.isArray(rawConsultationData.responses) && rawConsultationData.responses.length > 0) ||
+        (Array.isArray(rawConsultationData.participatingSpecialists) && rawConsultationData.participatingSpecialists.length > 0)
+      );
+
+      if (!hasValidData) {
+        console.warn('[ResponseCard] rawConsultationData exists but lacks valid responses or specialists', {
+          hasResponses: !!rawConsultationData.responses,
+          responsesLength: rawConsultationData.responses?.length,
+          hasParticipatingSpecialists: !!rawConsultationData.participatingSpecialists,
+          participatingSpecialistsLength: rawConsultationData.participatingSpecialists?.length
+        });
+      }
+
       const data = mapConsultationToCardData(rawConsultationData);
       console.log('[ResponseCard] Generated card data:', data);
       return data;

@@ -37,12 +37,41 @@ export default function IntelligenceCardModal({
   const cardRef = useRef<SVGSVGElement>(null);
 
   // Debug logging to trace data flow
-  console.log('[IntelligenceCardModal] rawConsultationData:', rawConsultationData);
-  console.log('[IntelligenceCardModal] responses:', rawConsultationData?.responses);
-  console.log('[IntelligenceCardModal] responses length:', rawConsultationData?.responses?.length);
+  console.log('[IntelligenceCardModal] Props received:', {
+    hasRawConsultationData: !!rawConsultationData,
+    hasUserFeedback: !!userFeedback,
+    hasMdReview: !!mdReview,
+    isMiniApp,
+    fid
+  });
+  console.log('[IntelligenceCardModal] rawConsultationData structure:', {
+    hasResponses: !!rawConsultationData?.responses,
+    responsesLength: rawConsultationData?.responses?.length,
+    responsesArray: rawConsultationData?.responses,
+    hasParticipatingSpecialists: !!rawConsultationData?.participatingSpecialists,
+    participatingSpecialistsLength: rawConsultationData?.participatingSpecialists?.length,
+    participatingSpecialistsArray: rawConsultationData?.participatingSpecialists,
+    hasSynthesizedRecommendations: !!rawConsultationData?.synthesizedRecommendations,
+    consultationId: rawConsultationData?.consultationId
+  });
+
+  // Validate data before mapping
+  if (rawConsultationData) {
+    const hasValidResponses = Array.isArray(rawConsultationData.responses) && rawConsultationData.responses.length > 0;
+    const hasValidSpecialists = Array.isArray(rawConsultationData.participatingSpecialists) && rawConsultationData.participatingSpecialists.length > 0;
+
+    if (!hasValidResponses && !hasValidSpecialists) {
+      console.warn('[IntelligenceCardModal] Missing both responses and participatingSpecialists - will fall back to mock data');
+    }
+  }
 
   // Generate card data from consultation
   const cardData: IntelligenceCardData = useMemo(() => {
+    console.log('[IntelligenceCardModal] Generating card data with:', {
+      hasRawData: !!rawConsultationData,
+      hasUserFeedback: !!userFeedback,
+      hasMdReview: !!mdReview
+    });
     return mapConsultationToCardData(rawConsultationData, userFeedback, mdReview);
   }, [rawConsultationData, userFeedback, mdReview]);
 
@@ -252,7 +281,7 @@ export default function IntelligenceCardModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative max-w-lg w-full"
+          className="relative max-w-lg w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close button */}
@@ -384,13 +413,19 @@ export default function IntelligenceCardModal({
             </div>
           </div>
 
-          {/* Tracking CTA */}
+          {/* Tracking CTA - Conditional based on platform */}
           <div className="mt-4 text-center">
-            <p className="text-white/50 text-sm">
-              Scan QR code or visit{' '}
-              <span className="text-blue-400">orthoiq.app/track/{cardData.caseId}</span>
-              {' '}to validate predictions
-            </p>
+            {isMiniApp ? (
+              <p className="text-white/50 text-sm">
+                📬 You'll receive milestone notifications at 2, 4, and 8 weeks to track your progress and validate predictions.
+              </p>
+            ) : (
+              <p className="text-white/50 text-sm">
+                Scan QR code or visit{' '}
+                <span className="text-blue-400">orthoiq.app/track/{cardData.caseId}</span>
+                {' '}to validate predictions
+              </p>
+            )}
           </div>
         </motion.div>
       </motion.div>

@@ -298,7 +298,7 @@ export function mapConsultationToCardData(
 
   // Handle missing data gracefully
   if (!rawConsultationData) {
-    console.log('[mapConsultationToCardData] No data - using fallback');
+    console.error('[mapConsultationToCardData] Missing rawConsultationData - using fallback');
     return createFallbackCardData();
   }
 
@@ -311,6 +311,20 @@ export function mapConsultationToCardData(
   console.log('[mapConsultationToCardData] Parsed - responses count:', responses.length);
   console.log('[mapConsultationToCardData] Parsed - participatingSpecialists:', participatingSpecialists);
   console.log('[mapConsultationToCardData] Parsed - confidenceFactors:', confidenceFactors);
+
+  // Check for missing responses or specialists and log detailed diagnostics
+  if (!responses.length && !participatingSpecialists.length) {
+    console.error('[mapConsultationToCardData] No responses or specialists found', {
+      hasResponses: !!rawConsultationData.responses,
+      responsesIsArray: Array.isArray(rawConsultationData.responses),
+      responsesLength: rawConsultationData.responses?.length,
+      hasParticipatingSpecialists: !!rawConsultationData.participatingSpecialists,
+      participatingSpecialistsIsArray: Array.isArray(rawConsultationData.participatingSpecialists),
+      participatingSpecialistsLength: rawConsultationData.participatingSpecialists?.length,
+      rawDataKeys: Object.keys(rawConsultationData)
+    });
+    console.warn('[mapConsultationToCardData] Falling back to mock data due to missing consultation data');
+  }
 
   // Build agent stakes from participating specialists
   const agentStakes: AgentStakeData[] = [];
