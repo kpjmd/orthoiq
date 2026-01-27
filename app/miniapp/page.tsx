@@ -424,7 +424,7 @@ function MiniAppContent() {
         agentPerformance: data.agentPerformance,
         agentNetwork: data.agentNetwork,
         // Raw consultation data for Intelligence Card generation
-        rawConsultationData: data
+        rawConsultationData: data.rawConsultationData
       });
       
       setQuestion('');
