@@ -130,7 +130,7 @@ export default function AgentLoadingCards({ isLoading, mode }: AgentLoadingCards
     return () => {
       clearAllTimeouts();
     };
-  }, [isLoading, mode]);
+  }, [isLoading, mode, agents]);
 
   if (!isLoading) return null;
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWebAuth } from './WebAuthProvider';
 import ResponseCard from './ResponseCard';
 import ActionMenu from './ActionMenu';
@@ -156,25 +156,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     confidence: number;
   } | null>(null);
 
-  // Initialize session and fetch web usage on mount and when verification changes
-  useEffect(() => {
-    generateSessionId(); // Ensures session ID exists
-    fetchWebUsage();
-  }, [isVerified]);
-
-  // Update question limits based on verification status
-  useEffect(() => {
-    const limit = isVerified ? 10 : 1;
-    setDailyQuestions(prev => ({ ...prev, limit }));
-    setWebUsage(prev => ({
-      ...prev,
-      questionsRemaining: Math.max(0, limit - prev.questionsAsked),
-      isLimitReached: prev.questionsAsked >= limit
-    }));
-  }, [isVerified]);
-
   // Fetch web usage from API
-  const fetchWebUsage = async () => {
+  const fetchWebUsage = useCallback(async () => {
     try {
       const usage = await getWebSessionUsage(isVerified);
       setWebUsage(usage);
@@ -191,7 +174,24 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     } catch (error) {
       console.error('Failed to fetch web usage:', error);
     }
-  };
+  }, [isVerified, ctaDismissed]);
+
+  // Initialize session and fetch web usage on mount and when verification changes
+  useEffect(() => {
+    generateSessionId(); // Ensures session ID exists
+    fetchWebUsage();
+  }, [isVerified, fetchWebUsage]);
+
+  // Update question limits based on verification status
+  useEffect(() => {
+    const limit = isVerified ? 10 : 1;
+    setDailyQuestions(prev => ({ ...prev, limit }));
+    setWebUsage(prev => ({
+      ...prev,
+      questionsRemaining: Math.max(0, limit - prev.questionsAsked),
+      isLimitReached: prev.questionsAsked >= limit
+    }));
+  }, [isVerified]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

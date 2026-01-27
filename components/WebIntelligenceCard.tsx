@@ -138,6 +138,7 @@ export default function WebIntelligenceCard({ data, caseId }: WebIntelligenceCar
       {/* QR Code - Desktop only */}
       {!isMobile && qrDataUrl && (
         <div className="p-4 border-b border-slate-700 flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qrDataUrl} alt="QR Code" className="w-12 h-12 rounded-md" />
           <div className="ml-3">
             <p className="text-sm text-slate-200 font-medium">Track Predictions</p>

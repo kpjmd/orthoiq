@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Milestone {
@@ -42,11 +42,7 @@ export default function MilestoneTracker({
   const [concernFlags, setConcernFlags] = useState<string[]>([]);
   const [overallProgress, setOverallProgress] = useState<'improving' | 'stable' | 'worsening'>('improving');
 
-  useEffect(() => {
-    loadMilestones();
-  }, [consultationId]);
-
-  const loadMilestones = async () => {
+  const loadMilestones = useCallback(async () => {
     try {
       const response = await fetch(`/api/milestones?consultationId=${consultationId}`);
       if (response.ok) {
@@ -56,7 +52,11 @@ export default function MilestoneTracker({
     } catch (error) {
       console.error('Failed to load milestones:', error);
     }
-  };
+  }, [consultationId]);
+
+  useEffect(() => {
+    loadMilestones();
+  }, [loadMilestones]);
 
   const getDaysSinceConsultation = () => {
     const consultDate = new Date(consultationDate);

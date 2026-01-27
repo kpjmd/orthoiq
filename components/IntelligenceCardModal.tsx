@@ -417,7 +417,7 @@ export default function IntelligenceCardModal({
           <div className="mt-4 text-center">
             {isMiniApp ? (
               <p className="text-white/50 text-sm">
-                📬 You'll receive milestone notifications at 2, 4, and 8 weeks to track your progress and validate predictions.
+                📬 You&apos;ll receive milestone notifications at 2, 4, and 8 weeks to track your progress and validate predictions.
               </p>
             ) : (
               <p className="text-white/50 text-sm">
