@@ -166,35 +166,37 @@ export default async function SharePage({ params, searchParams }: SharePageProps
           </div>
         )}
 
-        {/* Prescription Display */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-            <span className="text-2xl mr-2">📋</span>
-            Medical Prescription:
-          </h2>
-          <div className="flex justify-center mb-4">
-            <div className="w-full max-w-4xl">
-              <PrescriptionGenerator 
-                data={{
-                  userQuestion: question,
-                  claudeResponse: response,
-                  confidence: Number(confidence) / 100 || 0.85,
-                  fid: 'shared-user',
-                  caseId: shareId,
-                  timestamp: shareData?.createdAt || new Date().toISOString(),
-                  inquiry: inquiry,
-                  keyPoints: keyPoints
-                }}
-                storedMetadata={storedPrescriptionId ? {
-                  id: storedPrescriptionId,
-                  rarity: storedRarity,
-                  theme: parseTheme(storedTheme),
-                  verificationHash: storedHash
-                } : undefined}
-              />
+        {/* Prescription Display - Only for prescription/artwork shares, not response shares */}
+        {(shareData?.shareType === 'prescription' || shareData?.shareType === 'artwork') && (
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+              <span className="text-2xl mr-2">📋</span>
+              Medical Prescription:
+            </h2>
+            <div className="flex justify-center mb-4">
+              <div className="w-full max-w-4xl">
+                <PrescriptionGenerator
+                  data={{
+                    userQuestion: question,
+                    claudeResponse: response,
+                    confidence: Number(confidence) / 100 || 0.85,
+                    fid: 'shared-user',
+                    caseId: shareId,
+                    timestamp: shareData?.createdAt || new Date().toISOString(),
+                    inquiry: inquiry,
+                    keyPoints: keyPoints
+                  }}
+                  storedMetadata={storedPrescriptionId ? {
+                    id: storedPrescriptionId,
+                    rarity: storedRarity,
+                    theme: parseTheme(storedTheme),
+                    verificationHash: storedHash
+                  } : undefined}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Response - only show in full view mode */}
         {viewMode === 'full' && (
