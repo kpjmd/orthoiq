@@ -19,35 +19,57 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
   const userFid = fid || user?.fid?.toString();
 
   useEffect(() => {
-    // Opt-out model: check if user has explicitly opted out via localStorage
     if (!userFid) {
       setIsChecking(false);
       return;
     }
 
-    // Check if user has explicitly opted out
-    const hasOptedOut = localStorage.getItem(`notification_opted_out_${userFid}`) === 'true';
-    setIsEnabled(!hasOptedOut);
-    setIsChecking(false);
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/notifications/status?fid=${userFid}`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsEnabled(data.enabled);
+        } else {
+          // Default to enabled on error (opt-out model)
+          setIsEnabled(true);
+        }
+      } catch (error) {
+        console.error('Failed to check notification status:', error);
+        setIsEnabled(true);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    checkStatus();
   }, [userFid]);
 
-  const enableNotifications = () => {
+  const enableNotifications = async () => {
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
 
     try {
-      // Remove opt-out flag from localStorage
-      localStorage.removeItem(`notification_opted_out_${userFid}`);
+      // SDK addMiniApp triggers webhook that re-enables tokens
+      sdk.actions.addMiniApp();
+
+      // Optimistically update UI
       setIsEnabled(true);
       onPermissionGranted?.();
 
-      // Optionally trigger SDK to register for notifications
-      try {
-        sdk.actions.addMiniApp();
-      } catch (e) {
-        console.log('SDK addMiniApp called');
-      }
+      // Verify after webhook has time to process
+      setTimeout(async () => {
+        try {
+          const response = await fetch(`/api/notifications/status?fid=${userFid}`);
+          if (response.ok) {
+            const data = await response.json();
+            setIsEnabled(data.enabled);
+          }
+        } catch (e) {
+          // Keep optimistic state
+        }
+      }, 2000);
     } catch (error) {
       console.error('Failed to enable notifications:', error);
     } finally {
@@ -55,15 +77,26 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
     }
   };
 
-  const disableNotifications = () => {
+  const disableNotifications = async () => {
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
 
     try {
-      // Set opt-out flag in localStorage
-      localStorage.setItem(`notification_opted_out_${userFid}`, 'true');
-      setIsEnabled(false);
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'disable_permissions',
+          data: { fid: userFid }
+        })
+      });
+
+      if (response.ok) {
+        setIsEnabled(false);
+      } else {
+        console.error('Failed to disable notifications');
+      }
     } catch (error) {
       console.error('Failed to disable notifications:', error);
     } finally {
