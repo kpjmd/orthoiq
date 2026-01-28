@@ -108,12 +108,12 @@ export default function IntelligenceCardModal({
         })
       });
 
-      let shareUrl = `https://orthoiq.app/track/${cardData.caseId}`;
-
-      if (shareResponse.ok) {
-        const shareData = await shareResponse.json();
-        shareUrl = shareData.shareUrl || shareUrl;
+      if (!shareResponse.ok) {
+        throw new Error('Failed to create share link');
       }
+
+      const shareData = await shareResponse.json();
+      const shareUrl = shareData.shareUrl;
 
       const shareText = `🧠 OrthoIQ Intelligence Card\n\n📊 ${cardData.participatingCount} AI Specialists • ${cardData.consensusPercentage}% Consensus\n💰 ${cardData.totalStake.toFixed(1)} tokens staked\n🎯 ${tierConfig.label} Tier\n\n${cardData.primaryPrediction.text}`;
 

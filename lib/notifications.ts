@@ -241,6 +241,25 @@ export async function requestNotificationPermissions(fid: string): Promise<boole
   }
 }
 
+// Disable notification permissions for a user
+export async function disableNotificationPermissions(fid: string): Promise<boolean> {
+  try {
+    console.log(`[NotificationPermissions] Disabling notifications for FID: ${fid}`);
+
+    // Disable all tokens for this user
+    await sql`
+      UPDATE notification_tokens
+      SET enabled = false
+      WHERE fid = ${fid}
+    `;
+
+    return true;
+  } catch (error) {
+    console.error('Failed to disable notification permissions:', error);
+    return false;
+  }
+}
+
 // Schedule daily reset notifications for all users
 export async function scheduleRateLimitResetNotifications(): Promise<void> {
   try {

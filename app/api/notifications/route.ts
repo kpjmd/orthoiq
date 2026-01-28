@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendResponseReviewNotification, sendRateLimitResetNotification, requestNotificationPermissions } from '@/lib/notifications';
+import { sendResponseReviewNotification, sendRateLimitResetNotification, requestNotificationPermissions, disableNotificationPermissions } from '@/lib/notifications';
 import { UserTier } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
         const permissionSuccess = await requestNotificationPermissions(permissionFid);
         return NextResponse.json({ success: permissionSuccess });
 
+      case 'disable_permissions':
+        const { fid: disableFid } = data;
+        const disableSuccess = await disableNotificationPermissions(disableFid);
+        return NextResponse.json({ success: disableSuccess });
+
       default:
         return NextResponse.json(
           { error: 'Invalid notification type' },
@@ -38,8 +43,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ 
+  return NextResponse.json({
     message: 'OrthoIQ Notifications API',
-    supportedTypes: ['response_review', 'rate_limit_reset', 'request_permissions']
+    supportedTypes: ['response_review', 'rate_limit_reset', 'request_permissions', 'disable_permissions']
   });
 }

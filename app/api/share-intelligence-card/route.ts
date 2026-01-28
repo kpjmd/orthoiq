@@ -40,15 +40,16 @@ export async function POST(request: NextRequest) {
       30 // Expire in 30 days
     );
 
-    // Create tracking URL for the card
+    // Create share and tracking URLs
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://orthoiq.vercel.app';
-    const shareUrl = `${baseUrl}/track/${caseId}`;
+    const shareUrl = `${baseUrl}/share/${shareId}`;
+    const trackUrl = `${baseUrl}/track/${caseId}`;
 
     return NextResponse.json({
       success: true,
       shareId,
       shareUrl,
-      trackUrl: shareUrl,
+      trackUrl,
       type: 'intelligence-card',
       metadata: {
         caseId,

@@ -428,9 +428,21 @@ function MiniAppContent() {
       });
       
       setQuestion('');
-      
+
+      // Auto-enable notifications for new users (opt-out model)
+      const fidString = typeof fid === 'number' ? fid.toString() : fid;
+      if (!localStorage.getItem(`notification_auto_enabled_${fidString}`)) {
+        try {
+          await sdk.actions.addMiniApp();
+          localStorage.setItem(`notification_auto_enabled_${fidString}`, 'true');
+          console.log('Auto-enabled notifications for new user');
+        } catch (error) {
+          console.log('User declined auto-enable:', error);
+        }
+      }
+
       // Update rate limit info
-      await loadRateLimitStatus(typeof fid === 'number' ? fid.toString() : fid, getUserTier());
+      await loadRateLimitStatus(fidString, getUserTier());
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
