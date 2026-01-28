@@ -414,7 +414,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS shares (
         id SERIAL PRIMARY KEY,
         share_id VARCHAR(255) UNIQUE NOT NULL,
-        share_type VARCHAR(20) NOT NULL CHECK (share_type IN ('response', 'artwork', 'prescription')),
+        share_type VARCHAR(20) NOT NULL CHECK (share_type IN ('response', 'artwork', 'prescription', 'intelligence-card')),
         question TEXT NOT NULL,
         response TEXT NOT NULL,
         confidence REAL DEFAULT 0.0,
@@ -449,10 +449,10 @@ export async function initDatabase() {
         ALTER TABLE shares DROP CONSTRAINT IF EXISTS shares_share_type_check;
       `;
       await sql`
-        ALTER TABLE shares ADD CONSTRAINT shares_share_type_check 
-        CHECK (share_type IN ('response', 'artwork', 'prescription'));
+        ALTER TABLE shares ADD CONSTRAINT shares_share_type_check
+        CHECK (share_type IN ('response', 'artwork', 'prescription', 'intelligence-card'));
       `;
-      console.log('Updated shares table constraint to allow prescription type');
+      console.log('Updated shares table constraint to allow prescription and intelligence-card types');
     } catch (error) {
       console.log('Note: Shares table constraint update may have already been applied');
     }
