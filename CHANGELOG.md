@@ -1,5 +1,48 @@
 # OrthoIQ Changelog
 
+## [1.5.2] - 2026-01-27: Mini App Milestone Notifications & Share Page Fixes
+
+### Fixed
+- **Mini App Milestone Notifications**: Implemented webhook handler to register notification tokens from Farcaster mini app users
+  - **Root Cause**: The webhook endpoint at `/app/api/webhook/route.ts` was logging events but not saving notification tokens to the database
+  - **Impact**: 0 users had notification tokens registered, preventing the milestone notification cron job from sending any notifications to mini app users
+  - **Fix**: Updated webhook to parse and handle Farcaster events (`miniapp_added`, `notifications_enabled`, `notifications_disabled`, `miniapp_removed`)
+  - **Implementation**: Uses `@farcaster/miniapp-node` to verify webhook signatures and save tokens to `notification_tokens` table
+  - Now when users enable notifications in the mini app, tokens are properly registered with `fid`, `token`, `url`, and `enabled=true`
+  - The existing milestone notification cron job (`/api/cron/send-milestone-notifications`) can now find users and send notifications at 2, 4, and 8 week milestones
+  - Modified files: `app/api/webhook/route.ts`
+
+- **Share Page Prescription Section**: Fixed confusing legacy prescription artwork showing on all share links
+  - **Root Cause**: The "Medical Prescription" section with prescription artwork was displaying for ALL share types, including simple response shares from "Share Response" button
+  - **Impact**: Users viewing shared responses saw confusing prescription cards that weren't relevant to the simple response content
+  - **Fix**: Made prescription section conditional - only shows for `shareType === 'prescription'` or `shareType === 'artwork'`
+  - **Benefit**: Response-type shares (from mini app "Share Response") now show only the question and response, making them cleaner and less confusing
+  - Share links like `https://orthoiq.vercel.app/share/mkw43p80gnlhiu7lbko` no longer show prescription section
+  - Prescription and artwork shares still display the prescription section correctly for legacy shares
+  - Modified files: `app/share/[id]/page.tsx`
+
+### Verification
+
+**Milestone Notifications:**
+- Created test scripts to verify token registration logic works correctly
+- Tokens are saved to database with proper conflict handling (ON CONFLICT DO UPDATE)
+- Milestone query correctly finds consultations eligible for notifications when tokens exist
+- Next steps: Users need to enable notifications in mini app, then cron job will send milestone notifications
+
+**Share Page Fix:**
+- Created test shares for each type (response, prescription, artwork)
+- Response shares: No "Medical Prescription:" section (verified)
+- Prescription/Artwork shares: "Medical Prescription:" section shows (verified)
+- Real share links tested: `mkw43p80gnlhiu7lbko` (response), `mfplnibwiw5jxedk9t` (prescription)
+
+### Technical Details
+- The cron job logic was always correct - it just had no tokens to work with
+- Webhook now properly handles 4 Farcaster event types with signature verification
+- Share page conditional uses database `share_type` field to determine visibility
+- Both fixes are backwards compatible with existing data
+
+---
+
 ## [1.5.1] - 2026-01-19: Web User Milestone Notifications Fix
 
 ### Fixed
