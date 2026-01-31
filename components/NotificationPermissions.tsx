@@ -208,7 +208,7 @@ export default function NotificationPermissions({
               Enable Milestone Notifications
             </h3>
             <p className="text-xs text-blue-700 mb-3">
-              Get notified at 2, 4, and 8 weeks to track your orthodontic progress
+              Get notified at 2, 4, and 8 weeks to track your orthopedic progress
             </p>
             <button
               onClick={handleAddApp}

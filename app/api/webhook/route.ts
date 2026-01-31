@@ -82,14 +82,15 @@ async function handleMiniappAdded(data: any) {
 
 async function handleMiniappRemoved(data: any) {
   const { fid } = data as any;
+  const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
   // Remove all notification tokens for this user
   await sql`
     DELETE FROM notification_tokens
-    WHERE fid = ${fid}
+    WHERE fid = ${fidString}
   `;
 
-  console.log(`[Webhook] Mini app removed for FID ${fid} - tokens deleted`);
+  console.log(`[Webhook] Mini app removed for FID ${fidString} - tokens deleted`);
 }
 
 async function handleNotificationsEnabled(data: any) {
@@ -102,31 +103,35 @@ async function handleNotificationsEnabled(data: any) {
 
 async function handleNotificationsDisabled(data: any) {
   const { fid } = data as any;
+  const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
   // Mark all tokens as disabled for this user
   await sql`
     UPDATE notification_tokens
     SET enabled = false
-    WHERE fid = ${fid}
+    WHERE fid = ${fidString}
   `;
 
-  console.log(`[Webhook] Notifications disabled for FID ${fid}`);
+  console.log(`[Webhook] Notifications disabled for FID ${fidString}`);
 }
 
 async function saveNotificationToken(fid: number, token: string, url: string) {
   const startTime = Date.now();
 
+  // Convert numeric FID to string to match database schema and polling queries
+  const fidString = fid.toString();
+
   // First, disable any existing tokens for this user
   await sql`
     UPDATE notification_tokens
     SET enabled = false
-    WHERE fid = ${fid}
+    WHERE fid = ${fidString}
   `;
 
   // Insert the new token
   await sql`
     INSERT INTO notification_tokens (fid, token, url, enabled, created_at, updated_at)
-    VALUES (${fid}, ${token}, ${url}, true, NOW(), NOW())
+    VALUES (${fidString}, ${token}, ${url}, true, NOW(), NOW())
     ON CONFLICT (fid, token)
     DO UPDATE SET
       url = ${url},
@@ -135,10 +140,10 @@ async function saveNotificationToken(fid: number, token: string, url: string) {
   `;
 
   const processingTime = Date.now() - startTime;
-  console.log(`[Webhook] Token saved for FID ${fid} in ${processingTime}ms`);
+  console.log(`[Webhook] Token saved for FID ${fidString} in ${processingTime}ms`);
 
   if (processingTime > 1000) {
-    console.warn(`[Webhook] Slow processing: ${processingTime}ms for FID ${fid}`);
+    console.warn(`[Webhook] Slow processing: ${processingTime}ms for FID ${fidString}`);
   }
 }
 
