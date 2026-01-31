@@ -20,6 +20,7 @@ export default function NotificationPermissions({
   const [isEnabled, setIsEnabled] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
 
   const userFid = fid || user?.fid?.toString();
 
@@ -67,16 +68,18 @@ export default function NotificationPermissions({
 
     const checkStatus = async () => {
       try {
-        const response = await fetch(`/api/notifications/status?fid=${userFid}`);
+        const response = await fetch(`/api/notifications/app-status?fid=${userFid}`);
         if (response.ok) {
           const data = await response.json();
-          setIsEnabled(data.enabled);
+          setIsAppInstalled(data.appAdded);
+          setIsEnabled(data.notificationsEnabled);
         } else {
-          // Default to disabled on error (opt-in model)
+          setIsAppInstalled(false);
           setIsEnabled(false);
         }
       } catch (error) {
-        console.error('Failed to check notification status:', error);
+        console.error('Failed to check app status:', error);
+        setIsAppInstalled(false);
         setIsEnabled(false);
       } finally {
         setIsChecking(false);
@@ -117,6 +120,9 @@ export default function NotificationPermissions({
     try {
       // Prompt user to add the mini app
       const result = await sdk.actions.addMiniApp();
+
+      // App was successfully added
+      setIsAppInstalled(true);
 
       // Check if user also enabled notifications during the add flow
       if (result.notificationDetails) {
@@ -221,7 +227,7 @@ export default function NotificationPermissions({
   }
 
   // Early return if app not added - show installation prompt
-  if (!isAppAdded) {
+  if (!isAppInstalled) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4">
         <div className="flex items-start gap-3">

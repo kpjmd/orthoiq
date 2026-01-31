@@ -94,10 +94,22 @@ async function handleMiniappRemoved(data: any) {
 
 async function handleNotificationsEnabled(data: any) {
   const { fid, notificationDetails } = data as any;
+  const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  await saveNotificationToken(fid, notificationDetails.token, notificationDetails.url);
+  console.log(`[Webhook] Processing notifications_enabled for FID ${fidString}`, {
+    hasToken: !!notificationDetails?.token,
+    hasUrl: !!notificationDetails?.url,
+    timestamp: new Date().toISOString()
+  });
 
-  console.log(`[Webhook] Notifications enabled for FID ${fid}`);
+  if (!notificationDetails?.token || !notificationDetails?.url) {
+    console.error(`[Webhook] Missing required notification details for FID ${fidString}`);
+    return;
+  }
+
+  await saveNotificationToken(fidString, notificationDetails.token, notificationDetails.url);
+
+  console.log(`[Webhook] Notifications enabled for FID ${fidString}`);
 }
 
 async function handleNotificationsDisabled(data: any) {
@@ -114,11 +126,11 @@ async function handleNotificationsDisabled(data: any) {
   console.log(`[Webhook] Notifications disabled for FID ${fidString}`);
 }
 
-async function saveNotificationToken(fid: number, token: string, url: string) {
+async function saveNotificationToken(fid: string, token: string, url: string) {
   const startTime = Date.now();
 
-  // Convert numeric FID to string to match database schema and polling queries
-  const fidString = fid.toString();
+  // FID is already converted to string by caller
+  const fidString = fid;
 
   // First, disable any existing tokens for this user
   await sql`
