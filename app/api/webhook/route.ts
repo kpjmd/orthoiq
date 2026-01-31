@@ -70,14 +70,13 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleMiniappAdded(data: any) {
-  const { fid, notificationDetails } = data as any;
+  const { fid } = data as any;
+  const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  if (notificationDetails) {
-    await saveNotificationToken(fid, notificationDetails.token, notificationDetails.url);
-    console.log(`[Webhook] Mini app added for FID ${fid} - notification token saved`);
-  } else {
-    console.log(`[Webhook] Mini app added for FID ${fid} - no notification details`);
-  }
+  // Per Farcaster privacy spec: miniapp_added does NOT enable notifications.
+  // User must explicitly opt-in, which triggers notifications_enabled webhook.
+  // We only log here - no token storage.
+  console.log(`[Webhook] Mini app added for FID ${fidString} - awaiting explicit notification opt-in`);
 }
 
 async function handleMiniappRemoved(data: any) {

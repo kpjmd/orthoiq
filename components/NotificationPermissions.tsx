@@ -116,19 +116,31 @@ export default function NotificationPermissions({
 
     try {
       // Prompt user to add the mini app
-      await sdk.actions.addMiniApp();
+      const result = await sdk.actions.addMiniApp();
 
-      // Poll to verify the webhook completed
-      const verified = await pollNotificationStatus(userFid);
+      // Check if user also enabled notifications during the add flow
+      if (result.notificationDetails) {
+        // User enabled notifications - poll to verify webhook processed
+        console.log('App added WITH notifications - polling for webhook confirmation');
 
-      if (verified) {
-        console.log('App added and notifications enabled');
-        setIsEnabled(true);
-        onPermissionGranted?.();
-        // Parent component will re-render with isAppAdded=true
+        const verified = await pollNotificationStatus(userFid);
+
+        if (verified) {
+          console.log('App added and notifications enabled');
+          setIsEnabled(true);
+        } else {
+          // Webhook might still be processing - optimistically enable
+          console.warn('Webhook verification timed out, but notificationDetails received');
+          setIsEnabled(true);
+        }
       } else {
-        console.warn('App add verification timed out');
+        // User added app but did NOT enable notifications
+        // Per Farcaster privacy spec: this is expected behavior
+        console.log('App added - user can now opt-in to notifications separately');
       }
+
+      // Notify parent that app was added
+      onPermissionGranted?.();
     } catch (error) {
       console.error('Failed to add app:', error);
       // User declined or error occurred
@@ -143,24 +155,35 @@ export default function NotificationPermissions({
     setIsProcessing(true);
 
     try {
-      // Re-enable via API (user already has app added)
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'enable_permissions',
-          data: { fid: userFid }
-        })
-      });
+      // Per Farcaster SDK: call addMiniApp() which may prompt for notifications.
+      // If app is already added, Farcaster client may show notifications prompt.
+      // The result includes notificationDetails if user enabled notifications.
+      const result = await sdk.actions.addMiniApp();
 
-      if (response.ok) {
-        setIsEnabled(true);
-        onPermissionGranted?.();
+      if (result.notificationDetails) {
+        // User enabled notifications during the add/prompt flow
+        console.log('Notifications enabled via addMiniApp - polling for webhook confirmation');
+
+        // Poll to verify the webhook completed and token was saved
+        const verified = await pollNotificationStatus(userFid);
+
+        if (verified) {
+          console.log('Notifications enabled and verified');
+          setIsEnabled(true);
+          onPermissionGranted?.();
+        } else {
+          // Webhook might still be processing - optimistically enable
+          console.warn('Webhook verification timed out, but notificationDetails received');
+          setIsEnabled(true);
+          onPermissionGranted?.();
+        }
       } else {
-        console.error('Failed to enable notifications');
+        // User did not enable notifications - they can do so via Farcaster client settings
+        console.log('App added but notifications not enabled - user can enable via Farcaster settings');
       }
     } catch (error) {
       console.error('Failed to enable notifications:', error);
+      // User declined or error occurred
     } finally {
       setIsProcessing(false);
     }
