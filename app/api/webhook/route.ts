@@ -114,6 +114,8 @@ async function handleNotificationsDisabled(data: any) {
 }
 
 async function saveNotificationToken(fid: number, token: string, url: string) {
+  const startTime = Date.now();
+
   // First, disable any existing tokens for this user
   await sql`
     UPDATE notification_tokens
@@ -132,7 +134,12 @@ async function saveNotificationToken(fid: number, token: string, url: string) {
       updated_at = NOW()
   `;
 
-  console.log(`[Webhook] Notification token saved for FID ${fid}`);
+  const processingTime = Date.now() - startTime;
+  console.log(`[Webhook] Token saved for FID ${fid} in ${processingTime}ms`);
+
+  if (processingTime > 1000) {
+    console.warn(`[Webhook] Slow processing: ${processingTime}ms for FID ${fid}`);
+  }
 }
 
 export async function GET() {

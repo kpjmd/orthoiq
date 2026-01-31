@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkNotificationPermissions } from '@/lib/notifications';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +17,19 @@ export async function GET(request: NextRequest) {
 
     const enabled = await checkNotificationPermissions(fid);
 
-    return NextResponse.json({ enabled });
+    // Include last update timestamp for debugging
+    const tokens = await sql`
+      SELECT enabled, updated_at
+      FROM notification_tokens
+      WHERE fid = ${fid}
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `;
+
+    return NextResponse.json({
+      enabled,
+      lastUpdate: tokens[0]?.updated_at || null
+    });
   } catch (error) {
     console.error('Failed to check notification status:', error);
     return NextResponse.json(

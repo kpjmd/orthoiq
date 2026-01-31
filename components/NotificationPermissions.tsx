@@ -18,6 +18,42 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
 
   const userFid = fid || user?.fid?.toString();
 
+  /**
+   * Poll notification status until webhook completes
+   * Attempts: 500ms, 1s, 2s, 4s, 5s, 5s, 5s, 5s (max ~27s)
+   */
+  const pollNotificationStatus = async (
+    fid: string,
+    maxAttempts: number = 8,
+    initialDelay: number = 500
+  ): Promise<boolean> => {
+    let attempt = 0;
+    let delay = initialDelay;
+
+    while (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      try {
+        const response = await fetch(`/api/notifications/status?fid=${fid}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.enabled) {
+            console.log(`Notification verified on attempt ${attempt + 1}`);
+            return true;
+          }
+        }
+      } catch (e) {
+        console.error(`Verification attempt ${attempt + 1} failed:`, e);
+      }
+
+      attempt++;
+      delay = Math.min(delay * 2, 5000); // Exponential backoff, max 5s
+    }
+
+    console.warn('Notification verification timed out after all attempts');
+    return false; // Timed out
+  };
+
   useEffect(() => {
     if (!userFid) {
       setIsChecking(false);
@@ -45,33 +81,54 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
     checkStatus();
   }, [userFid]);
 
+  // Background sync to detect and correct state mismatches
+  useEffect(() => {
+    if (!userFid || !isEnabled) return;
+
+    // Periodically verify status when enabled
+    const syncInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/notifications/status?fid=${userFid}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.enabled !== isEnabled) {
+            console.log(`Background sync: correcting state ${isEnabled} -> ${data.enabled}`);
+            setIsEnabled(data.enabled);
+          }
+        }
+      } catch (e) {
+        // Silent failure for background sync
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(syncInterval);
+  }, [userFid, isEnabled]);
+
   const enableNotifications = async () => {
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
 
     try {
-      // SDK addMiniApp triggers webhook that re-enables tokens
-      sdk.actions.addMiniApp();
+      // Call SDK and AWAIT the result
+      await sdk.actions.addMiniApp();
 
       // Optimistically update UI
       setIsEnabled(true);
       onPermissionGranted?.();
 
-      // Verify after webhook has time to process
-      setTimeout(async () => {
-        try {
-          const response = await fetch(`/api/notifications/status?fid=${userFid}`);
-          if (response.ok) {
-            const data = await response.json();
-            setIsEnabled(data.enabled);
-          }
-        } catch (e) {
-          // Keep optimistic state
-        }
-      }, 2000);
+      // Poll for verification with intelligent backoff
+      const verified = await pollNotificationStatus(userFid);
+
+      if (!verified) {
+        // Webhook didn't complete within timeout
+        // Keep optimistic state but log warning
+        console.warn('Notification verification timed out - webhook may still be processing');
+      }
     } catch (error) {
       console.error('Failed to enable notifications:', error);
+      // SDK call failed - revert optimistic update
+      setIsEnabled(false);
     } finally {
       setIsProcessing(false);
     }
