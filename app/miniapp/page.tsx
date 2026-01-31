@@ -426,22 +426,11 @@ function MiniAppContent() {
         // Raw consultation data for Intelligence Card generation
         rawConsultationData: data.rawConsultationData
       });
-      
+
       setQuestion('');
 
-      // Auto-enable notifications for new users (opt-out model)
-      const fidString = typeof fid === 'number' ? fid.toString() : fid;
-      if (!localStorage.getItem(`notification_auto_enabled_${fidString}`)) {
-        try {
-          await sdk.actions.addMiniApp();
-          localStorage.setItem(`notification_auto_enabled_${fidString}`, 'true');
-          console.log('Auto-enabled notifications for new user');
-        } catch (error) {
-          console.log('User declined auto-enable:', error);
-        }
-      }
-
       // Update rate limit info
+      const fidString = typeof fid === 'number' ? fid.toString() : fid;
       await loadRateLimitStatus(fidString, getUserTier());
       
     } catch (err) {
@@ -554,6 +543,7 @@ function MiniAppContent() {
         {/* Notification Permissions */}
         <NotificationPermissions
           fid={context?.user?.fid?.toString()}
+          isAppAdded={context?.client?.added ?? false}
         />
 
         {/* Consultation Mode Toggle */}

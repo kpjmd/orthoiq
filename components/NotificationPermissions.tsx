@@ -6,13 +6,18 @@ import { useAuth } from './AuthProvider';
 
 interface NotificationPermissionsProps {
   fid?: string;
+  isAppAdded?: boolean;
   onPermissionGranted?: () => void;
 }
 
-export default function NotificationPermissions({ fid, onPermissionGranted }: NotificationPermissionsProps) {
+export default function NotificationPermissions({
+  fid,
+  isAppAdded = false,
+  onPermissionGranted
+}: NotificationPermissionsProps) {
   const { user } = useAuth();
-  // Opt-out model: enabled by default
-  const [isEnabled, setIsEnabled] = useState(true);
+  // Opt-in model: disabled by default
+  const [isEnabled, setIsEnabled] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -67,12 +72,12 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
           const data = await response.json();
           setIsEnabled(data.enabled);
         } else {
-          // Default to enabled on error (opt-out model)
-          setIsEnabled(true);
+          // Default to disabled on error (opt-in model)
+          setIsEnabled(false);
         }
       } catch (error) {
         console.error('Failed to check notification status:', error);
-        setIsEnabled(true);
+        setIsEnabled(false);
       } finally {
         setIsChecking(false);
       }
@@ -104,31 +109,58 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
     return () => clearInterval(syncInterval);
   }, [userFid, isEnabled]);
 
+  const handleAddApp = async () => {
+    if (!userFid || isProcessing) return;
+
+    setIsProcessing(true);
+
+    try {
+      // Prompt user to add the mini app
+      await sdk.actions.addMiniApp();
+
+      // Poll to verify the webhook completed
+      const verified = await pollNotificationStatus(userFid);
+
+      if (verified) {
+        console.log('App added and notifications enabled');
+        setIsEnabled(true);
+        onPermissionGranted?.();
+        // Parent component will re-render with isAppAdded=true
+      } else {
+        console.warn('App add verification timed out');
+      }
+    } catch (error) {
+      console.error('Failed to add app:', error);
+      // User declined or error occurred
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const enableNotifications = async () => {
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
 
     try {
-      // Call SDK and AWAIT the result
-      await sdk.actions.addMiniApp();
+      // Re-enable via API (user already has app added)
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'enable_permissions',
+          data: { fid: userFid }
+        })
+      });
 
-      // Optimistically update UI
-      setIsEnabled(true);
-      onPermissionGranted?.();
-
-      // Poll for verification with intelligent backoff
-      const verified = await pollNotificationStatus(userFid);
-
-      if (!verified) {
-        // Webhook didn't complete within timeout
-        // Keep optimistic state but log warning
-        console.warn('Notification verification timed out - webhook may still be processing');
+      if (response.ok) {
+        setIsEnabled(true);
+        onPermissionGranted?.();
+      } else {
+        console.error('Failed to enable notifications');
       }
     } catch (error) {
       console.error('Failed to enable notifications:', error);
-      // SDK call failed - revert optimistic update
-      setIsEnabled(false);
     } finally {
       setIsProcessing(false);
     }
@@ -163,6 +195,42 @@ export default function NotificationPermissions({ fid, onPermissionGranted }: No
 
   if (!userFid || isChecking) {
     return null;
+  }
+
+  // Early return if app not added - show installation prompt
+  if (!isAppAdded) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">📱</span>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-blue-900 mb-1">
+              Enable Milestone Notifications
+            </h3>
+            <p className="text-xs text-blue-700 mb-3">
+              Get notified at 2, 4, and 8 weeks to track your orthodontic progress
+            </p>
+            <button
+              onClick={handleAddApp}
+              disabled={isProcessing}
+              className="w-full bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Adding...
+                </span>
+              ) : (
+                "Add to Farcaster"
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -241,6 +241,25 @@ export async function requestNotificationPermissions(fid: string): Promise<boole
   }
 }
 
+// Enable notification permissions for a user
+export async function enableNotificationPermissions(fid: string): Promise<boolean> {
+  try {
+    console.log(`[NotificationPermissions] Enabling notifications for FID: ${fid}`);
+
+    // Re-enable existing notification tokens
+    await sql`
+      UPDATE notification_tokens
+      SET enabled = true, updated_at = NOW()
+      WHERE fid = ${fid}
+    `;
+
+    return true;
+  } catch (error) {
+    console.error('Failed to enable notification permissions:', error);
+    return false;
+  }
+}
+
 // Disable notification permissions for a user
 export async function disableNotificationPermissions(fid: string): Promise<boolean> {
   try {
