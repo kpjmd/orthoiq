@@ -1,5 +1,37 @@
 # OrthoIQ Changelog
 
+## [1.5.3] - 2026-02-11: Notification Toggle Sync Fix
+
+### Fixed
+- **Notification Toggle Revert Issue**: Fixed notification toggle showing "Disable" for ~30 seconds then reverting to "Enable"
+  - **Root Cause**: The component relied entirely on webhooks as the only save path for notification tokens. If webhooks failed silently (verification timeout, DB error, or never arrived), no token was saved. The background sync (every 30s) would then query the DB, find no enabled tokens, and "correct" the UI back to disabled.
+  - **Impact**: Users enabling notifications would see the toggle revert after 30 seconds, making notifications appear broken
+  - **Fix**: Implemented client-side token save as the primary path, with webhook as redundant/fallback
+  - **Implementation**:
+    - Created `/api/notifications/save-token` endpoint for direct client-side token saves
+    - Modified `NotificationPermissions` component to save tokens directly from SDK response (`result.notificationDetails`)
+    - Added 60-second grace period to background sync to prevent race conditions
+    - Fixed `isAppInstalled` to use SDK prop (`context.client.added`) instead of unreliable DB query
+    - Enhanced webhook logging with request IDs, timing metrics, and separate error handling for verification vs DB failures
+    - Added `checkNotificationStatus()` function to distinguish DB errors from "no tokens" state
+    - Status endpoint now returns 500 on DB errors (prevents false corrections by background sync)
+  - Modified files: `app/api/notifications/save-token/route.ts` (new), `components/NotificationPermissions.tsx`, `app/api/webhook/route.ts`, `lib/notifications.ts`, `app/api/notifications/status/route.ts`
+
+### Testing Required
+- [x] Enable flow: Token appears in DB within 2s via direct save
+- [x] Toggle stays "Disable" after 60+ seconds (no revert)
+- [ ] Milestone notifications: Mini app users successfully receive notifications at 2, 4, and 8 weeks
+- [ ] Deep link: Users can open notification link and complete follow-up questionnaire
+
+### Technical Details
+- Client-side save is now the primary path, eliminating single point of failure
+- Webhook serves as redundant/secondary path for reliability
+- Background sync has 60s grace period after toggles (set via `lastToggleTime` ref)
+- Webhook logs include `[Webhook:<id>]` prefix with timing for diagnostic tracking
+- Non-ok status responses (500) are ignored by background sync to prevent false corrections on transient DB errors
+
+---
+
 ## [1.5.2] - 2026-01-27: Mini App Milestone Notifications & Share Page Fixes
 
 ### Fixed
