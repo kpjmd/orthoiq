@@ -8,141 +8,162 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+function generateRequestId() {
+  return `wh_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+}
+
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  let data: any;
+
+  // Step 1: Parse and verify the webhook event
   try {
     const body = await request.text();
-
-    // Parse and verify the webhook event
-    const data = await parseWebhookEvent(body, verifyAppKeyWithNeynar);
-
-    console.log('Farcaster webhook received:', {
-      timestamp: new Date().toISOString(),
-      event: (data as any).event,
-      fid: (data as any).fid
-    });
-
-    // Handle different webhook events
-    switch ((data as any).event) {
-      case 'miniapp_added':
-        await handleMiniappAdded(data);
-        break;
-      case 'miniapp_removed':
-        await handleMiniappRemoved(data);
-        break;
-      case 'notifications_enabled':
-        await handleNotificationsEnabled(data);
-        break;
-      case 'notifications_disabled':
-        await handleNotificationsDisabled(data);
-        break;
-      default:
-        console.log('Unknown webhook event type:', (data as any).event);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Webhook processed successfully'
-    });
-
+    data = await parseWebhookEvent(body, verifyAppKeyWithNeynar);
   } catch (e: unknown) {
+    const elapsed = Date.now() - startTime;
     const error = e as ParseWebhookEvent.ErrorType;
 
-    // Handle specific webhook verification errors
+    // Log verification failures distinctly
+    console.error(`[Webhook:${requestId}] Verification failed in ${elapsed}ms:`, {
+      errorName: error.name,
+      errorMessage: error.message,
+    });
+
     switch (error.name) {
       case 'VerifyJsonFarcasterSignature.InvalidDataError':
       case 'VerifyJsonFarcasterSignature.InvalidEventDataError':
-        console.error('Invalid webhook data:', error);
         return NextResponse.json({ error: 'Invalid request data' }, { status: 400 });
       case 'VerifyJsonFarcasterSignature.InvalidAppKeyError':
-        console.error('Invalid app key:', error);
         return NextResponse.json({ error: 'Invalid app key' }, { status: 401 });
       case 'VerifyJsonFarcasterSignature.VerifyAppKeyError':
-        console.error('Error verifying app key:', error);
         return NextResponse.json({ error: 'Verification error' }, { status: 500 });
       default:
-        console.error('Webhook processing error:', error);
         return NextResponse.json(
           { success: false, error: 'Failed to process webhook' },
           { status: 500 }
         );
     }
   }
+
+  // Step 2: Handle the verified event
+  try {
+    console.log(`[Webhook:${requestId}] Received event:`, {
+      event: data.event,
+      fid: data.fid,
+      timestamp: new Date().toISOString(),
+    });
+
+    switch (data.event) {
+      case 'miniapp_added':
+        await handleMiniappAdded(requestId, data);
+        break;
+      case 'miniapp_removed':
+        await handleMiniappRemoved(requestId, data);
+        break;
+      case 'notifications_enabled':
+        await handleNotificationsEnabled(requestId, data);
+        break;
+      case 'notifications_disabled':
+        await handleNotificationsDisabled(requestId, data);
+        break;
+      default:
+        console.log(`[Webhook:${requestId}] Unknown event type: ${data.event}`);
+    }
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[Webhook:${requestId}] Completed in ${elapsed}ms`);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Webhook processed successfully'
+    });
+
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    console.error(`[Webhook:${requestId}] Handler error after ${elapsed}ms:`, error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to process webhook' },
+      { status: 500 }
+    );
+  }
 }
 
-async function handleMiniappAdded(data: any) {
-  const { fid } = data as any;
+async function handleMiniappAdded(requestId: string, data: any) {
+  const { fid } = data;
   const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  // Per Farcaster privacy spec: miniapp_added does NOT enable notifications.
-  // User must explicitly opt-in, which triggers notifications_enabled webhook.
-  // We only log here - no token storage.
-  console.log(`[Webhook] Mini app added for FID ${fidString} - awaiting explicit notification opt-in`);
+  console.log(`[Webhook:${requestId}] Mini app added for FID ${fidString} - awaiting explicit notification opt-in`);
 }
 
-async function handleMiniappRemoved(data: any) {
-  const { fid } = data as any;
+async function handleMiniappRemoved(requestId: string, data: any) {
+  const { fid } = data;
   const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  // Remove all notification tokens for this user
   await sql`
     DELETE FROM notification_tokens
     WHERE fid = ${fidString}
   `;
 
-  console.log(`[Webhook] Mini app removed for FID ${fidString} - tokens deleted`);
+  console.log(`[Webhook:${requestId}] Mini app removed for FID ${fidString} - tokens deleted`);
 }
 
-async function handleNotificationsEnabled(data: any) {
-  const { fid, notificationDetails } = data as any;
+async function handleNotificationsEnabled(requestId: string, data: any) {
+  const { fid, notificationDetails } = data;
   const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  console.log(`[Webhook] Processing notifications_enabled for FID ${fidString}`, {
+  console.log(`[Webhook:${requestId}] Processing notifications_enabled for FID ${fidString}`, {
     hasToken: !!notificationDetails?.token,
     hasUrl: !!notificationDetails?.url,
-    timestamp: new Date().toISOString()
   });
 
   if (!notificationDetails?.token || !notificationDetails?.url) {
-    console.error(`[Webhook] Missing required notification details for FID ${fidString}`);
+    console.error(`[Webhook:${requestId}] Missing notification details for FID ${fidString}`);
     return;
   }
 
-  await saveNotificationToken(fidString, notificationDetails.token, notificationDetails.url);
-
-  console.log(`[Webhook] Notifications enabled for FID ${fidString}`);
+  try {
+    await saveNotificationToken(requestId, fidString, notificationDetails.token, notificationDetails.url);
+    console.log(`[Webhook:${requestId}] Notifications enabled for FID ${fidString}`);
+  } catch (dbError) {
+    console.error(`[Webhook:${requestId}] DB error saving token for FID ${fidString}:`, dbError);
+    throw dbError;
+  }
 }
 
-async function handleNotificationsDisabled(data: any) {
-  const { fid } = data as any;
+async function handleNotificationsDisabled(requestId: string, data: any) {
+  const { fid } = data;
   const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  // Mark all tokens as disabled for this user
-  await sql`
-    UPDATE notification_tokens
-    SET enabled = false
-    WHERE fid = ${fidString}
-  `;
-
-  console.log(`[Webhook] Notifications disabled for FID ${fidString}`);
+  try {
+    await sql`
+      UPDATE notification_tokens
+      SET enabled = false
+      WHERE fid = ${fidString}
+    `;
+    console.log(`[Webhook:${requestId}] Notifications disabled for FID ${fidString}`);
+  } catch (dbError) {
+    console.error(`[Webhook:${requestId}] DB error disabling notifications for FID ${fidString}:`, dbError);
+    throw dbError;
+  }
 }
 
-async function saveNotificationToken(fid: string, token: string, url: string) {
+async function saveNotificationToken(requestId: string, fid: string, token: string, url: string) {
   const startTime = Date.now();
 
-  // FID is already converted to string by caller
-  const fidString = fid;
-
-  // First, disable any existing tokens for this user
+  // Disable any existing tokens for this user
   await sql`
     UPDATE notification_tokens
     SET enabled = false
-    WHERE fid = ${fidString}
+    WHERE fid = ${fid}
   `;
 
   // Insert the new token
   await sql`
     INSERT INTO notification_tokens (fid, token, url, enabled, created_at, updated_at)
-    VALUES (${fidString}, ${token}, ${url}, true, NOW(), NOW())
+    VALUES (${fid}, ${token}, ${url}, true, NOW(), NOW())
     ON CONFLICT (fid, token)
     DO UPDATE SET
       url = ${url},
@@ -151,16 +172,15 @@ async function saveNotificationToken(fid: string, token: string, url: string) {
   `;
 
   const processingTime = Date.now() - startTime;
-  console.log(`[Webhook] Token saved for FID ${fidString} in ${processingTime}ms`);
+  console.log(`[Webhook:${requestId}] Token saved for FID ${fid} in ${processingTime}ms`);
 
   if (processingTime > 1000) {
-    console.warn(`[Webhook] Slow processing: ${processingTime}ms for FID ${fidString}`);
+    console.warn(`[Webhook:${requestId}] Slow DB write: ${processingTime}ms for FID ${fid}`);
   }
 }
 
 export async function GET() {
-  // Health check endpoint
-  return NextResponse.json({ 
+  return NextResponse.json({
     status: 'ok',
     service: 'OrthoIQ Farcaster Webhook',
     timestamp: new Date().toISOString()

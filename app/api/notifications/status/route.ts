@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkNotificationPermissions } from '@/lib/notifications';
+import { checkNotificationStatus } from '@/lib/notifications';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const enabled = await checkNotificationPermissions(fid);
+    const status = await checkNotificationStatus(fid);
+
+    if (status.error) {
+      console.error(`[NotificationStatus] DB error for FID ${fid}:`, status.error);
+      return NextResponse.json(
+        { error: 'Database error checking notification status' },
+        { status: 500 }
+      );
+    }
 
     // Include last update timestamp for debugging
     const tokens = await sql`
@@ -27,11 +35,12 @@ export async function GET(request: NextRequest) {
     `;
 
     return NextResponse.json({
-      enabled,
+      enabled: status.enabled,
+      tokenCount: status.tokenCount,
       lastUpdate: tokens[0]?.updated_at || null
     });
   } catch (error) {
-    console.error('Failed to check notification status:', error);
+    console.error('[NotificationStatus] Failed to check notification status:', error);
     return NextResponse.json(
       { error: 'Failed to check notification status' },
       { status: 500 }

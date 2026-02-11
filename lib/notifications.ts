@@ -217,15 +217,34 @@ async function logNotification(fid: string, notification: NotificationData, deli
 export async function checkNotificationPermissions(fid: string): Promise<boolean> {
   try {
     const result = await sql`
-      SELECT COUNT(*) as count FROM notification_tokens 
+      SELECT COUNT(*) as count FROM notification_tokens
       WHERE fid = ${fid} AND enabled = true
     `;
-    
+
     return parseInt(result[0].count) > 0;
   } catch (error) {
     console.error('Failed to check notification permissions:', error);
     return false;
   }
+}
+
+// Check notification status with error distinction (for status endpoint)
+export async function checkNotificationStatus(fid: string): Promise<{
+  enabled: boolean;
+  error: string | null;
+  tokenCount: number;
+}> {
+  const result = await sql`
+    SELECT COUNT(*) as count FROM notification_tokens
+    WHERE fid = ${fid} AND enabled = true
+  `;
+
+  const tokenCount = parseInt(result[0].count);
+  return {
+    enabled: tokenCount > 0,
+    error: null,
+    tokenCount,
+  };
 }
 
 // Request notification permissions from user (handled by mini app UI)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { useAuth } from './AuthProvider';
 
@@ -20,12 +20,43 @@ export default function NotificationPermissions({
   const [isEnabled, setIsEnabled] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAppInstalled, setIsAppInstalled] = useState(false);
+  // Use the SDK prop directly — DB doesn't reliably track app-added state
+  const [isAppInstalled, setIsAppInstalled] = useState(isAppAdded);
+
+  // Grace period: skip background sync for 60s after user toggles
+  const lastToggleTime = useRef<number>(0);
 
   const userFid = fid || user?.fid?.toString();
 
   /**
-   * Poll notification status until webhook completes
+   * Save notification token directly to DB (primary path).
+   * Returns true on success.
+   */
+  const saveTokenDirectly = async (
+    fid: string,
+    token: string,
+    url: string
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/notifications/save-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid, token, url }),
+      });
+      if (response.ok) {
+        console.log('Token saved directly via client');
+        return true;
+      }
+      console.error('Direct token save failed:', response.status);
+      return false;
+    } catch (e) {
+      console.error('Direct token save error:', e);
+      return false;
+    }
+  };
+
+  /**
+   * Poll notification status until webhook completes (fallback path).
    * Attempts: 500ms, 1s, 2s, 4s, 5s, 5s, 5s, 5s (max ~27s)
    */
   const pollNotificationStatus = async (
@@ -53,48 +84,50 @@ export default function NotificationPermissions({
       }
 
       attempt++;
-      delay = Math.min(delay * 2, 5000); // Exponential backoff, max 5s
+      delay = Math.min(delay * 2, 5000);
     }
 
     console.warn('Notification verification timed out after all attempts');
-    return false; // Timed out
+    return false;
   };
 
+  // Initial status check — use SDK prop for isAppInstalled, only query DB for isEnabled
   useEffect(() => {
     if (!userFid) {
       setIsChecking(false);
       return;
     }
 
+    // Trust the SDK prop for app-installed state
+    setIsAppInstalled(isAppAdded);
+
     const checkStatus = async () => {
       try {
-        const response = await fetch(`/api/notifications/app-status?fid=${userFid}`);
+        const response = await fetch(`/api/notifications/status?fid=${userFid}`);
         if (response.ok) {
           const data = await response.json();
-          setIsAppInstalled(data.appAdded);
-          setIsEnabled(data.notificationsEnabled);
-        } else {
-          setIsAppInstalled(false);
-          setIsEnabled(false);
+          setIsEnabled(data.enabled);
         }
       } catch (error) {
-        console.error('Failed to check app status:', error);
-        setIsAppInstalled(false);
-        setIsEnabled(false);
+        console.error('Failed to check notification status:', error);
       } finally {
         setIsChecking(false);
       }
     };
 
     checkStatus();
-  }, [userFid]);
+  }, [userFid, isAppAdded]);
 
   // Background sync to detect and correct state mismatches
   useEffect(() => {
     if (!userFid || !isEnabled) return;
 
-    // Periodically verify status when enabled
     const syncInterval = setInterval(async () => {
+      // Grace period: skip sync for 60s after a user toggle
+      if (Date.now() - lastToggleTime.current < 60000) {
+        return;
+      }
+
       try {
         const response = await fetch(`/api/notifications/status?fid=${userFid}`);
         if (response.ok) {
@@ -104,10 +137,11 @@ export default function NotificationPermissions({
             setIsEnabled(data.enabled);
           }
         }
+        // Non-ok responses (500) are ignored — prevents false corrections on DB errors
       } catch (e) {
         // Silent failure for background sync
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
 
     return () => clearInterval(syncInterval);
   }, [userFid, isEnabled]);
@@ -116,40 +150,39 @@ export default function NotificationPermissions({
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
+    lastToggleTime.current = Date.now();
 
     try {
-      // Prompt user to add the mini app
       const result = await sdk.actions.addMiniApp();
 
       // App was successfully added
       setIsAppInstalled(true);
 
-      // Check if user also enabled notifications during the add flow
       if (result.notificationDetails) {
-        // User enabled notifications - poll to verify webhook processed
-        console.log('App added WITH notifications - polling for webhook confirmation');
+        console.log('App added WITH notifications - saving token directly');
 
-        const verified = await pollNotificationStatus(userFid);
+        // Primary path: save token directly from client
+        const saved = await saveTokenDirectly(
+          userFid,
+          result.notificationDetails.token,
+          result.notificationDetails.url
+        );
 
-        if (verified) {
-          console.log('App added and notifications enabled');
+        if (saved) {
           setIsEnabled(true);
         } else {
-          // Webhook might still be processing - optimistically enable
-          console.warn('Webhook verification timed out, but notificationDetails received');
-          setIsEnabled(true);
+          // Fallback: poll for webhook
+          console.warn('Direct save failed, falling back to webhook polling');
+          const verified = await pollNotificationStatus(userFid);
+          setIsEnabled(verified);
         }
       } else {
-        // User added app but did NOT enable notifications
-        // Per Farcaster privacy spec: this is expected behavior
         console.log('App added - user can now opt-in to notifications separately');
       }
 
-      // Notify parent that app was added
       onPermissionGranted?.();
     } catch (error) {
       console.error('Failed to add app:', error);
-      // User declined or error occurred
     } finally {
       setIsProcessing(false);
     }
@@ -159,37 +192,38 @@ export default function NotificationPermissions({
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
+    lastToggleTime.current = Date.now();
 
     try {
-      // Per Farcaster SDK: call addMiniApp() which may prompt for notifications.
-      // If app is already added, Farcaster client may show notifications prompt.
-      // The result includes notificationDetails if user enabled notifications.
       const result = await sdk.actions.addMiniApp();
 
       if (result.notificationDetails) {
-        // User enabled notifications during the add/prompt flow
-        console.log('Notifications enabled via addMiniApp - polling for webhook confirmation');
+        console.log('Notifications enabled via addMiniApp - saving token directly');
 
-        // Poll to verify the webhook completed and token was saved
-        const verified = await pollNotificationStatus(userFid);
+        // Primary path: save token directly from client
+        const saved = await saveTokenDirectly(
+          userFid,
+          result.notificationDetails.token,
+          result.notificationDetails.url
+        );
 
-        if (verified) {
-          console.log('Notifications enabled and verified');
+        if (saved) {
           setIsEnabled(true);
           onPermissionGranted?.();
         } else {
-          // Webhook might still be processing - optimistically enable
-          console.warn('Webhook verification timed out, but notificationDetails received');
-          setIsEnabled(true);
-          onPermissionGranted?.();
+          // Fallback: poll for webhook
+          console.warn('Direct save failed, falling back to webhook polling');
+          const verified = await pollNotificationStatus(userFid);
+          setIsEnabled(verified);
+          if (verified) {
+            onPermissionGranted?.();
+          }
         }
       } else {
-        // User did not enable notifications - they can do so via Farcaster client settings
         console.log('App added but notifications not enabled - user can enable via Farcaster settings');
       }
     } catch (error) {
       console.error('Failed to enable notifications:', error);
-      // User declined or error occurred
     } finally {
       setIsProcessing(false);
     }
@@ -199,6 +233,7 @@ export default function NotificationPermissions({
     if (!userFid || isProcessing) return;
 
     setIsProcessing(true);
+    lastToggleTime.current = Date.now();
 
     try {
       const response = await fetch('/api/notifications', {
