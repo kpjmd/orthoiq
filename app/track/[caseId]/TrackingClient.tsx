@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import OutcomeValidationForm, { OutcomeValidationData, MilestoneType } from '@/components/OutcomeValidationForm';
+import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
+import { isPainRelatedConsultation } from '@/lib/promis';
+import { PROMISCompletionResult, PROMISDelta } from '@/lib/types';
 
 interface MilestoneStatus {
   day: number;
@@ -67,6 +70,28 @@ export default function TrackingClient({
   const [milestoneStatus, setMilestoneStatus] = useState(initialMilestoneStatus);
   const [currentMilestone, setCurrentMilestone] = useState(initialCurrentMilestone);
   const [completedCount, setCompletedCount] = useState(initialCompletedCount);
+
+  // PROMIS state for follow-up milestones
+  const [showPromisForm, setShowPromisForm] = useState(false);
+  const [promisCompleted, setPromisCompleted] = useState(false);
+  const [promisDelta, setPromisDelta] = useState<PROMISDelta | null>(null);
+  const [hasPromisBaseline, setHasPromisBaseline] = useState(false);
+
+  // Check if a PROMIS baseline exists for this consultation
+  useEffect(() => {
+    const checkBaseline = async () => {
+      try {
+        const res = await fetch(`/api/feedback/promis?consultationId=${caseId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setHasPromisBaseline(data.responses?.some((r: any) => r.timepoint === 'baseline') || false);
+        }
+      } catch {
+        // Baseline check is best-effort
+      }
+    };
+    checkBaseline();
+  }, [caseId]);
 
   const handlePrivacyToggle = async () => {
     try {
@@ -330,6 +355,31 @@ export default function TrackingClient({
                 </div>
               )}
 
+              {/* PROMIS delta display after follow-up */}
+              {promisDelta && (
+                <div className="mt-4 p-4 bg-gray-800/50 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-300 mb-2">PROMIS Score Changes</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">Physical Function</span>
+                      <span className={promisDelta.physicalFunction >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        {promisDelta.physicalFunction >= 0 ? '+' : ''}{promisDelta.physicalFunction} pts
+                        {Math.abs(promisDelta.physicalFunction) >= 5 && ' (clinically meaningful)'}
+                      </span>
+                    </div>
+                    {promisDelta.painInterference != null && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Pain Interference</span>
+                        <span className={promisDelta.painInterference >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {promisDelta.painInterference >= 0 ? '+' : ''}{promisDelta.painInterference} pts improvement
+                          {Math.abs(promisDelta.painInterference) >= 5 && ' (clinically meaningful)'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {currentMilestone && (
                 <div className="mt-4 text-sm text-gray-400">
                   Next milestone: {currentMilestone.label} (Day {currentMilestone.day})
@@ -342,6 +392,49 @@ export default function TrackingClient({
               >
                 Dismiss
               </button>
+            </motion.div>
+          ) : showPromisForm && currentMilestone && hasPromisBaseline ? (
+            <motion.div
+              key="promis-form"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-6"
+            >
+              <PROMISQuestionnaire
+                timepoint={
+                  currentMilestone.day <= 14 ? '2week' :
+                  currentMilestone.day <= 28 ? '4week' : '8week'
+                }
+                consultationId={caseId}
+                isPainRelated={true}
+                patientId={fid}
+                onComplete={(result) => {
+                  setPromisCompleted(true);
+                  setPromisDelta(result.delta || null);
+                  setShowPromisForm(false);
+                  // Mark milestone as completed
+                  const updatedMilestones = milestoneStatus.map(ms => {
+                    if (ms.day === currentMilestone.day) {
+                      return { ...ms, completed: true, data: { overall_progress: 'promis_complete', promis: result } };
+                    }
+                    return ms;
+                  });
+                  setMilestoneStatus(updatedMilestones);
+                  setCompletedCount(prev => prev + 1);
+                  const nextMilestone = updatedMilestones.find(ms => !ms.completed);
+                  setCurrentMilestone(nextMilestone || null);
+                  setSubmitSuccess(true);
+                  setValidationResult({
+                    message: 'PROMIS follow-up questionnaire completed.',
+                    validationResults: { predictionsValidated: [] },
+                  });
+                }}
+                onSkip={() => {
+                  setShowPromisForm(false);
+                  setShowValidationForm(true);
+                }}
+              />
             </motion.div>
           ) : showValidationForm && currentMilestone ? (
             <motion.div
@@ -382,7 +475,7 @@ export default function TrackingClient({
                   : `Your ${currentMilestone.label} check-in will be available in ${currentMilestone.day - daysSince} days.`}
               </p>
               <button
-                onClick={() => setShowValidationForm(true)}
+                onClick={() => hasPromisBaseline ? setShowPromisForm(true) : setShowValidationForm(true)}
                 disabled={!currentMilestone.due}
                 className={`w-full py-3 rounded-lg font-medium transition-colors ${
                   currentMilestone.due
