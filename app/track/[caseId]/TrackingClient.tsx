@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import OutcomeValidationForm, { OutcomeValidationData, MilestoneType } from '@/components/OutcomeValidationForm';
 import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
 import { isPainRelatedConsultation } from '@/lib/promis';
-import { PROMISCompletionResult, PROMISDelta } from '@/lib/types';
+import { PROMISCompletionResult, PROMISDelta } from '@/lib/promisTypes';
 
 interface MilestoneStatus {
   day: number;

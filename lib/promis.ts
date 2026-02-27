@@ -1,7 +1,7 @@
 // PROMIS (Patient-Reported Outcomes Measurement Information System) Scoring Utilities
 // Physical Function Short Form 10a + Pain Interference Short Form 6a
 
-import { PROMISInstrument, PROMISQuestion, PROMISScores, PROMISDelta, PROMISTimepoint, PROMISInterpretationBand } from './types';
+import { PROMISInstrument, PROMISQuestion, PROMISScores, PROMISDelta, PROMISTimepoint, PROMISInterpretationBand } from './promisTypes';
 
 // ── Physical Function 10a Questions ──
 

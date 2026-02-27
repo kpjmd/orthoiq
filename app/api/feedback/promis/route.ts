@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storePromisResponse, getPromisResponses, getPromisBaseline } from '@/lib/promisDb';
 import { computeScores, calculateDelta, validateResponses } from '@/lib/promis';
-import { PROMISTimepoint } from '@/lib/types';
+import { PROMISTimepoint } from '@/lib/promisTypes';
 
 const VALID_TIMEPOINTS: PROMISTimepoint[] = ['baseline', '2week', '4week', '8week'];
 

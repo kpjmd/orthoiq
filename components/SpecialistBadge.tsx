@@ -14,7 +14,7 @@ interface SpecialistBadgeProps {
   tokenReward?: number;
 }
 
-const specialistIcons: { [key: string]: string } = {
+export const specialistIcons: { [key: string]: string } = {
   'triage': '🏥',
   'painWhisperer': '💊',
   'movementDetective': '🔍',
@@ -22,7 +22,7 @@ const specialistIcons: { [key: string]: string } = {
   'mindMender': '🧠'
 };
 
-const specialistColors: { [key: string]: { bg: string; border: string; text: string; icon: string; status: string } } = {
+export const specialistColors: { [key: string]: { bg: string; border: string; text: string; icon: string; status: string } } = {
   'triage': {
     bg: 'bg-gradient-to-r from-blue-50 to-blue-100',
     border: 'border-blue-300',

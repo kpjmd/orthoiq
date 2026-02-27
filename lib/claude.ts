@@ -512,7 +512,8 @@ function transformFastModeConsultation(result: any, requestId?: string, userQues
     participatingSpecialists: ['triage'],
     fromAgentsSystem: true,
     suggestedFollowUp: triage.followUpQuestions || [],
-    triageConfidence: triage.confidence
+    triageConfidence: triage.confidence,
+    urgencyLevel: triage.urgencyLevel || 'routine',
   };
 }
 
@@ -582,7 +583,8 @@ function transformFastModeResponse(result: any, requestId?: string, userQuestion
     fromAgentsSystem: true,
     // Fast mode specific
     suggestedFollowUp: triage.followUpQuestions || [],
-    triageConfidence: triage.confidence
+    triageConfidence: triage.confidence,
+    urgencyLevel: triage.urgencyLevel || 'routine',
   };
 }
 
@@ -678,7 +680,8 @@ function transformNormalModeResponse(result: any, requestId?: string, userQuesti
     participatingSpecialists: consultation.participatingSpecialists || [],
     consultationId: consultation.consultationId,
     fromAgentsSystem: true,
-    rawConsultationData: consultation // Preserve raw consultation data for specialist extraction
+    rawConsultationData: consultation, // Preserve raw consultation data for specialist extraction
+    researchData: result.research || null, // Inline research from agents system (bypasses polling)
   };
 }
 

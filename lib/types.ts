@@ -37,6 +37,9 @@ export interface ClaudeResponse {
   consultationId?: string;
   fromAgentsSystem?: boolean;
   rawConsultationData?: any; // Preserve raw consultation data for specialist extraction
+  researchData?: any; // Inline research data returned by agents system alongside consultation
+  // Phase 3.1: Two-stage consultation UX
+  urgencyLevel?: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
   // Scope validation for out-of-scope queries
   isOutOfScope?: boolean;
   scopeValidation?: {
@@ -599,6 +602,62 @@ export interface ConsultationResponseFast {
 
 export type ConsultationResponse = ConsultationResponseNormal | ConsultationResponseFast;
 
+// Research Agent Integration Types (Phase 2)
+export interface ResearchCitation {
+  pmid: string;
+  title: string;
+  authors: string[];
+  journal: string;
+  year: number;
+  quality: 'high' | 'moderate' | 'low';
+  relevanceScore: number;
+  abstract?: string;
+  pubmedUrl: string;
+}
+
+export interface ResearchResult {
+  consultationId: string;
+  status: ResearchStatus;
+  intro?: string;
+  citations: ResearchCitation[];
+  totalStudiesFound: number;
+  searchTerms: string[];
+  completedAt?: string;
+  error?: string;
+}
+
+export type ResearchStatus = 'idle' | 'pending' | 'complete' | 'failed' | 'not_found';
+
+export interface ResearchState {
+  status: ResearchStatus;
+  result: ResearchResult | null;
+  error: string | null;
+}
+
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+export interface AgentSummaryData {
+  specialist: string;
+  specialistType: string;
+  icon: string;
+  summary: string;
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+  agreementWithTriage: string;
+}
+
+export interface StructuredBriefData {
+  keyFinding: string;
+  immediateAction: string;
+  consensusCount: number;
+  totalAgents: number;
+  overallConfidence: number;
+  overallConfidenceLevel: ConfidenceLevel;
+  agentSummaries: AgentSummaryData[];
+  followUpQuestion: string | null;
+  perAgentConfidences: Array<{ specialist: string; confidence: number }>;
+}
+
 // Feedback System Types
 export interface FeedbackRequest {
   consultationId: string;
@@ -625,3 +684,12 @@ export interface FeedbackRequest {
     };
   };
 }
+
+export interface ChatMessage {
+  id?: number;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at?: string;
+}
+
+// ── PROMIS types moved to lib/promisTypes.ts ──

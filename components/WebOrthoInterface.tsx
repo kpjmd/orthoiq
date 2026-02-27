@@ -18,7 +18,7 @@ import { useResearchPolling } from '@/hooks/useResearchPolling';
 import { normalizeResearchResponse } from '@/lib/researchService';
 import PROMISQuestionnaire from './PROMISQuestionnaire';
 import { isPainRelatedConsultation } from '@/lib/promis';
-import { PROMISCompletionResult } from '@/lib/types';
+import { PROMISCompletionResult } from '@/lib/promisTypes';
 
 type ConsultationStage =
   | 'idle'

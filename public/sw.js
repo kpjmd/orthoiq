@@ -1,5 +1,5 @@
 // Service Worker for OrthoIQ PWA
-const CACHE_NAME = 'orthoiq-v2-fresh';
+const CACHE_NAME = 'orthoiq-v3';
 const STATIC_ASSETS = [
   '/',
   '/miniapp',
@@ -88,6 +88,11 @@ self.addEventListener('fetch', (event) => {
         });
       })
     );
+    return;
+  }
+
+  // Don't intercept Next.js JS/CSS chunks — let browser HTTP cache handle them natively
+  if (event.request.url.includes('/_next/')) {
     return;
   }
 

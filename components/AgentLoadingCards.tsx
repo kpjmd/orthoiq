@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 
 interface Agent {
   name: string;
@@ -68,8 +68,11 @@ export default function AgentLoadingCards({ isLoading, mode }: AgentLoadingCards
   const [allRevealed, setAllRevealed] = useState(false);
   const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
-  // Get agents based on mode
-  const agents = mode === 'fast' ? [SPECIALISTS[0]] : SPECIALISTS;
+  // Get agents based on mode — memoized to avoid new reference on every render
+  const agents = useMemo(
+    () => (mode === 'fast' ? [SPECIALISTS[0]] : SPECIALISTS),
+    [mode]
+  );
 
   // Clear all timeouts
   const clearAllTimeouts = () => {
@@ -130,6 +133,7 @@ export default function AgentLoadingCards({ isLoading, mode }: AgentLoadingCards
     return () => {
       clearAllTimeouts();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, mode, agents]);
 
   if (!isLoading) return null;

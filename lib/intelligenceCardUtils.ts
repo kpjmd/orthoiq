@@ -1,7 +1,7 @@
 // Intelligence Card Data Utilities
 // Maps rawConsultationData from OrthoIQ-Agents backend to Intelligence Card format
 
-export type SpecialistType = 'triage' | 'painWhisperer' | 'movementDetective' | 'strengthSage' | 'mindMender';
+export type SpecialistType = 'triage' | 'painWhisperer' | 'movementDetective' | 'strengthSage' | 'mindMender' | 'research';
 export type CardTier = 'standard' | 'complete' | 'verified' | 'exceptional';
 
 export interface AgentStakeData {
@@ -57,7 +57,8 @@ const AGENT_DISPLAY_NAMES: Record<SpecialistType, string> = {
   painWhisperer: 'Pain',
   movementDetective: 'Movement',
   strengthSage: 'Strength',
-  mindMender: 'Mental'
+  mindMender: 'Mental',
+  research: 'Research',
 };
 
 // Agent full names for predictions
@@ -66,7 +67,8 @@ const AGENT_FULL_NAMES: Record<SpecialistType, string> = {
   painWhisperer: 'Pain Whisperer',
   movementDetective: 'Movement Detective',
   strengthSage: 'Strength Sage',
-  mindMender: 'Mind Mender'
+  mindMender: 'Mind Mender',
+  research: 'Research Agent',
 };
 
 // Agent colors for theming
@@ -75,7 +77,8 @@ const AGENT_COLORS: Record<SpecialistType, string> = {
   painWhisperer: '#8b5cf6', // Purple
   movementDetective: '#10b981', // Green
   strengthSage: '#f59e0b',  // Amber
-  mindMender: '#ef4444'     // Red
+  mindMender: '#ef4444',    // Red
+  research: '#06b6d4',      // Cyan
 };
 
 /**
@@ -120,6 +123,7 @@ function normalizeSpecialistType(input: string): SpecialistType {
   if (normalized.includes('movement') || normalized.includes('detective')) return 'movementDetective';
   if (normalized.includes('strength') || normalized.includes('sage')) return 'strengthSage';
   if (normalized.includes('mind') || normalized.includes('mender') || normalized.includes('mental')) return 'mindMender';
+  if (normalized.includes('research')) return 'research';
 
   return 'triage'; // Default fallback
 }

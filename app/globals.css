@@ -37,3 +37,28 @@
     @apply text-xs text-gray-600 italic bg-yellow-50 border border-yellow-200 p-3 rounded-lg;
   }
 }
+
+/* PROMIS "Track Your Recovery" pulse animation */
+.promis-pulse {
+  animation: promisPulse 2s ease-in-out infinite;
+}
+
+@keyframes promisPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 12px 2px rgba(59, 130, 246, 0.2);
+  }
+}
+
+/* Ensure combined response never truncates - safety fallback */
+.prose.prose-lg * {
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+  max-height: none !important;
+}

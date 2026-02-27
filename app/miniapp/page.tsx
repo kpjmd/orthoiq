@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import ResponseCard from '@/components/ResponseCard';
 import ActionMenu from '@/components/ActionMenu';
@@ -11,6 +11,14 @@ import { useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
 import OrthoIQLogo from '@/components/OrthoIQLogo';
 import AgentLoadingCards from '@/components/AgentLoadingCards';
+import FeedbackModal from '@/components/FeedbackModal';
+import TriageResponseCard from '@/components/TriageResponseCard';
+import ComprehensiveLoadingState from '@/components/ComprehensiveLoadingState';
+import ConsultationChatbot from '@/components/ConsultationChatbot';
+import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
+import { useResearchPolling } from '@/hooks/useResearchPolling';
+import { isPainRelatedConsultation } from '@/lib/promis';
+import { PROMISCompletionResult } from '@/lib/promisTypes';
 import { UserTier } from '@/lib/rateLimit';
 
 // Farcaster SDK Context Types
@@ -93,7 +101,133 @@ interface ResponseData {
   };
   // Raw consultation data for Intelligence Card generation
   rawConsultationData?: any;
+  // OrthoIQ-Agents integration fields
+  dataCompleteness?: number;
+  suggestedFollowUp?: string[];
+  triageConfidence?: number;
+  specialistCoverage?: { [specialist: string]: boolean };
+  participatingSpecialists?: string[];
+  consultationId?: string;
+  fromAgentsSystem?: boolean;
+  urgencyLevel?: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
 }
+
+type ConsultationStage =
+  | 'idle'
+  | 'triage_loading'
+  | 'triage_complete'
+  | 'comprehensive_loading'
+  | 'comprehensive_complete'
+  | 'exited';
+
+// Helper function to format structured response objects into readable text
+const formatStructuredResponse = (obj: any): string => {
+  if (typeof obj === 'string') return obj;
+
+  if (obj && typeof obj === 'object') {
+    const sections = [];
+
+    if (obj.diagnosis) {
+      sections.push(`**Diagnosis:**\n${obj.diagnosis}`);
+    }
+    if (obj.immediate_actions) {
+      sections.push(`**Immediate Actions:**\n${obj.immediate_actions}`);
+    }
+    if (obj.red_flags) {
+      sections.push(`**Red Flags:**\n${obj.red_flags}`);
+    }
+    if (obj.specialist_recommendation) {
+      sections.push(`**Specialist Recommendation:**\n${obj.specialist_recommendation}`);
+    }
+    if (obj.followup) {
+      sections.push(`**Follow-up:**\n${obj.followup}`);
+    }
+    if (sections.length > 0) {
+      return sections.join('\n\n');
+    }
+    try {
+      return JSON.stringify(obj, null, 2);
+    } catch {
+      return '[Complex response object - please check console for details]';
+    }
+  }
+
+  return String(obj);
+};
+
+// Extract and format API response data into ResponseData
+const parseApiResponse = (data: any): ResponseData => {
+  let formattedResponse = data.response;
+
+  try {
+    if (typeof data.response === 'string' && (data.response.trim().startsWith('{') || data.response.trim().startsWith('['))) {
+      const parsed = JSON.parse(data.response);
+      if (parsed.response) {
+        formattedResponse = formatStructuredResponse(parsed.response);
+      } else if (typeof parsed === 'string') {
+        formattedResponse = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        formattedResponse = formatStructuredResponse(parsed);
+      }
+    } else if (typeof data.response === 'object' && data.response !== null) {
+      formattedResponse = formatStructuredResponse(data.response);
+    }
+  } catch (parseError) {
+    console.warn('MiniApp: JSON parsing failed:', parseError);
+    if (typeof data.response === 'string' && data.response.includes('"response"')) {
+      try {
+        const jsonMatch = data.response.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          formattedResponse = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (typeof formattedResponse !== 'string') {
+    formattedResponse = formatStructuredResponse(formattedResponse);
+  }
+  if (typeof formattedResponse !== 'string') {
+    formattedResponse = 'An error occurred while formatting the response. Please try again.';
+  }
+
+  return {
+    response: formattedResponse,
+    confidence: data.confidence,
+    isFiltered: data.isFiltered,
+    isPendingReview: data.isPendingReview,
+    isApproved: data.isApproved,
+    reviewedBy: data.reviewedBy,
+    reviewType: data.reviewType,
+    hasAdditions: data.hasAdditions,
+    hasCorrections: data.hasCorrections,
+    additionsText: data.additionsText,
+    correctionsText: data.correctionsText,
+    inquiry: data.inquiry,
+    keyPoints: data.keyPoints,
+    questionId: data.questionId,
+    enrichments: data.enrichments || [],
+    hasResearch: data.hasResearch || false,
+    userTier: data.userTier || 'basic',
+    dataCompleteness: data.dataCompleteness,
+    suggestedFollowUp: data.suggestedFollowUp,
+    triageConfidence: data.triageConfidence,
+    specialistCoverage: data.specialistCoverage,
+    participatingSpecialists: data.participatingSpecialists,
+    consultationId: data.consultationId,
+    fromAgentsSystem: data.fromAgentsSystem,
+    specialistConsultation: data.specialistConsultation,
+    agentBadges: data.agentBadges || [],
+    hasSpecialistConsultation: data.hasSpecialistConsultation || false,
+    agentRouting: data.agentRouting,
+    agentPerformance: data.agentPerformance,
+    agentNetwork: data.agentNetwork,
+    rawConsultationData: data.rawConsultationData,
+    urgencyLevel: data.urgencyLevel,
+  };
+};
 
 function MiniAppContent() {
   const { user: authUser, isAuthenticated } = useAuth();
@@ -101,14 +235,63 @@ function MiniAppContent() {
   const [context, setContext] = useState<FarcasterContext | null>(null);
   const [question, setQuestion] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
-  const [responseData, setResponseData] = useState<ResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [consultationStage, setConsultationStage] = useState<ConsultationStage>('idle');
+  const [triageResult, setTriageResult] = useState<ResponseData | null>(null);
+  const [comprehensiveResult, setComprehensiveResult] = useState<ResponseData | null>(null);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const isLoading = consultationStage === 'triage_loading' || consultationStage === 'comprehensive_loading';
   const [error, setError] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState<{remaining: number; total: number; resetTime?: Date; tier?: UserTier} | null>(null);
-  const [consultationMode, setConsultationMode] = useState<'fast' | 'normal'>('fast');
   const [userPreferences, setUserPreferences] = useState<any>(null);
   const [isReturningUser, setIsReturningUser] = useState(false);
+
+  // PROMIS questionnaire state
+  const [showPromisButton, setShowPromisButton] = useState(false);
+  const [showPromisQuestionnaire, setShowPromisQuestionnaire] = useState(false);
+  const [promisCompleted, setPromisCompleted] = useState(false);
+  const [promisResult, setPromisResult] = useState<PROMISCompletionResult | null>(null);
+  const [pendingComprehensiveReveal, setPendingComprehensiveReveal] = useState(false);
+  const [showTriagePromis, setShowTriagePromis] = useState(false);
+  const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
+
+  // Memoize full caseData so the backend can build precise PubMed queries.
+  const researchCaseData = useMemo(() => {
+    const raw = comprehensiveResult?.rawConsultationData;
+    if (!raw) return undefined;
+    const cd = raw.caseData;
+    if (!cd) return undefined;
+    return {
+      primaryComplaint: cd.primaryComplaint || '',
+      symptoms: cd.symptoms,
+      duration: cd.duration,
+      location: cd.location,
+      painLevel: cd.painLevel,
+      age: cd.age,
+      rawQuery: cd.rawQuery,
+    };
+  }, [comprehensiveResult?.rawConsultationData]);
+
+  // Research polling — gate on comprehensive_complete
+  const researchPolling = useResearchPolling({
+    enabled: !!(consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId),
+    consultationId: comprehensiveResult?.consultationId,
+    caseData: researchCaseData,
+    consultationResult: comprehensiveResult?.rawConsultationData,
+    userTier: comprehensiveResult?.userTier,
+  });
+
+  // Show PROMIS button after 5s during comprehensive loading
+  useEffect(() => {
+    if (consultationStage === 'comprehensive_loading' && !promisCompleted) {
+      const timer = setTimeout(() => setShowPromisButton(true), 5000);
+      return () => clearTimeout(timer);
+    }
+    if (consultationStage !== 'comprehensive_loading' && consultationStage !== 'comprehensive_complete') {
+      setShowPromisButton(false);
+    }
+  }, [consultationStage, promisCompleted]);
 
   const getUserTier = useCallback((): UserTier => {
     // Prioritize authUser from Quick Auth
@@ -125,17 +308,17 @@ function MiniAppContent() {
 
   useEffect(() => {
     console.log('MiniApp: Starting SDK initialization...');
-    
+
     // Check if we're in a Mini App context first
     const url = new URL(window.location.href);
     const hasMiniAppParam = url.searchParams.get('miniApp') === 'true';
     const isInFrame = window !== window.top;
-    
+
     console.log('MiniApp Context Check:');
     console.log('- Has miniApp param:', hasMiniAppParam);
     console.log('- Is in frame:', isInFrame);
     console.log('- Global Mini App flag:', window.__ORTHOIQ_MINI_APP__ || false);
-    
+
     // Enhanced context detection using SDK
     const checkMiniAppContext = async () => {
       try {
@@ -143,12 +326,12 @@ function MiniAppContent() {
         const sdkInstance = (window.__FARCASTER_SDK__ as typeof sdk) || sdk;
         const isActuallyMiniApp = await sdkInstance.isInMiniApp();
         console.log('- SDK isInMiniApp result:', isActuallyMiniApp);
-        
+
         // Log context but don't redirect - always show mini app UI
         if (!isActuallyMiniApp && !hasMiniAppParam && !isInFrame) {
           console.log('Not in Farcaster context - but still showing mini app UI');
         }
-        
+
         return isActuallyMiniApp || isInFrame || hasMiniAppParam;
       } catch (err) {
         console.error('Failed to check Mini App context:', err);
@@ -156,7 +339,7 @@ function MiniAppContent() {
         return isInFrame || hasMiniAppParam;
       }
     };
-    
+
     // Debug frame context information
     try {
       console.log('MiniApp Debug - Frame Context:');
@@ -165,7 +348,7 @@ function MiniAppContent() {
       console.log('- Parent available:', window.parent !== window);
       console.log('- Document referrer:', document.referrer);
       console.log('- User agent:', navigator.userAgent);
-      
+
       // Try to get parent info (will likely be blocked)
       try {
         console.log('- Parent origin:', window.parent.location.origin);
@@ -175,7 +358,7 @@ function MiniAppContent() {
     } catch (debugError) {
       console.error('MiniApp Debug error:', debugError);
     }
-    
+
     // Preconnect to Quick Auth server for better performance
     const link = document.createElement('link');
     link.rel = 'preconnect';
@@ -205,32 +388,32 @@ function MiniAppContent() {
     const load = async () => {
       try {
         console.log('MiniApp: Loading SDK context...');
-        
+
         // Check Mini App context (for logging and SDK optimization)
         const isMiniAppContext = await checkMiniAppContext();
         console.log('MiniApp: Context verification result:', isMiniAppContext);
-        
+
         // Use the pre-loaded SDK if available
         const sdkInstance = (window.__FARCASTER_SDK__ as typeof sdk) || sdk;
-        
+
         // Add timeout to prevent infinite loading
         const contextPromise = sdkInstance.context;
-        const timeoutPromise = new Promise((_, reject) => 
+        const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('SDK context timeout after 5 seconds')), 5000)
         );
-        
+
         const context = await Promise.race([contextPromise, timeoutPromise]) as FarcasterContext;
         console.log('MiniApp: SDK context loaded successfully:', context);
-        
+
         setContext(context);
         setIsSDKLoaded(true);
-        
+
         // Clear fallback timer since we succeeded
         clearTimeout(fallbackTimer);
-        
+
         // Signal that the app is ready
         ensureReady();
-        
+
         // Load rate limit info and user preferences - always use Farcaster FID
         if (context?.user?.fid) {
           console.log('MiniApp: Loading rate limit status and preferences for FID:', context.user.fid);
@@ -242,16 +425,16 @@ function MiniAppContent() {
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
         setError(`Failed to initialize Mini App: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        
+
         // Clear fallback timer and ensure ready is called
         clearTimeout(fallbackTimer);
-        
+
         // Still call ready() even on error to dismiss splash screen
         ensureReady();
-        
+
         // Set SDK as loaded even on error to show the interface
         setIsSDKLoaded(true);
-        
+
         // Create a mock context for basic functionality
         setContext({
           user: undefined,
@@ -305,11 +488,6 @@ function MiniAppContent() {
         const data = await res.json();
         setUserPreferences(data);
 
-        // Set consultation mode from preferences
-        if (data.preferred_mode) {
-          setConsultationMode(data.preferred_mode);
-        }
-
         // Check if returning user
         setIsReturningUser(!data.is_new_user && data.consultation_count > 0);
 
@@ -333,7 +511,8 @@ function MiniAppContent() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Stage 1: Triage submit
+  const handleTriageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
 
@@ -345,9 +524,10 @@ function MiniAppContent() {
       return;
     }
 
-    setIsLoading(true);
+    setConsultationStage('triage_loading');
     setError('');
-    setResponseData(null);
+    setTriageResult(null);
+    setComprehensiveResult(null);
     setCurrentQuestion(question.trim());
 
     try {
@@ -368,7 +548,7 @@ function MiniAppContent() {
             tier: getUserTier()
           } : null,
           tier: getUserTier(),
-          mode: consultationMode,
+          mode: 'fast',
           platform: 'miniapp'
         }),
         signal: controller.signal,
@@ -377,10 +557,10 @@ function MiniAppContent() {
       clearTimeout(timeoutId);
 
       const contentType = res.headers.get('content-type');
-      
+
       if (!res.ok) {
         let errorMessage = `API error (${res.status})`;
-        
+
         if (contentType && contentType.includes('application/json')) {
           try {
             const errorData = await res.json();
@@ -393,57 +573,121 @@ function MiniAppContent() {
           const errorText = await res.text();
           errorMessage = errorText || errorMessage;
         }
-        
+
         throw new Error(errorMessage);
       }
 
       const data = await res.json();
-      setResponseData({
-        response: data.response,
-        confidence: data.confidence,
-        isFiltered: data.isFiltered,
-        isPendingReview: data.isPendingReview,
-        isApproved: data.isApproved,
-        reviewedBy: data.reviewedBy,
-        reviewType: data.reviewType,
-        hasAdditions: data.hasAdditions,
-        hasCorrections: data.hasCorrections,
-        additionsText: data.additionsText,
-        correctionsText: data.correctionsText,
-        inquiry: data.inquiry,
-        keyPoints: data.keyPoints,
-        questionId: data.questionId,
-        enrichments: data.enrichments || [],
-        hasResearch: data.hasResearch || false,
-        userTier: data.userTier || 'basic',
-        // Agent coordination data
-        specialistConsultation: data.specialistConsultation,
-        agentBadges: data.agentBadges || [],
-        hasSpecialistConsultation: data.hasSpecialistConsultation || false,
-        agentRouting: data.agentRouting,
-        agentPerformance: data.agentPerformance,
-        agentNetwork: data.agentNetwork,
-        // Raw consultation data for Intelligence Card generation
-        rawConsultationData: data.rawConsultationData
-      });
-
+      const result = parseApiResponse(data);
+      setTriageResult(result);
+      setConsultationStage('triage_complete');
       setQuestion('');
 
-      // Update rate limit info
+      // Count the question only once (not again for comprehensive upgrade)
       const fidString = typeof fid === 'number' ? fid.toString() : fid;
       await loadRateLimitStatus(fidString, getUserTier());
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
+      setConsultationStage('idle');
     }
   };
 
+  // Stage 2: Comprehensive upgrade
+  const handleComprehensiveUpgrade = async () => {
+    // Re-validate FID
+    const fid = context?.user?.fid;
+    if (!fid) {
+      setError('Authentication required. Please refresh the app and try again.');
+      return;
+    }
+
+    setConsultationStage('comprehensive_loading');
+    setError('');
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      const res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: currentQuestion,
+          fid: typeof fid === 'number' ? fid.toString() : fid,
+          authUser: authUser ? {
+            fid: authUser.fid,
+            username: authUser.username,
+            displayName: authUser.displayName,
+            tier: getUserTier()
+          } : null,
+          tier: getUserTier(),
+          mode: 'normal',
+          platform: 'miniapp'
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const contentType = res.headers.get('content-type');
+
+      if (!res.ok) {
+        let errorMessage = `API error (${res.status})`;
+
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            const errorText = await res.text();
+            errorMessage = errorText || errorMessage;
+          }
+        } else {
+          const errorText = await res.text();
+          errorMessage = errorText || errorMessage;
+        }
+        // Fall back to triage_complete on error (preserves triage result)
+        setError(errorMessage);
+        setConsultationStage('triage_complete');
+        return;
+      }
+
+      const data = await res.json();
+      const result = parseApiResponse(data);
+      setComprehensiveResult(result);
+      if (showPromisQuestionnaire && !promisCompleted) {
+        setPendingComprehensiveReveal(true);
+      }
+      setConsultationStage('comprehensive_complete');
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setConsultationStage('triage_complete');
+    }
+  };
+
+  // Exit from triage without comprehensive
+  const handleTriageExit = () => {
+    setConsultationStage('exited');
+    setShowFeedbackModal(true);
+  };
+
   const handleAskAnother = () => {
-    setResponseData(null);
+    setConsultationStage('idle');
+    setTriageResult(null);
+    setComprehensiveResult(null);
     setCurrentQuestion('');
     setError('');
+    setShowFeedbackModal(false);
+    setFeedbackSubmitted(false);
+    setShowPromisButton(false);
+    setShowPromisQuestionnaire(false);
+    setPromisCompleted(false);
+    setPromisResult(null);
+    setPendingComprehensiveReveal(false);
+    setShowTriagePromis(false);
+    setTriagePromisCompleted(false);
     document.getElementById('question')?.focus();
   };
 
@@ -513,7 +757,7 @@ function MiniAppContent() {
                 Welcome, {context.user.displayName || context.user.username || `FID ${context.user.fid}`}
               </div>
             )}
-            
+
             {/* User Info */}
             <div className="space-y-1">
               <div className="flex items-center justify-center space-x-2">
@@ -546,56 +790,8 @@ function MiniAppContent() {
           isAppAdded={context?.client?.added ?? false}
         />
 
-        {/* Consultation Mode Toggle */}
-        <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Consultation Mode</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setConsultationMode('fast');
-                if (context?.user?.fid) {
-                  saveUserPreference(context.user.fid.toString(), 'fast');
-                }
-              }}
-              className={`p-3 rounded-lg border-2 transition-all ${
-                consultationMode === 'fast'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="text-lg mb-1">⚡</div>
-              <div className="font-medium text-sm">Fast Triage</div>
-              <div className="text-xs text-gray-500">~17 seconds</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConsultationMode('normal');
-                if (context?.user?.fid) {
-                  saveUserPreference(context.user.fid.toString(), 'normal');
-                }
-              }}
-              className={`p-3 rounded-lg border-2 transition-all ${
-                consultationMode === 'normal'
-                  ? 'border-purple-500 bg-purple-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="text-lg mb-1">🏥</div>
-              <div className="font-medium text-sm">Multi-Specialist</div>
-              <div className="text-xs text-gray-500">~60 seconds</div>
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-2 text-center">
-            {consultationMode === 'fast'
-              ? 'Quick assessment from triage specialist'
-              : 'Full consultation with 5 AI specialists'}
-          </p>
-        </div>
-
         {/* Question Form */}
-        <form onSubmit={handleSubmit} className="mb-6">
+        <form onSubmit={handleTriageSubmit} className="mb-6">
           {/* Expandable Question Tips */}
           <details className="mb-4 group">
             <summary className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg cursor-pointer list-none flex items-center justify-between hover:from-purple-100 hover:to-indigo-100 transition-colors">
@@ -668,7 +864,7 @@ function MiniAppContent() {
               </div>
 
               <p className="text-xs text-gray-500 text-center italic">
-                In multi-specialist mode, all 5 agents analyze your case
+                After initial triage, you can request a full multi-specialist consultation for a deeper analysis
               </p>
             </div>
           </details>
@@ -708,7 +904,7 @@ function MiniAppContent() {
               disabled={isLoading}
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={isLoading || !question.trim()}
@@ -720,21 +916,18 @@ function MiniAppContent() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Getting AI Response...
+                Getting triage assessment (~17s)...
               </span>
             ) : (
-              'Get AI Answer'
+              'Get Assessment'
             )}
           </button>
         </form>
 
-        {/* Agent Loading Display */}
-        {isLoading && (
+        {/* Triage loading — fast mode loading cards */}
+        {consultationStage === 'triage_loading' && (
           <div className="mb-6">
-            <AgentLoadingCards
-              isLoading={isLoading}
-              mode={consultationMode === 'normal' ? 'normal' : 'fast'}
-            />
+            <AgentLoadingCards isLoading={true} mode="fast" />
           </div>
         )}
 
@@ -744,78 +937,351 @@ function MiniAppContent() {
             <p className="text-red-800">{error}</p>
             {error.includes('Daily limit reached') && rateLimitInfo?.resetTime && (
               <p className="text-red-600 text-sm mt-2">
-                Questions reset at midnight UTC in: <CountdownTimer 
-                  targetTime={rateLimitInfo.resetTime} 
+                Questions reset at midnight UTC in: <CountdownTimer
+                  targetTime={rateLimitInfo.resetTime}
                   onComplete={() => {
                     if (context?.user?.fid) {
                       loadRateLimitStatus(context.user.fid.toString(), getUserTier());
                     }
-                  }} 
+                  }}
                 />
               </p>
             )}
           </div>
         )}
 
-        {/* Response Display */}
-        {responseData && (
+        {/* ── TRIAGE COMPLETE ── */}
+        {consultationStage === 'triage_complete' && triageResult && (
           <div className="mb-6">
+            <TriageResponseCard
+              response={triageResult.response}
+              confidence={triageResult.confidence}
+              urgencyLevel={triageResult.urgencyLevel || 'routine'}
+              suggestedFollowUp={triageResult.suggestedFollowUp || []}
+              consultationId={triageResult.consultationId}
+              onSeeFullAnalysis={handleComprehensiveUpgrade}
+              onExit={handleTriageExit}
+            />
+          </div>
+        )}
+
+        {/* ── COMPREHENSIVE LOADING ── */}
+        {consultationStage === 'comprehensive_loading' && triageResult && (
+          <div className="mb-6">
+            <TriageResponseCard
+              response={triageResult.response}
+              confidence={triageResult.confidence}
+              urgencyLevel={triageResult.urgencyLevel || 'routine'}
+              suggestedFollowUp={triageResult.suggestedFollowUp || []}
+              collapsed={true}
+            />
+            <ComprehensiveLoadingState />
+
+            {/* PROMIS baseline capture during loading */}
+            {showPromisQuestionnaire && !promisCompleted && (
+              <div className="mt-4">
+                <PROMISQuestionnaire
+                  timepoint="baseline"
+                  consultationId={triageResult.consultationId || ''}
+                  isPainRelated={isPainRelatedConsultation(triageResult.rawConsultationData?.caseData || { rawQuery: currentQuestion })}
+                  patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous'}
+                  onComplete={(result) => {
+                    setPromisResult(result);
+                    setPromisCompleted(true);
+                  }}
+                  onSkip={() => {
+                    setShowPromisQuestionnaire(false);
+                    setShowPromisButton(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Pulsing "Track Your Recovery" button */}
+            {showPromisButton && !showPromisQuestionnaire && !promisCompleted && (
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    setShowPromisQuestionnaire(true);
+                    setShowPromisButton(false);
+                  }}
+                  className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                >
+                  <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire while you wait</p>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── COMPREHENSIVE COMPLETE ── */}
+        {consultationStage === 'comprehensive_complete' && comprehensiveResult && (
+          <div className="mb-6">
+            {/* PROMIS results-ready CTA when questionnaire was active during loading */}
+            {pendingComprehensiveReveal && promisCompleted && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                <p className="text-sm text-green-800 font-medium mb-2">Your results are ready</p>
+                <button
+                  onClick={() => setPendingComprehensiveReveal(false)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                >
+                  View Your Results &rarr;
+                </button>
+              </div>
+            )}
+
+            {/* PROMIS questionnaire inline if started during loading and still active */}
+            {showPromisQuestionnaire && !promisCompleted && (
+              <div className="mb-4">
+                <PROMISQuestionnaire
+                  timepoint="baseline"
+                  consultationId={comprehensiveResult.consultationId || triageResult?.consultationId || ''}
+                  isPainRelated={isPainRelatedConsultation(comprehensiveResult.rawConsultationData?.caseData || { rawQuery: currentQuestion })}
+                  patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous'}
+                  onComplete={(result) => {
+                    setPromisResult(result);
+                    setPromisCompleted(true);
+                    setPendingComprehensiveReveal(false);
+                  }}
+                  onSkip={() => {
+                    setShowPromisQuestionnaire(false);
+                    setPendingComprehensiveReveal(false);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* PROMIS completion summary */}
+            {promisCompleted && promisResult && !pendingComprehensiveReveal && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                <p className="text-xs text-green-700">
+                  Baseline questionnaire complete — T-Score: {promisResult.scores.physicalFunctionTScore}
+                </p>
+              </div>
+            )}
+
+            {/* Second-chance PROMIS button on structured brief */}
+            {!showPromisQuestionnaire && !promisCompleted && !pendingComprehensiveReveal && (
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowPromisQuestionnaire(true)}
+                  className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                >
+                  <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire to track your progress over time</p>
+                </button>
+              </div>
+            )}
+            {/* Data Completeness Indicator */}
+            {comprehensiveResult.dataCompleteness !== undefined && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Data Completeness Assessment
+                  </span>
+                  <span className={`text-sm font-semibold ${
+                    comprehensiveResult.dataCompleteness >= 0.8 ? 'text-green-600' :
+                    comprehensiveResult.dataCompleteness >= 0.6 ? 'text-yellow-600' :
+                    comprehensiveResult.dataCompleteness >= 0.3 ? 'text-orange-600' : 'text-red-600'
+                  }`}>
+                    {Math.round(comprehensiveResult.dataCompleteness * 100)}%
+                  </span>
+                </div>
+
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-500 ${
+                      comprehensiveResult.dataCompleteness >= 0.8 ? 'bg-green-500' :
+                      comprehensiveResult.dataCompleteness >= 0.6 ? 'bg-yellow-500' :
+                      comprehensiveResult.dataCompleteness >= 0.3 ? 'bg-orange-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${comprehensiveResult.dataCompleteness * 100}%` }}
+                  ></div>
+                </div>
+
+                <p className={`text-xs ${
+                  comprehensiveResult.dataCompleteness >= 0.8 ? 'text-green-700' :
+                  comprehensiveResult.dataCompleteness >= 0.6 ? 'text-yellow-700' :
+                  comprehensiveResult.dataCompleteness >= 0.3 ? 'text-orange-700' : 'text-red-700'
+                }`}>
+                  {comprehensiveResult.dataCompleteness >= 0.8 ? '✅ Complete data - full specialist consultation available' :
+                   comprehensiveResult.dataCompleteness >= 0.6 ? '⚠️ Good data - comprehensive assessment provided' :
+                   comprehensiveResult.dataCompleteness >= 0.3 ? '🔍 Partial data - some specialists may be limited' :
+                   '📝 Limited data - basic assessment only'}
+                </p>
+
+                {comprehensiveResult.fromAgentsSystem && (
+                  <div className="mt-2 flex items-center text-xs text-indigo-600">
+                    <span className="mr-1">🤖</span>
+                    Powered by OrthoIQ Multi-Specialist AI Network
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Specialist Coverage */}
+            {comprehensiveResult.specialistCoverage && Object.keys(comprehensiveResult.specialistCoverage).length > 0 && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg">
+                <div className="flex items-center mb-3">
+                  <span className="text-lg mr-2">🏥</span>
+                  <h4 className="font-semibold text-teal-800">Specialist Coverage</h4>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(comprehensiveResult.specialistCoverage).map(([specialist, participated]) => (
+                    <div key={specialist} className={`flex items-center text-xs p-2 rounded ${
+                      participated ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      <span className="mr-1">{participated ? '✅' : '⭕'}</span>
+                      {specialist.charAt(0).toUpperCase() + specialist.slice(1).replace('_', ' ')}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <ResponseCard
-              response={responseData.response}
-              confidence={responseData.confidence}
-              isFiltered={responseData.isFiltered}
-              isPendingReview={responseData.isPendingReview}
-              isApproved={responseData.isApproved}
-              reviewedBy={responseData.reviewedBy}
-              reviewType={responseData.reviewType}
-              hasAdditions={responseData.hasAdditions}
-              hasCorrections={responseData.hasCorrections}
-              additionsText={responseData.additionsText}
-              correctionsText={responseData.correctionsText}
+              response={comprehensiveResult.response}
+              confidence={comprehensiveResult.confidence}
+              isFiltered={comprehensiveResult.isFiltered}
+              isPendingReview={comprehensiveResult.isPendingReview}
+              isApproved={comprehensiveResult.isApproved}
+              reviewedBy={comprehensiveResult.reviewedBy}
+              reviewType={comprehensiveResult.reviewType}
+              hasAdditions={comprehensiveResult.hasAdditions}
+              hasCorrections={comprehensiveResult.hasCorrections}
+              additionsText={comprehensiveResult.additionsText}
+              correctionsText={comprehensiveResult.correctionsText}
               question={currentQuestion}
               fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
               caseId={`miniapp-${Date.now()}`}
-              inquiry={responseData.inquiry}
-              keyPoints={responseData.keyPoints}
-              questionId={responseData.questionId?.toString()}
+              inquiry={comprehensiveResult.inquiry}
+              keyPoints={comprehensiveResult.keyPoints}
+              questionId={comprehensiveResult.questionId?.toString()}
               isAuthenticated={!!context?.user?.fid || !!authUser?.fid}
-              enrichments={responseData.enrichments || []}
-              hasResearch={responseData.hasResearch || false}
-              userTier={responseData.userTier || getUserTier()}
-              agentCoordination={responseData.agentNetwork ? {
-                activeAgents: responseData.agentNetwork.activeAgents,
-                totalAgents: responseData.agentNetwork.totalCapacity,
-                coordinationType: responseData.agentRouting?.networkExecuted ? 'parallel' : 'sequential',
-                networkStatus: (responseData.agentNetwork.activeAgents > 0 && responseData.agentRouting?.networkExecuted) ? 'active' : 'degraded',
-                performance: responseData.agentPerformance ? {
-                  successRate: responseData.agentPerformance.successRate,
-                  avgResponseTime: responseData.agentPerformance.averageExecutionTime
+              enrichments={comprehensiveResult.enrichments || []}
+              hasResearch={comprehensiveResult.hasResearch || false}
+              userTier={comprehensiveResult.userTier || getUserTier()}
+              agentCoordination={comprehensiveResult.agentNetwork ? {
+                activeAgents: comprehensiveResult.agentNetwork.activeAgents,
+                totalAgents: comprehensiveResult.agentNetwork.totalCapacity,
+                coordinationType: comprehensiveResult.agentRouting?.networkExecuted ? 'parallel' : 'sequential',
+                networkStatus: (comprehensiveResult.agentNetwork.activeAgents > 0 && comprehensiveResult.agentRouting?.networkExecuted) ? 'active' : 'degraded',
+                performance: comprehensiveResult.agentPerformance ? {
+                  successRate: comprehensiveResult.agentPerformance.successRate,
+                  avgResponseTime: comprehensiveResult.agentPerformance.averageExecutionTime
                 } : undefined,
-                currentLoad: responseData.agentNetwork.currentLoad,
-                maxLoad: responseData.agentNetwork.totalCapacity,
-                taskRoutes: responseData.agentRouting ? [{
+                currentLoad: comprehensiveResult.agentNetwork.currentLoad,
+                maxLoad: comprehensiveResult.agentNetwork.totalCapacity,
+                taskRoutes: comprehensiveResult.agentRouting ? [{
                   from: 'miniapp-user',
-                  to: responseData.agentRouting.selectedAgent,
-                  reason: responseData.agentRouting.routingReason
+                  to: comprehensiveResult.agentRouting.selectedAgent,
+                  reason: comprehensiveResult.agentRouting.routingReason
                 }] : undefined
               } : undefined}
-              specialistConsultation={responseData.specialistConsultation}
-              agentBadges={responseData.agentBadges || []}
-              hasSpecialistConsultation={responseData.hasSpecialistConsultation || false}
-              rawConsultationData={responseData.rawConsultationData}
+              specialistConsultation={comprehensiveResult.specialistConsultation}
+              agentBadges={comprehensiveResult.agentBadges || []}
+              hasSpecialistConsultation={comprehensiveResult.hasSpecialistConsultation || false}
+              rawConsultationData={comprehensiveResult.rawConsultationData}
+              researchState={researchPolling.researchState}
             />
-            
+
+            {/* Post-consultation chatbot — placed directly below agent responses */}
+            {comprehensiveResult.consultationId && (
+              <ConsultationChatbot
+                consultationId={comprehensiveResult.consultationId}
+                consultationContext={{ response: comprehensiveResult.response, rawConsultationData: comprehensiveResult.rawConsultationData }}
+                specialistContext="triage"
+                userQuestion={currentQuestion}
+                fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
+                suggestedFollowUp={comprehensiveResult.suggestedFollowUp || triageResult?.suggestedFollowUp || []}
+              />
+            )}
+
             {/* Action Menu */}
             <ActionMenu
-              response={responseData.response}
+              response={comprehensiveResult.response}
               question={currentQuestion}
               onAskAnother={handleAskAnother}
               onViewArtwork={() => setShowPrescriptionModal(true)}
               onRate={handleRate}
               canAskAnother={true}
-              inquiry={responseData.inquiry}
-              keyPoints={responseData.keyPoints}
+              inquiry={comprehensiveResult.inquiry}
+              keyPoints={comprehensiveResult.keyPoints}
             />
+          </div>
+        )}
+
+        {/* ── EXITED ── */}
+        {consultationStage === 'exited' && (
+          <div className="mb-6">
+            <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
+              <p className="text-3xl mb-3">✅</p>
+              <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
+              <p className="text-sm text-green-700 mb-4">We hope the triage assessment was helpful.</p>
+
+              {/* Post-consultation chatbot */}
+              {triageResult?.consultationId && (
+                <div className="text-left mb-4">
+                  <ConsultationChatbot
+                    consultationId={triageResult.consultationId}
+                    consultationContext={{ response: triageResult.response, rawConsultationData: triageResult.rawConsultationData }}
+                    specialistContext="triage"
+                    userQuestion={currentQuestion}
+                    fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
+                    suggestedFollowUp={triageResult.suggestedFollowUp || []}
+                  />
+                </div>
+              )}
+
+              {/* PROMIS opt-in for triage-exit users (after feedback) */}
+              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && triageResult?.consultationId && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => setShowTriagePromis(true)}
+                    className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                  >
+                    <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                    <p className="text-xs text-gray-500 mt-0.5">2 minutes &bull; Helps track your progress over time</p>
+                  </button>
+                </div>
+              )}
+
+              {/* PROMIS questionnaire inline for triage-exit */}
+              {showTriagePromis && !triagePromisCompleted && triageResult?.consultationId && (
+                <div className="text-left mb-4">
+                  <PROMISQuestionnaire
+                    timepoint="baseline"
+                    consultationId={triageResult.consultationId}
+                    isPainRelated={isPainRelatedConsultation(triageResult.rawConsultationData?.caseData || { rawQuery: currentQuestion })}
+                    patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous'}
+                    onComplete={(result) => {
+                      setTriagePromisCompleted(true);
+                      setPromisResult(result);
+                    }}
+                    onSkip={() => setShowTriagePromis(false)}
+                  />
+                </div>
+              )}
+
+              {/* PROMIS completion for triage-exit */}
+              {triagePromisCompleted && (
+                <div className="mb-4 p-3 bg-green-100 border border-green-200 rounded-lg">
+                  <p className="text-xs text-green-700">Baseline questionnaire complete</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleAskAnother}
+                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                  feedbackSubmitted && !triagePromisCompleted && !showTriagePromis
+                    ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Ask Another Question
+              </button>
+            </div>
           </div>
         )}
 
@@ -824,11 +1290,23 @@ function MiniAppContent() {
           isOpen={showPrescriptionModal}
           onClose={() => setShowPrescriptionModal(false)}
           question={currentQuestion}
-          response={responseData?.response || ''}
+          response={comprehensiveResult?.response || triageResult?.response || ''}
           fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
-          inquiry={responseData?.inquiry}
-          keyPoints={responseData?.keyPoints}
+          inquiry={comprehensiveResult?.inquiry || triageResult?.inquiry}
+          keyPoints={comprehensiveResult?.keyPoints || triageResult?.keyPoints}
+          rawConsultationData={comprehensiveResult?.rawConsultationData || triageResult?.rawConsultationData}
         />
+
+        {/* FeedbackModal for triage exit */}
+        {consultationStage === 'exited' && triageResult && (
+          <FeedbackModal
+            isOpen={showFeedbackModal}
+            onClose={() => setShowFeedbackModal(false)}
+            consultationId={triageResult.consultationId || triageResult.specialistConsultation?.consultationId || ''}
+            patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
+            mode="fast"
+          />
+        )}
 
         {/* Disclaimer */}
         <div className="text-center text-xs text-gray-500 mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">

@@ -14,9 +14,11 @@ import TokenRewards from './TokenRewards';
 import IntelligenceCardCTA from './IntelligenceCardCTA';
 import WebIntelligenceCard from './WebIntelligenceCard';
 import ClientOnly from './ClientOnly';
-import { PrescriptionData, PrescriptionMetadata, AgentEnrichment } from '@/lib/types';
+import { PrescriptionData, PrescriptionMetadata, AgentEnrichment, ResearchState } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
 import { mapConsultationToCardData } from '@/lib/intelligenceCardUtils';
+import StructuredBrief from './StructuredBrief';
+import ResearchDetailPanel from './ResearchDetailPanel';
 
 interface AgentCoordinationData {
   activeAgents?: number;
@@ -75,6 +77,8 @@ interface ResponseCardProps {
   hasSpecialistConsultation?: boolean;
   // Raw consultation data for enhanced prescription
   rawConsultationData?: any;
+  // Research Agent state
+  researchState?: ResearchState;
   // Callback for when feedback is submitted
   onFeedbackSubmitted?: (submitted: boolean) => void;
 }
@@ -106,6 +110,7 @@ export default function ResponseCard({
   agentBadges = [],
   hasSpecialistConsultation = false,
   rawConsultationData,
+  researchState,
   onFeedbackSubmitted
 }: ResponseCardProps) {
   // Debug logging for rawConsultationData
@@ -205,12 +210,25 @@ export default function ResponseCard({
       }
 
       const data = mapConsultationToCardData(rawConsultationData);
+      // Inject research agent into card data if research completed
+      if (data && researchState?.status === 'complete') {
+        data.agentStakes.push({
+          specialist: 'research',
+          agentName: 'Research',
+          tokenStake: 2.0,
+          participated: true,
+          color: '#06b6d4',
+          confidence: 0.8,
+        });
+        data.totalStake = Math.round((data.totalStake + 2.0) * 10) / 10;
+        data.participatingCount = data.agentStakes.length;
+      }
       console.log('[ResponseCard] Generated card data:', data);
       return data;
     }
     console.log('[ResponseCard] No card data - rawConsultationData:', !!rawConsultationData, 'feedbackSubmitted:', feedbackSubmitted);
     return null;
-  }, [rawConsultationData, feedbackSubmitted]);
+  }, [rawConsultationData, feedbackSubmitted, researchState?.status]);
 
   // Simulate progressive loading for specialist consultation
   useEffect(() => {
@@ -325,6 +343,27 @@ export default function ResponseCard({
   const collapseAllSpecialists = () => {
     setExpandedSpecialists(new Set());
   };
+
+  const handleExpandFromBrief = (index: number) => {
+    setExpandedSpecialists(prev => new Set(prev).add(index));
+    const el = document.getElementById(`specialist-accordion-${index}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const [researchPanelVisible, setResearchPanelVisible] = useState(false);
+  const handleViewResearch = () => {
+    setResearchPanelVisible(true);
+    setTimeout(() => {
+      document.getElementById('research-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
+  // Determine whether to show StructuredBrief
+  const showStructuredBrief = hasSpecialistConsultation && rawConsultationData?.responses?.length > 0;
+
+  const defaultResearchState: ResearchState = researchState || { status: 'idle', result: null, error: null };
 
   const getCoordinationBadges = () => {
     if (!agentCoordination) return [];
@@ -679,15 +718,25 @@ export default function ResponseCard({
         transition={{ delay: 0.3 }}
         className="p-6"
         style={{ overflow: 'visible', height: 'auto' }}>
-        <div
-          className="prose prose-lg max-w-none text-left prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-4 prose-ul:mb-4 prose-li:text-gray-700 prose-strong:text-gray-900 prose-strong:font-semibold [&>*]:!line-clamp-none [&>*]:!-webkit-line-clamp-none"
-          style={{ maxHeight: 'none', overflow: 'visible', WebkitLineClamp: 'unset', display: 'block' }}
-        >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {hasCorrections && correctionsText ? correctionsText : displayResponse}
-          </ReactMarkdown>
-        </div>
-        
+        {showStructuredBrief ? (
+          <StructuredBrief
+            rawConsultationData={rawConsultationData}
+            researchState={defaultResearchState}
+            onExpandSpecialist={handleExpandFromBrief}
+            onViewResearch={handleViewResearch}
+            enrichments={enrichments}
+          />
+        ) : (
+          <div
+            className="prose prose-lg max-w-none text-left prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-4 prose-ul:mb-4 prose-li:text-gray-700 prose-strong:text-gray-900 prose-strong:font-semibold [&_*]:!overflow-visible [&_*]:!line-clamp-none [&_*]:!max-h-none"
+            style={{ maxHeight: 'none', overflow: 'visible', WebkitLineClamp: 'unset', display: 'block' }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {hasCorrections && correctionsText ? correctionsText : displayResponse}
+            </ReactMarkdown>
+          </div>
+        )}
+
         {/* Doctor's Additions */}
         {hasAdditions && additionsText && (
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -701,7 +750,7 @@ export default function ResponseCard({
             </div>
           </div>
         )}
-        
+
       </motion.div>
 
       {/* Feedback System with Modal - Only for fast mode (comprehensive uses prescription lock below) */}
@@ -777,7 +826,15 @@ export default function ResponseCard({
           patientId={fid}
           mode={hasSpecialistConsultation ? 'normal' : 'fast'}
           hasSpecialistConsultation={hasSpecialistConsultation}
-          specialists={agentBadges}
+          specialists={[
+            ...agentBadges,
+            ...(researchState?.status === 'complete' ? [{
+              name: 'Research Agent',
+              type: 'research',
+              active: true,
+              specialty: 'PubMed Literature Review',
+            }] : []),
+          ]}
           onFeedbackSubmitted={handleFeedbackSubmitted}
         />
       )}
@@ -1000,6 +1057,7 @@ export default function ResponseCard({
                 return (
                   <motion.div
                     key={index}
+                    id={`specialist-accordion-${index}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.7 + index * 0.1 }}
@@ -1073,6 +1131,13 @@ export default function ResponseCard({
         </motion.div>
       )}
       
+      {/* Research Detail Panel - after specialist accordions */}
+      {hasSpecialistConsultation && defaultResearchState.status === 'complete' && (
+        <div id="research-detail-panel">
+          <ResearchDetailPanel researchState={defaultResearchState} />
+        </div>
+      )}
+
       {/* Fallback for unavailable specialists - only show for comprehensive mode, not fast mode (triage only) */}
       {hasSpecialistConsultation && (!enrichments || enrichments.length === 0) && consultationStage === 'complete' && specialistConsultation?.participatingSpecialists && specialistConsultation.participatingSpecialists.length > 1 && (
         <motion.div

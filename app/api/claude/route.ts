@@ -133,38 +133,44 @@ export async function POST(request: NextRequest) {
 
     console.log(`[${requestId}] Processing question - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Tier: ${userTier}, ID: ${rateLimitIdentifier}`);
 
-    // Check platform-aware rate limiting (with email verification for web users)
+    // Check platform-aware rate limiting — skip for comprehensive (it's a triage continuation, already counted)
     let rateLimitResult;
-    try {
-      rateLimitResult = await checkPlatformRateLimit(
-        rateLimitIdentifier,
-        detectedPlatform,
-        consultationMode,
-        userTier,
-        isEmailVerified || false // Pass email verification status for web users
-      );
+    if (consultationMode !== 'comprehensive') {
+      try {
+        // Derive verified status from webUser.authType when frontend doesn't send isEmailVerified explicitly
+        const effectiveIsVerified = isEmailVerified ?? (webUser?.authType === 'verified' || webUser?.emailVerified === true);
+        rateLimitResult = await checkPlatformRateLimit(
+          rateLimitIdentifier,
+          detectedPlatform,
+          consultationMode,
+          userTier,
+          effectiveIsVerified // Pass email verification status for web users
+        );
 
-      if (!rateLimitResult.allowed) {
-        console.warn(`[${requestId}] Rate limit exceeded - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Verified: ${isEmailVerified}`);
+        if (!rateLimitResult.allowed) {
+          console.warn(`[${requestId}] Rate limit exceeded - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Verified: ${effectiveIsVerified}`);
 
-        // Use soft notification instead of hard block
-        // Return with 200 status but include rate limit info in response
-        return NextResponse.json({
-          rateLimited: true,
-          softWarning: rateLimitResult.softWarning,
-          upgradePrompt: rateLimitResult.upgradePrompt,
-          resetTime: rateLimitResult.resetTime,
-          platform: detectedPlatform,
-          mode: consultationMode,
-          remaining: 0,
-          total: rateLimitResult.total,
-          isVerified: rateLimitResult.isVerified
-        });
+          // Use soft notification instead of hard block
+          // Return with 200 status but include rate limit info in response
+          return NextResponse.json({
+            rateLimited: true,
+            softWarning: rateLimitResult.softWarning,
+            upgradePrompt: rateLimitResult.upgradePrompt,
+            resetTime: rateLimitResult.resetTime,
+            platform: detectedPlatform,
+            mode: consultationMode,
+            remaining: 0,
+            total: rateLimitResult.total,
+            isVerified: rateLimitResult.isVerified
+          });
+        }
+        console.log(`[${requestId}] Rate limit check passed - ${rateLimitResult.remaining}/${rateLimitResult.total} remaining`);
+      } catch (rateLimitError) {
+        console.error(`[${requestId}] Rate limit check failed:`, rateLimitError);
+        // Continue with request but log the error
       }
-      console.log(`[${requestId}] Rate limit check passed - ${rateLimitResult.remaining}/${rateLimitResult.total} remaining`);
-    } catch (rateLimitError) {
-      console.error(`[${requestId}] Rate limit check failed:`, rateLimitError);
-      // Continue with request but log the error
+    } else {
+      console.log(`[${requestId}] Skipping rate limit check for comprehensive upgrade (continuation of triage)`);
     }
 
     // Get AI response from OrthoIQ-Agents (primary) with Claude fallback
@@ -182,7 +188,9 @@ export async function POST(request: NextRequest) {
       // Ensure response is always a string
       if (typeof claudeResponse.response !== 'string') {
         console.log(`[${requestId}] Formatting structured response object`);
-        claudeResponse.response = formatStructuredResponse(claudeResponse.response);
+        claudeResponse.response = claudeResponse.response != null
+          ? formatStructuredResponse(claudeResponse.response)
+          : '';
       }
 
       console.log(`[${requestId}] Response received, confidence: ${claudeResponse.confidence}, fromAgents: ${claudeResponse.fromAgentsSystem}`);
@@ -405,7 +413,9 @@ export async function POST(request: NextRequest) {
             consultationId: specialistConsultation.consultationId,
             questionId: questionId,
             fid: fid,
-            webUserId: webUser?.id,
+            webUserId: (webUser?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(webUser.id))
+              ? webUser.id
+              : undefined,
             mode: (mode === 'normal' ? 'normal' : 'fast') as 'fast' | 'normal',
             participatingSpecialists: specialistConsultation.participatingSpecialists,
             coordinationSummary: specialistConsultation.coordinationSummary,
@@ -439,7 +449,7 @@ export async function POST(request: NextRequest) {
     };
     
     return NextResponse.json({
-      response: claudeResponse.response,
+      response: claudeResponse.response || '',
       confidence: claudeResponse.confidence,
       isFiltered: false,
       isApproved: reviewStatus.isApproved,
@@ -452,6 +462,7 @@ export async function POST(request: NextRequest) {
       correctionsText: reviewStatus.correctionsText,
       inquiry: claudeResponse.inquiry,
       keyPoints: claudeResponse.keyPoints,
+      urgencyLevel: claudeResponse.urgencyLevel,
       questionId: questionId,
       // Agent enrichments
       enrichments: agentEnrichments,
@@ -462,25 +473,57 @@ export async function POST(request: NextRequest) {
       specialistConsultation: specialistConsultation,
       agentBadges: agentBadges,
       hasSpecialistConsultation: specialistConsultation !== null,
+      // OrthoIQ-Agents fields — propagated from claudeResponse to top-level for frontend parseApiResponse
+      consultationId: claudeResponse.consultationId || specialistConsultation?.consultationId || `fallback-${requestId}`,
+      fromAgentsSystem: claudeResponse.fromAgentsSystem || false,
+      dataCompleteness: claudeResponse.dataCompleteness,
+      suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
+      triageConfidence: claudeResponse.triageConfidence,
+      participatingSpecialists: claudeResponse.participatingSpecialists || [],
+      researchData: claudeResponse.researchData || null,
       // Raw consultation data for Intelligence Card generation
-      rawConsultationData: claudeResponse.rawConsultationData || (mode === 'fast' && specialistConsultation ? {
+      // Fallback covers all modes (not just fast) so the Intelligence Card always has data
+      rawConsultationData: claudeResponse.rawConsultationData || (specialistConsultation ? {
         consultationId: specialistConsultation.consultationId,
-        participatingSpecialists: ['triage'],
+        participatingSpecialists: specialistConsultation.participatingSpecialists || ['triage'],
+        suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
         responses: [{
           response: {
             specialistType: 'triage',
             specialist: 'OrthoTriage Master',
-            confidence: claudeResponse.confidence || 0.85,
-            response: claudeResponse.response
+            confidence: claudeResponse.confidence || 0.7,
+            response: claudeResponse.response || '',
+            urgencyLevel: claudeResponse.urgencyLevel || 'routine',
           }
         }],
         synthesizedRecommendations: {
+          synthesis: claudeResponse.response || '',
           confidenceFactors: {
-            overallConfidence: claudeResponse.confidence || 0.85,
-            interAgentAgreement: 0.85
+            overallConfidence: claudeResponse.confidence || 0.7,
+            interAgentAgreement: 0.7
           }
         }
-      } : undefined),
+      } : {
+        consultationId: `fallback-${requestId}`,
+        participatingSpecialists: ['triage'],
+        suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
+        responses: [{
+          response: {
+            specialistType: 'triage',
+            specialist: 'OrthoTriage Master',
+            confidence: claudeResponse.confidence || 0.7,
+            response: claudeResponse.response || '',
+            urgencyLevel: claudeResponse.urgencyLevel || 'routine',
+          }
+        }],
+        synthesizedRecommendations: {
+          synthesis: claudeResponse.response || '',
+          confidenceFactors: {
+            overallConfidence: claudeResponse.confidence || 0.7,
+            interAgentAgreement: 0.7
+          }
+        }
+      }),
       // Agent coordination fields
       agentNetwork: {
         activeAgents: networkStats.activeAgents,

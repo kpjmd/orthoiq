@@ -9,7 +9,7 @@ import {
   getPhysicalFunctionBand,
   getPainInterferenceBand,
 } from '@/lib/promis';
-import { PROMISTimepoint, PROMISScores, PROMISCompletionResult, PROMISDelta } from '@/lib/types';
+import { PROMISTimepoint, PROMISScores, PROMISCompletionResult, PROMISDelta } from '@/lib/promisTypes';
 
 interface PROMISQuestionnaireProps {
   timepoint: PROMISTimepoint;
