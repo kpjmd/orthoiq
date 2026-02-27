@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ensureInitialized } from '@/lib/startup';
-import { storeChatMessage, getChatHistory, getChatMessageCount } from '@/lib/database';
+import { storeChatMessage, getChatHistory, getChatMessageCount } from '@/lib/chatDb';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',

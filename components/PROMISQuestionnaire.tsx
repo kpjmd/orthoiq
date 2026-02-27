@@ -54,37 +54,7 @@ export default function PROMISQuestionnaire({
     }
   }, [currentQuestion, phase]);
 
-  const handleNext = useCallback(() => {
-    if (currentIndex < currentQuestions.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } else if (phase === 'physicalFunction') {
-      // Physical Function complete — check if should prompt for Pain Interference
-      if (isPainRelated) {
-        setPhase('painPrompt');
-      } else {
-        submitResponses(pfResponses, null);
-      }
-    } else if (phase === 'painInterference') {
-      submitResponses(pfResponses, piResponses);
-    }
-  }, [currentIndex, currentQuestions.length, phase, isPainRelated, pfResponses, piResponses]);
-
-  const handleBack = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-    }
-  }, [currentIndex]);
-
-  const handlePainAccept = () => {
-    setPhase('painInterference');
-    setCurrentIndex(0);
-  };
-
-  const handlePainDecline = () => {
-    submitResponses(pfResponses, null);
-  };
-
-  const submitResponses = async (
+  const submitResponses = useCallback(async (
     pf: Record<string, number>,
     pi: Record<string, number> | null
   ) => {
@@ -137,6 +107,36 @@ export default function PROMISQuestionnaire({
         setCurrentIndex(PHYSICAL_FUNCTION_QUESTIONS.length - 1);
       }
     }
+  }, [consultationId, patientId, timepoint, onComplete]);
+
+  const handleNext = useCallback(() => {
+    if (currentIndex < currentQuestions.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else if (phase === 'physicalFunction') {
+      // Physical Function complete — check if should prompt for Pain Interference
+      if (isPainRelated) {
+        setPhase('painPrompt');
+      } else {
+        submitResponses(pfResponses, null);
+      }
+    } else if (phase === 'painInterference') {
+      submitResponses(pfResponses, piResponses);
+    }
+  }, [currentIndex, currentQuestions.length, phase, isPainRelated, pfResponses, piResponses, submitResponses]);
+
+  const handleBack = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  }, [currentIndex]);
+
+  const handlePainAccept = () => {
+    setPhase('painInterference');
+    setCurrentIndex(0);
+  };
+
+  const handlePainDecline = () => {
+    submitResponses(pfResponses, null);
   };
 
   // ── Submitting state ──

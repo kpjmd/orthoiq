@@ -1,8 +1,8 @@
 import { neon } from '@neondatabase/serverless';
-import { Question, AgentTask, ResearchSynthesis } from './types';
+import { Question, AgentTask, ResearchSynthesis, ChatMessage } from './types';
 
 // Create a Neon SQL client
-function getSql() {
+export function getSql() {
   const connectionString = process.env.DATABASE_URL;
   
   if (!connectionString) {
@@ -1044,7 +1044,54 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_web_rate_limits_reset_time ON web_rate_limits(reset_time);
     `;
 
-    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, and web rate limits tables)');
+    // Chat messages table for post-consultation chatbot (Phase 3.2)
+    await sql`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        consultation_id VARCHAR(255) NOT NULL,
+        fid VARCHAR(255) NOT NULL,
+        role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant')),
+        content TEXT NOT NULL,
+        specialist_context VARCHAR(50) DEFAULT 'triage',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_consultation_id ON chat_messages(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_fid ON chat_messages(fid);
+    `;
+
+    // PROMIS (Patient-Reported Outcomes) responses table
+    await sql`
+      CREATE TABLE IF NOT EXISTS promis_responses (
+        id SERIAL PRIMARY KEY,
+        consultation_id VARCHAR(255) NOT NULL,
+        patient_id VARCHAR(255) NOT NULL,
+        timepoint VARCHAR(20) NOT NULL CHECK (timepoint IN ('baseline', '2week', '4week', '8week')),
+        physical_function_responses JSONB NOT NULL,
+        physical_function_raw_score INTEGER NOT NULL,
+        physical_function_t_score REAL NOT NULL,
+        pain_interference_responses JSONB,
+        pain_interference_raw_score INTEGER,
+        pain_interference_t_score REAL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(consultation_id, timepoint)
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_promis_responses_consultation_id ON promis_responses(consultation_id);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_promis_responses_patient_id ON promis_responses(patient_id);
+    `;
+
+    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, web rate limits, chat messages, and PROMIS responses tables)');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -4100,3 +4147,8 @@ export async function cleanupExpiredRateLimits(): Promise<number> {
     return 0;
   }
 }
+
+// Chat and PROMIS database functions have been extracted to dedicated modules
+// to keep this file at a manageable size for build tooling:
+//   lib/chatDb.ts   — storeChatMessage, getChatHistory, getChatMessageCount
+//   lib/promisDb.ts — storePromisResponse, getPromisResponses, getPromisBaseline

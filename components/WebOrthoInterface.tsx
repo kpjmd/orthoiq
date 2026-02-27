@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useWebAuth } from './WebAuthProvider';
 import ResponseCard from './ResponseCard';
 import ActionMenu from './ActionMenu';
@@ -8,7 +9,24 @@ import PrescriptionModal from './PrescriptionModal';
 import OrthoIQLogo from './OrthoIQLogo';
 import WebToMiniAppCTA from './WebToMiniAppCTA';
 import AgentLoadingCards from './AgentLoadingCards';
+import FeedbackModal from './FeedbackModal';
+import TriageResponseCard from './TriageResponseCard';
+import ComprehensiveLoadingState from './ComprehensiveLoadingState';
+import ConsultationChatbot from './ConsultationChatbot';
 import { getWebSessionUsage, generateSessionId } from '@/lib/webTracking';
+import { useResearchPolling } from '@/hooks/useResearchPolling';
+import { normalizeResearchResponse } from '@/lib/researchService';
+import PROMISQuestionnaire from './PROMISQuestionnaire';
+import { isPainRelatedConsultation } from '@/lib/promis';
+import { PROMISCompletionResult } from '@/lib/types';
+
+type ConsultationStage =
+  | 'idle'
+  | 'triage_loading'
+  | 'triage_complete'
+  | 'comprehensive_loading'
+  | 'comprehensive_complete'
+  | 'exited';
 
 interface WebOrthoInterfaceProps {
   className?: string;
@@ -77,73 +95,159 @@ interface ResponseData {
   };
   // Raw consultation data for enhanced prescription
   rawConsultationData?: any;
+  // Inline research data from agents system
+  researchData?: any;
+  // Phase 3.1: urgency level from triage
+  urgencyLevel?: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
 }
 
 // Helper function to format structured response objects into readable text
 const formatStructuredResponse = (obj: any): string => {
   if (typeof obj === 'string') return obj;
-  
-  // Handle structured medical response format
+
   if (obj && typeof obj === 'object') {
     const sections = [];
-    
+
     if (obj.diagnosis) {
       sections.push(`**Diagnosis:**\n${obj.diagnosis}`);
     }
-    
     if (obj.immediate_actions) {
       sections.push(`**Immediate Actions:**\n${obj.immediate_actions}`);
     }
-    
     if (obj.red_flags) {
       sections.push(`**Red Flags:**\n${obj.red_flags}`);
     }
-    
     if (obj.specialist_recommendation) {
       sections.push(`**Specialist Recommendation:**\n${obj.specialist_recommendation}`);
     }
-    
     if (obj.followup) {
       sections.push(`**Follow-up:**\n${obj.followup}`);
     }
-    
-    // If it's a structured object with these fields, format them
     if (sections.length > 0) {
       return sections.join('\n\n');
     }
-    
-    // For other objects, try to stringify them safely
     try {
       return JSON.stringify(obj, null, 2);
     } catch {
       return '[Complex response object - please check console for details]';
     }
   }
-  
-  return String(obj);
+
+  return obj != null ? String(obj) : '';
+};
+
+// Extract and format API response data into ResponseData
+const parseApiResponse = (data: any): ResponseData => {
+  let formattedResponse = data.response;
+
+  try {
+    if (typeof data.response === 'string' && (data.response.trim().startsWith('{') || data.response.trim().startsWith('['))) {
+      const parsed = JSON.parse(data.response);
+      if (parsed.response) {
+        formattedResponse = formatStructuredResponse(parsed.response);
+      } else if (typeof parsed === 'string') {
+        formattedResponse = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        formattedResponse = formatStructuredResponse(parsed);
+      }
+    } else if (typeof data.response === 'object' && data.response !== null) {
+      formattedResponse = formatStructuredResponse(data.response);
+    }
+  } catch (parseError) {
+    console.warn('WebOrthoInterface: JSON parsing failed:', parseError);
+    if (typeof data.response === 'string' && data.response.includes('"response"')) {
+      try {
+        const jsonMatch = data.response.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+        if (jsonMatch && jsonMatch[1]) {
+          formattedResponse = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (typeof formattedResponse !== 'string') {
+    formattedResponse = formatStructuredResponse(formattedResponse);
+  }
+  if (typeof formattedResponse !== 'string') {
+    formattedResponse = 'An error occurred while formatting the response. Please try again.';
+  }
+
+  return {
+    response: formattedResponse,
+    confidence: data.confidence,
+    isFiltered: data.isFiltered,
+    isPendingReview: data.isPendingReview,
+    isApproved: data.isApproved,
+    reviewedBy: data.reviewedBy,
+    reviewType: data.reviewType,
+    hasAdditions: data.hasAdditions,
+    hasCorrections: data.hasCorrections,
+    additionsText: data.additionsText,
+    correctionsText: data.correctionsText,
+    inquiry: data.inquiry,
+    keyPoints: data.keyPoints,
+    questionId: data.questionId,
+    enrichments: data.enrichments || [],
+    hasResearch: data.hasResearch || false,
+    userTier: data.userTier || 'basic',
+    dataCompleteness: data.dataCompleteness,
+    suggestedFollowUp: data.suggestedFollowUp,
+    triageConfidence: data.triageConfidence,
+    specialistCoverage: data.specialistCoverage,
+    participatingSpecialists: data.participatingSpecialists,
+    consultationId: data.consultationId,
+    fromAgentsSystem: data.fromAgentsSystem,
+    specialistConsultation: data.specialistConsultation,
+    agentBadges: data.agentBadges || [],
+    hasSpecialistConsultation: data.hasSpecialistConsultation || false,
+    agentRouting: data.agentRouting,
+    agentPerformance: data.agentPerformance,
+    agentNetwork: data.agentNetwork,
+    rawConsultationData: data.rawConsultationData,
+    researchData: data.researchData || null,
+    urgencyLevel: data.urgencyLevel,
+  };
 };
 
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
   const { user, isAuthenticated, isVerified, signOut, upgradeToEmail, isLoading: authLoading, magicLinkSent } = useWebAuth();
+
   const [question, setQuestion] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
-  const [responseData, setResponseData] = useState<ResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Consultation stage machine
+  const [consultationStage, setConsultationStage] = useState<ConsultationStage>('idle');
+  const [triageResult, setTriageResult] = useState<ResponseData | null>(null);
+  const [comprehensiveResult, setComprehensiveResult] = useState<ResponseData | null>(null);
+
+  // Derived loading state
+  const isLoading = consultationStage === 'triage_loading' || consultationStage === 'comprehensive_loading';
+
   const [error, setError] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   // Limits: 1 for unauthenticated/guest, 10 for verified email users
   const [dailyQuestions, setDailyQuestions] = useState({ used: 0, limit: 1 });
   const [showUpgradeForm, setShowUpgradeForm] = useState(false);
   const [upgradeEmail, setUpgradeEmail] = useState('');
   const [upgradeError, setUpgradeError] = useState('');
   const [upgradeSentEmail, setUpgradeSentEmail] = useState('');
-  const [consultationMode, setConsultationMode] = useState<'fast' | 'normal'>('fast');
-
-  // Web tracking state - limits: 1 for guest, 10 for verified email
-  const [webUsage, setWebUsage] = useState({ questionsAsked: 0, questionsRemaining: 1, isLimitReached: false });
-  const [showCTA, setShowCTA] = useState(false);
-  const [ctaDismissed, setCTADismissed] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  // PROMIS questionnaire state
+  const [showPromisButton, setShowPromisButton] = useState(false);
+  const [showPromisQuestionnaire, setShowPromisQuestionnaire] = useState(false);
+  // true when questionnaire was started during comprehensive_loading (needs stable shared block)
+  const [promisStartedDuringLoading, setPromisStartedDuringLoading] = useState(false);
+  const [promisCompleted, setPromisCompleted] = useState(false);
+  const [promisResult, setPromisResult] = useState<PROMISCompletionResult | null>(null);
+  // For comprehensive path: hold results silently until questionnaire completes
+  const [pendingComprehensiveReveal, setPendingComprehensiveReveal] = useState(false);
+  // Triage-exit PROMIS state
+  const [showTriagePromis, setShowTriagePromis] = useState(false);
+  const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
+
   // Scope validation for out-of-scope queries
   const [scopeValidationData, setScopeValidationData] = useState<{
     category: string;
@@ -156,18 +260,65 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     confidence: number;
   } | null>(null);
 
+  // Web tracking state
+  const [webUsage, setWebUsage] = useState({ questionsAsked: 0, questionsRemaining: 1, isLimitReached: false });
+  const [showCTA, setShowCTA] = useState(false);
+  const [ctaDismissed, setCTADismissed] = useState(false);
+
+  // Detect whether inline research has actual completed citations (not just a trigger stub like { status: 'pending', pollEndpoint })
+  const inlineResearch = comprehensiveResult?.researchData;
+  const hasCompletedInlineResearch = !!(inlineResearch && (
+    inlineResearch.citations?.length > 0 ||
+    inlineResearch.research?.citations?.length > 0
+  ));
+
+  // Memoize caseData to prevent new object references on every render,
+  // which would cause the useResearchPolling abort ref race condition.
+  // Pass full structured fields so the backend can build precise PubMed queries.
+  const researchCaseData = useMemo(() => {
+    const raw = comprehensiveResult?.rawConsultationData;
+    if (!raw) return undefined;
+    const cd = raw.caseData;
+    if (!cd) return undefined;
+    return {
+      primaryComplaint: cd.primaryComplaint || '',
+      symptoms: cd.symptoms,
+      duration: cd.duration,
+      location: cd.location,
+      painLevel: cd.painLevel,
+      age: cd.age,
+      rawQuery: cd.rawQuery,
+    };
+  }, [comprehensiveResult?.rawConsultationData]);
+  const researchConsultationResult = comprehensiveResult?.rawConsultationData;
+
+  // Research Agent polling — disabled only when inline research already has real citations
+  const researchPolling = useResearchPolling({
+    enabled: !!(consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId && !hasCompletedInlineResearch),
+    consultationId: comprehensiveResult?.consultationId,
+    caseData: researchCaseData,
+    consultationResult: researchConsultationResult,
+    userTier: comprehensiveResult?.userTier,
+  });
+
+  // Use inline research only when it has real citations; otherwise fall back to polling
+  const effectiveResearchState = hasCompletedInlineResearch
+    ? {
+        status: 'complete' as const,
+        result: normalizeResearchResponse(inlineResearch, comprehensiveResult?.consultationId || ''),
+        error: null,
+      }
+    : researchPolling.researchState;
+
   // Fetch web usage from API
   const fetchWebUsage = useCallback(async () => {
     try {
       const usage = await getWebSessionUsage(isVerified);
       setWebUsage(usage);
 
-      // Show soft CTA after first question (if not dismissed)
       if (usage.questionsAsked >= 1 && !usage.isLimitReached && !ctaDismissed) {
         setShowCTA(true);
       }
-
-      // Always show hard limit CTA when limit is reached
       if (usage.isLimitReached) {
         setShowCTA(true);
       }
@@ -176,13 +327,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     }
   }, [isVerified, ctaDismissed]);
 
-  // Initialize session and fetch web usage on mount and when verification changes
   useEffect(() => {
-    generateSessionId(); // Ensures session ID exists
+    generateSessionId();
     fetchWebUsage();
   }, [isVerified, fetchWebUsage]);
 
-  // Update question limits based on verification status
   useEffect(() => {
     const limit = isVerified ? 10 : 1;
     setDailyQuestions(prev => ({ ...prev, limit }));
@@ -193,11 +342,22 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     }));
   }, [isVerified]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Show PROMIS button after 5s during comprehensive loading
+  useEffect(() => {
+    if (consultationStage === 'comprehensive_loading' && !promisCompleted) {
+      const timer = setTimeout(() => setShowPromisButton(true), 5000);
+      return () => clearTimeout(timer);
+    }
+    if (consultationStage !== 'comprehensive_loading' && consultationStage !== 'comprehensive_complete') {
+      setShowPromisButton(false);
+    }
+  }, [consultationStage, promisCompleted]);
+
+  // Stage 1: Triage submit
+  const handleTriageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
 
-    // Check web usage limit
     if (webUsage.isLimitReached) {
       const limit = isVerified ? 10 : 1;
       setError(`You've reached your ${limit}-question daily limit. ${isVerified ? 'Try again tomorrow!' : 'Verify your email for 10 questions/day or use our Farcaster Mini App for unlimited access!'}`);
@@ -205,20 +365,17 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       return;
     }
 
-    setIsLoading(true);
+    setConsultationStage('triage_loading');
     setError('');
-    setResponseData(null);
+    setTriageResult(null);
+    setComprehensiveResult(null);
     setScopeValidationData(null);
     setCurrentQuestion(question.trim());
 
     const userTier = user?.authType === 'email' ? 'medical' : 'authenticated';
-    console.log(`[WebOrthoInterface] Sending request with tier: ${userTier}, user:`, user);
 
     try {
-      // Get session ID before fetch call to avoid SSR/hydration issues
       const sessionId = generateSessionId();
-
-      // Create AbortController with 120 second timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000);
 
@@ -231,9 +388,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           tier: userTier,
           isWebUser: true,
           webUser: user,
-          mode: consultationMode,
-          platform: 'web', // Explicitly set platform for rate limiting
-          webSessionId: sessionId // Persistent session ID for guest rate limiting
+          mode: 'fast',
+          platform: 'web',
+          webSessionId: sessionId,
         }),
         signal: controller.signal,
       });
@@ -241,15 +398,14 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       clearTimeout(timeoutId);
 
       const contentType = res.headers.get('content-type');
-      
+
       if (!res.ok) {
         let errorMessage = `API error (${res.status})`;
-        
         if (contentType && contentType.includes('application/json')) {
           try {
             const errorData = await res.json();
             errorMessage = errorData.error || errorMessage;
-          } catch (parseError) {
+          } catch {
             const errorText = await res.text();
             errorMessage = errorText || errorMessage;
           }
@@ -257,129 +413,137 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           const errorText = await res.text();
           errorMessage = errorText || errorMessage;
         }
-        
         throw new Error(errorMessage);
       }
 
       const data = await res.json();
 
-      // Check for scope validation (out-of-scope queries)
       if (data.isOutOfScope && data.scopeValidation) {
-        console.log('WebOrthoInterface: Received scope validation response:', data.scopeValidation.category);
         setScopeValidationData(data.scopeValidation);
         setQuestion('');
-        setIsLoading(false);
+        setConsultationStage('idle');
         return;
       }
 
-      // Format the response to ensure it's always a string
-      let formattedResponse = data.response;
-      
-      // Parse JSON response if it's still in JSON format
-      try {
-        // Only attempt JSON parsing if the response starts with { or [
-        if (typeof data.response === 'string' && (data.response.trim().startsWith('{') || data.response.trim().startsWith('['))) {
-          const parsed = JSON.parse(data.response);
-          if (parsed.response) {
-            formattedResponse = formatStructuredResponse(parsed.response);
-            console.log('WebOrthoInterface: Successfully extracted response from JSON');
-          } else if (typeof parsed === 'string') {
-            formattedResponse = parsed;
-          } else if (parsed && typeof parsed === 'object') {
-            // Handle structured object responses
-            formattedResponse = formatStructuredResponse(parsed);
-            console.log('WebOrthoInterface: Formatted structured object response');
-          }
-        } else if (typeof data.response === 'object' && data.response !== null) {
-          // Handle case where response is already an object
-          formattedResponse = formatStructuredResponse(data.response);
-          console.log('WebOrthoInterface: Formatted object response directly');
-        }
-      } catch (parseError) {
-        console.warn('WebOrthoInterface: JSON parsing failed:', parseError);
-        // If JSON parsing fails, try regex extraction as fallback
-        if (typeof data.response === 'string' && data.response.includes('"response"')) {
-          try {
-            const jsonMatch = data.response.match(/"response"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
-            if (jsonMatch && jsonMatch[1]) {
-              formattedResponse = jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
-              console.log('WebOrthoInterface: Used regex fallback for malformed JSON');
-            }
-          } catch {
-            console.warn('WebOrthoInterface: Failed to extract response from malformed JSON');
-          }
-        }
+      // Handle soft rate-limit block (HTTP 200 with rateLimited flag)
+      if (data.rateLimited) {
+        setError(data.softWarning || data.upgradePrompt || 'Rate limit reached. Please try again later.');
+        if (data.upgradePrompt) setShowCTA(true);
+        setConsultationStage('idle');
+        return;
       }
-      
-      // Final safety check - ensure formattedResponse is always a string
-      if (typeof formattedResponse !== 'string') {
-        console.warn('WebOrthoInterface: formattedResponse is not a string, formatting as string:', formattedResponse);
-        formattedResponse = formatStructuredResponse(formattedResponse);
-      }
-      
-      // Double-check that formatting worked
-      if (typeof formattedResponse !== 'string') {
-        console.error('WebOrthoInterface: Failed to format response as string, using fallback');
-        formattedResponse = 'An error occurred while formatting the response. Please try again.';
-      }
-      
-      setResponseData({
-        response: formattedResponse,
-        confidence: data.confidence,
-        isFiltered: data.isFiltered,
-        isPendingReview: data.isPendingReview,
-        isApproved: data.isApproved,
-        reviewedBy: data.reviewedBy,
-        reviewType: data.reviewType,
-        hasAdditions: data.hasAdditions,
-        hasCorrections: data.hasCorrections,
-        additionsText: data.additionsText,
-        correctionsText: data.correctionsText,
-        inquiry: data.inquiry,
-        keyPoints: data.keyPoints,
-        questionId: data.questionId,
-        enrichments: data.enrichments || [],
-        hasResearch: data.hasResearch || false,
-        userTier: data.userTier || 'basic',
-        // OrthoIQ-Agents integration fields
-        dataCompleteness: data.dataCompleteness,
-        suggestedFollowUp: data.suggestedFollowUp,
-        triageConfidence: data.triageConfidence,
-        specialistCoverage: data.specialistCoverage,
-        participatingSpecialists: data.participatingSpecialists,
-        consultationId: data.consultationId,
-        fromAgentsSystem: data.fromAgentsSystem,
-        // Agent coordination data
-        specialistConsultation: data.specialistConsultation,
-        agentBadges: data.agentBadges || [],
-        hasSpecialistConsultation: data.hasSpecialistConsultation || false,
-        agentRouting: data.agentRouting,
-        agentPerformance: data.agentPerformance,
-        agentNetwork: data.agentNetwork,
-        // Raw consultation data for enhanced prescription
-        rawConsultationData: data.rawConsultationData
-      });
-      
+
+      const result = parseApiResponse(data);
+      setTriageResult(result);
+      setConsultationStage('triage_complete');
       setQuestion('');
 
-      // Update daily usage
+      // Count the question only once (not again for comprehensive upgrade)
       setDailyQuestions(prev => ({ ...prev, used: prev.used + 1 }));
-
-      // Refresh web usage after successful submission
       await fetchWebUsage();
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
+      setConsultationStage('idle');
     }
   };
 
-  const handleAskAnother = () => {
-    setResponseData(null);
-    setScopeValidationData(null);
-    setCurrentQuestion('');
+  // Stage 2: Comprehensive upgrade
+  const handleComprehensiveUpgrade = async () => {
+    setConsultationStage('comprehensive_loading');
     setError('');
+
+    const userTier = user?.authType === 'email' ? 'medical' : 'authenticated';
+
+    try {
+      const sessionId = generateSessionId();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      const res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: currentQuestion,
+          fid: user?.id || 'web-guest',
+          tier: userTier,
+          isWebUser: true,
+          webUser: user,
+          mode: 'normal',
+          platform: 'web',
+          webSessionId: sessionId,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const contentType = res.headers.get('content-type');
+
+      if (!res.ok) {
+        let errorMessage = `API error (${res.status})`;
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            const errorText = await res.text();
+            errorMessage = errorText || errorMessage;
+          }
+        } else {
+          const errorText = await res.text();
+          errorMessage = errorText || errorMessage;
+        }
+        // Fall back to triage_complete on error
+        setError(errorMessage);
+        setConsultationStage('triage_complete');
+        return;
+      }
+
+      const data = await res.json();
+
+      // Handle soft rate-limit block (HTTP 200 with rateLimited flag)
+      if (data.rateLimited) {
+        setError(data.softWarning || data.upgradePrompt || 'Rate limit reached. Please try again later.');
+        setConsultationStage('triage_complete');
+        return;
+      }
+
+      const result = parseApiResponse(data);
+      setComprehensiveResult(result);
+      // If user is mid-questionnaire, hold the reveal
+      if (showPromisQuestionnaire && !promisCompleted) {
+        setPendingComprehensiveReveal(true);
+      }
+      setConsultationStage('comprehensive_complete');
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setConsultationStage('triage_complete');
+    }
+  };
+
+  // Exit from triage without comprehensive
+  const handleTriageExit = () => {
+    setConsultationStage('exited');
+    setShowFeedbackModal(true);
+  };
+
+  const handleAskAnother = () => {
+    setConsultationStage('idle');
+    setTriageResult(null);
+    setComprehensiveResult(null);
+    setScopeValidationData(null);
+    setError('');
+    setShowFeedbackModal(false);
+    setShowPromisButton(false);
+    setShowPromisQuestionnaire(false);
+    setPromisStartedDuringLoading(false);
+    setPromisCompleted(false);
+    setPromisResult(null);
+    setPendingComprehensiveReveal(false);
+    setShowTriagePromis(false);
+    setTriagePromisCompleted(false);
     document.getElementById('web-question')?.focus();
   };
 
@@ -422,7 +586,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           </div>
           <p className="text-lg opacity-90">Web Experience</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
-          
+
           {isAuthenticated && user && (
             <div className="mt-3">
               <p className="text-xs opacity-60">
@@ -453,77 +617,6 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       </div>
 
       <div className="p-6">
-        {/* Consultation Mode Toggle */}
-        <div className="mb-4 p-4 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-gray-900">Consultation Mode</h3>
-              <p className="text-xs text-gray-600 mt-1">Choose your response speed and depth</p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className={`text-xs font-medium ${consultationMode === 'fast' ? 'text-blue-600' : 'text-gray-400'}`}>
-                Fast
-              </span>
-              <button
-                onClick={() => setConsultationMode(consultationMode === 'fast' ? 'normal' : 'fast')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                  consultationMode === 'normal' ? 'bg-purple-600' : 'bg-blue-500'
-                }`}
-                type="button"
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    consultationMode === 'normal' ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className={`text-xs font-medium ${consultationMode === 'normal' ? 'text-purple-600' : 'text-gray-400'}`}>
-                Comprehensive
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Fast Mode Card */}
-            <div className={`p-3 rounded-lg border-2 transition-all ${
-              consultationMode === 'fast'
-                ? 'bg-blue-50 border-blue-500 shadow-md'
-                : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center mb-2">
-                <span className="text-lg mr-2">⚡</span>
-                <span className="font-semibold text-sm">Fast Triage</span>
-              </div>
-              <p className="text-xs text-gray-600 mb-2">Quick assessment from triage specialist</p>
-              <div className="flex items-center text-xs">
-                <svg className="w-3 h-3 mr-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="font-medium text-blue-600">~17 seconds</span>
-              </div>
-            </div>
-
-            {/* Comprehensive Mode Card */}
-            <div className={`p-3 rounded-lg border-2 transition-all ${
-              consultationMode === 'normal'
-                ? 'bg-purple-50 border-purple-500 shadow-md'
-                : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center mb-2">
-                <span className="text-lg mr-2">🏥</span>
-                <span className="font-semibold text-sm">Multi-Specialist</span>
-              </div>
-              <p className="text-xs text-gray-600 mb-2">Full consultation with 4-5 specialists</p>
-              <div className="flex items-center text-xs">
-                <svg className="w-3 h-3 mr-1 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="font-medium text-purple-600">~60 seconds</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Web Conversion CTA */}
         {showCTA && (
           <WebToMiniAppCTA
@@ -574,7 +667,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           </div>
         </div>
 
-        {/* Expandable Tips Section - Specialist Triggers */}
+        {/* Expandable Tips Section */}
         <details className="mb-4 group">
           <summary className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg cursor-pointer list-none flex items-center justify-between hover:from-purple-100 hover:to-indigo-100 transition-colors">
             <div className="flex items-center space-x-2">
@@ -645,13 +738,13 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             </div>
 
             <p className="text-xs text-gray-500 text-center italic">
-              In comprehensive mode, all 5 specialists analyze your case and stake tokens on their predictions
+              After initial triage, you can request a full multi-specialist consultation for a deeper analysis
             </p>
           </div>
         </details>
 
         {/* Question Form */}
-        <form onSubmit={handleSubmit} className="mb-6">
+        <form onSubmit={handleTriageSubmit} className="mb-6">
           <div className="mb-4">
             <label htmlFor="web-question" className="block text-sm font-medium text-gray-700 mb-2">
               What orthopedic question can I help you with?
@@ -666,15 +759,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               disabled={isLoading || getRemainingQuestions() === 0}
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={isLoading || !question.trim() || getRemainingQuestions() === 0}
-            className={`w-full font-medium py-3 px-4 rounded-lg transition-colors ${
-              consultationMode === 'normal'
-                ? 'bg-purple-600 hover:bg-purple-700'
-                : 'bg-blue-600 hover:bg-blue-700'
-            } disabled:bg-gray-400 disabled:cursor-not-allowed text-white`}
+            className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white"
           >
             {isLoading ? (
               <span className="flex items-center justify-center">
@@ -682,27 +771,22 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                {consultationMode === 'normal'
-                  ? 'Consulting specialists (~60s)...'
+                {consultationStage === 'comprehensive_loading'
+                  ? 'Consulting specialists (~50s)...'
                   : 'Getting triage assessment (~17s)...'}
               </span>
             ) : getRemainingQuestions() === 0 ? (
               'Daily limit reached - Try again tomorrow'
             ) : (
-              <>
-                {consultationMode === 'normal' ? '🏥 Get Multi-Specialist Consultation' : '⚡ Get Fast Triage'}
-              </>
+              'Get Assessment'
             )}
           </button>
         </form>
 
-        {/* Agent Loading Cards - Show during loading */}
-        {isLoading && (
+        {/* Triage loading — fast mode loading cards */}
+        {consultationStage === 'triage_loading' && (
           <div className="mb-6">
-            <AgentLoadingCards
-              isLoading={isLoading}
-              mode={consultationMode === 'normal' ? 'normal' : 'fast'}
-            />
+            <AgentLoadingCards isLoading={true} mode="fast" />
           </div>
         )}
 
@@ -713,7 +797,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           </div>
         )}
 
-        {/* Scope Validation Display - Friendly redirect for out-of-scope queries */}
+        {/* Scope Validation Display */}
         {scopeValidationData && (
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-6 shadow-sm">
             <div className="flex items-start gap-4">
@@ -756,48 +840,148 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           </div>
         )}
 
-        {/* Response Display */}
-        {responseData && (
+        {/* ── TRIAGE COMPLETE ── */}
+        {consultationStage === 'triage_complete' && triageResult && (
           <div className="mb-6">
+            <TriageResponseCard
+              response={triageResult.response}
+              confidence={triageResult.confidence}
+              urgencyLevel={triageResult.urgencyLevel || 'routine'}
+              suggestedFollowUp={triageResult.suggestedFollowUp || []}
+              consultationId={triageResult.consultationId}
+              onSeeFullAnalysis={handleComprehensiveUpgrade}
+              onExit={handleTriageExit}
+            />
+          </div>
+        )}
+
+        {/* ── COMPREHENSIVE LOADING ── */}
+        {consultationStage === 'comprehensive_loading' && triageResult && (
+          <div className="mb-6">
+            <TriageResponseCard
+              response={triageResult.response}
+              confidence={triageResult.confidence}
+              urgencyLevel={triageResult.urgencyLevel || 'routine'}
+              suggestedFollowUp={triageResult.suggestedFollowUp || []}
+              collapsed={true}
+            />
+            <ComprehensiveLoadingState />
+
+            {/* Pulsing "Track Your Recovery" button — appears after 5s */}
+            {showPromisButton && !showPromisQuestionnaire && !promisCompleted && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4"
+              >
+                <button
+                  onClick={() => {
+                    setShowPromisQuestionnaire(true);
+                    setPromisStartedDuringLoading(true);
+                    setShowPromisButton(false);
+                  }}
+                  className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                >
+                  <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire while you wait</p>
+                </button>
+              </motion.div>
+            )}
+          </div>
+        )}
+
+        {/* ── SHARED PROMIS QUESTIONNAIRE ──
+             Rendered outside both stage blocks so it persists across the
+             comprehensive_loading → comprehensive_complete transition without
+             unmounting, preserving all in-progress answers. */}
+        {showPromisQuestionnaire && !promisCompleted && promisStartedDuringLoading &&
+          (consultationStage === 'comprehensive_loading' || consultationStage === 'comprehensive_complete') && (
+          <div className="mb-4">
+            <PROMISQuestionnaire
+              timepoint="baseline"
+              consultationId={comprehensiveResult?.consultationId || triageResult?.consultationId || ''}
+              isPainRelated={isPainRelatedConsultation(
+                comprehensiveResult?.rawConsultationData?.caseData ||
+                triageResult?.rawConsultationData?.caseData ||
+                { rawQuery: currentQuestion }
+              )}
+              patientId={user?.id || 'web-guest'}
+              onComplete={(result) => {
+                setPromisResult(result);
+                setPromisCompleted(true);
+                setPendingComprehensiveReveal(false);
+              }}
+              onSkip={() => {
+                setShowPromisQuestionnaire(false);
+                setPromisStartedDuringLoading(false);
+                setPendingComprehensiveReveal(false);
+                if (consultationStage === 'comprehensive_loading') {
+                  setShowPromisButton(true);
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {/* ── COMPREHENSIVE COMPLETE ── */}
+        {consultationStage === 'comprehensive_complete' && comprehensiveResult && (
+          <div className="mb-6">
+            {/* PROMIS results-ready CTA when questionnaire was active during loading */}
+            {pendingComprehensiveReveal && promisCompleted && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-center"
+              >
+                <p className="text-sm text-green-800 font-medium mb-2">Your results are ready</p>
+                <button
+                  onClick={() => setPendingComprehensiveReveal(false)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                >
+                  View Your Results &rarr;
+                </button>
+              </motion.div>
+            )}
+
             {/* Data Completeness Indicator */}
-            {responseData.dataCompleteness !== undefined && (
+            {comprehensiveResult.dataCompleteness !== undefined && (
               <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700">
                     Data Completeness Assessment
                   </span>
                   <span className={`text-sm font-semibold ${
-                    responseData.dataCompleteness >= 0.8 ? 'text-green-600' :
-                    responseData.dataCompleteness >= 0.6 ? 'text-yellow-600' :
-                    responseData.dataCompleteness >= 0.3 ? 'text-orange-600' : 'text-red-600'
+                    comprehensiveResult.dataCompleteness >= 0.8 ? 'text-green-600' :
+                    comprehensiveResult.dataCompleteness >= 0.6 ? 'text-yellow-600' :
+                    comprehensiveResult.dataCompleteness >= 0.3 ? 'text-orange-600' : 'text-red-600'
                   }`}>
-                    {Math.round(responseData.dataCompleteness * 100)}%
+                    {Math.round(comprehensiveResult.dataCompleteness * 100)}%
                   </span>
                 </div>
-                
+
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <div 
+                  <div
                     className={`h-2 rounded-full transition-all duration-500 ${
-                      responseData.dataCompleteness >= 0.8 ? 'bg-green-500' :
-                      responseData.dataCompleteness >= 0.6 ? 'bg-yellow-500' :
-                      responseData.dataCompleteness >= 0.3 ? 'bg-orange-500' : 'bg-red-500'
+                      comprehensiveResult.dataCompleteness >= 0.8 ? 'bg-green-500' :
+                      comprehensiveResult.dataCompleteness >= 0.6 ? 'bg-yellow-500' :
+                      comprehensiveResult.dataCompleteness >= 0.3 ? 'bg-orange-500' : 'bg-red-500'
                     }`}
-                    style={{ width: `${responseData.dataCompleteness * 100}%` }}
+                    style={{ width: `${comprehensiveResult.dataCompleteness * 100}%` }}
                   ></div>
                 </div>
-                
+
                 <p className={`text-xs ${
-                  responseData.dataCompleteness >= 0.8 ? 'text-green-700' :
-                  responseData.dataCompleteness >= 0.6 ? 'text-yellow-700' :
-                  responseData.dataCompleteness >= 0.3 ? 'text-orange-700' : 'text-red-700'
+                  comprehensiveResult.dataCompleteness >= 0.8 ? 'text-green-700' :
+                  comprehensiveResult.dataCompleteness >= 0.6 ? 'text-yellow-700' :
+                  comprehensiveResult.dataCompleteness >= 0.3 ? 'text-orange-700' : 'text-red-700'
                 }`}>
-                  {responseData.dataCompleteness >= 0.8 ? '✅ Complete data - full specialist consultation available' :
-                   responseData.dataCompleteness >= 0.6 ? '⚠️ Good data - comprehensive assessment provided' :
-                   responseData.dataCompleteness >= 0.3 ? '🔍 Partial data - some specialists may be limited' :
+                  {comprehensiveResult.dataCompleteness >= 0.8 ? '✅ Complete data - full specialist consultation available' :
+                   comprehensiveResult.dataCompleteness >= 0.6 ? '⚠️ Good data - comprehensive assessment provided' :
+                   comprehensiveResult.dataCompleteness >= 0.3 ? '🔍 Partial data - some specialists may be limited' :
                    '📝 Limited data - basic assessment only'}
                 </p>
-                
-                {responseData.fromAgentsSystem && (
+
+                {comprehensiveResult.fromAgentsSystem && (
                   <div className="mt-2 flex items-center text-xs text-indigo-600">
                     <span className="mr-1">🤖</span>
                     Powered by OrthoIQ Multi-Specialist AI Network
@@ -806,42 +990,15 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               </div>
             )}
 
-            {/* Follow-up Questions */}
-            {responseData.suggestedFollowUp && responseData.suggestedFollowUp.length > 0 && (
-              <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-                <div className="flex items-center mb-3">
-                  <span className="text-lg mr-2">💡</span>
-                  <h4 className="font-semibold text-purple-800">For Better Results, Please Answer:</h4>
-                </div>
-                <ul className="space-y-2">
-                  {responseData.suggestedFollowUp.map((question, index) => (
-                    <li key={index} className="text-sm text-purple-700 bg-white bg-opacity-60 p-2 rounded border-l-3 border-purple-400">
-                      • {question}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  onClick={() => {
-                    const followUpText = responseData.suggestedFollowUp?.join('\n• ') || '';
-                    setQuestion(`Based on my previous question: "${currentQuestion}"\n\nHere are additional details:\n• ${followUpText}\n\n`);
-                    document.getElementById('web-question')?.focus();
-                  }}
-                  className="mt-3 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  💬 Add These Details to New Question
-                </button>
-              </div>
-            )}
-
             {/* Specialist Coverage */}
-            {responseData.specialistCoverage && Object.keys(responseData.specialistCoverage).length > 0 && (
+            {comprehensiveResult.specialistCoverage && Object.keys(comprehensiveResult.specialistCoverage).length > 0 && (
               <div className="mb-4 p-4 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg">
                 <div className="flex items-center mb-3">
                   <span className="text-lg mr-2">🏥</span>
                   <h4 className="font-semibold text-teal-800">Specialist Coverage</h4>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {Object.entries(responseData.specialistCoverage).map(([specialist, participated]) => (
+                  {Object.entries(comprehensiveResult.specialistCoverage).map(([specialist, participated]) => (
                     <div key={specialist} className={`flex items-center text-xs p-2 rounded ${
                       participated ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
                     }`}>
@@ -852,69 +1009,135 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 </div>
               </div>
             )}
-            
+
             <ResponseCard
-              response={responseData.response}
-              confidence={responseData.confidence}
-              isFiltered={responseData.isFiltered}
-              isPendingReview={responseData.isPendingReview}
-              isApproved={responseData.isApproved}
-              reviewedBy={responseData.reviewedBy}
-              reviewType={responseData.reviewType}
-              hasAdditions={responseData.hasAdditions}
-              hasCorrections={responseData.hasCorrections}
-              additionsText={responseData.additionsText}
-              correctionsText={responseData.correctionsText}
+              response={comprehensiveResult.response}
+              confidence={comprehensiveResult.confidence}
+              isFiltered={comprehensiveResult.isFiltered}
+              isPendingReview={comprehensiveResult.isPendingReview}
+              isApproved={comprehensiveResult.isApproved}
+              reviewedBy={comprehensiveResult.reviewedBy}
+              reviewType={comprehensiveResult.reviewType}
+              hasAdditions={comprehensiveResult.hasAdditions}
+              hasCorrections={comprehensiveResult.hasCorrections}
+              additionsText={comprehensiveResult.additionsText}
+              correctionsText={comprehensiveResult.correctionsText}
               question={currentQuestion}
               fid={user?.id || 'web-guest'}
               caseId={`web-${Date.now()}`}
-              inquiry={responseData.inquiry}
-              keyPoints={responseData.keyPoints}
-              questionId={responseData.questionId?.toString()}
+              inquiry={comprehensiveResult.inquiry}
+              keyPoints={comprehensiveResult.keyPoints}
+              questionId={comprehensiveResult.questionId?.toString()}
               isAuthenticated={isAuthenticated}
-              enrichments={responseData.enrichments}
-              hasResearch={responseData.hasResearch}
-              userTier={responseData.userTier}
-              agentCoordination={responseData.agentNetwork ? {
-                activeAgents: responseData.agentNetwork.activeAgents,
-                totalAgents: responseData.agentNetwork.totalCapacity,
-                coordinationType: responseData.agentRouting?.networkExecuted ? 'parallel' : 'sequential',
-                networkStatus: (responseData.agentNetwork.activeAgents > 0 && responseData.agentRouting?.networkExecuted) ? 'active' : 'degraded',
-                performance: responseData.agentPerformance ? {
-                  successRate: responseData.agentPerformance.successRate,
-                  avgResponseTime: responseData.agentPerformance.averageExecutionTime
+              enrichments={comprehensiveResult.enrichments}
+              hasResearch={comprehensiveResult.hasResearch}
+              userTier={comprehensiveResult.userTier}
+              agentCoordination={comprehensiveResult.agentNetwork ? {
+                activeAgents: comprehensiveResult.agentNetwork.activeAgents,
+                totalAgents: comprehensiveResult.agentNetwork.totalCapacity,
+                coordinationType: comprehensiveResult.agentRouting?.networkExecuted ? 'parallel' : 'sequential',
+                networkStatus: (comprehensiveResult.agentNetwork.activeAgents > 0 && comprehensiveResult.agentRouting?.networkExecuted) ? 'active' : 'degraded',
+                performance: comprehensiveResult.agentPerformance ? {
+                  successRate: comprehensiveResult.agentPerformance.successRate,
+                  avgResponseTime: comprehensiveResult.agentPerformance.averageExecutionTime
                 } : undefined,
-                currentLoad: responseData.agentNetwork.currentLoad,
-                maxLoad: responseData.agentNetwork.totalCapacity,
-                taskRoutes: responseData.agentRouting ? [{
+                currentLoad: comprehensiveResult.agentNetwork.currentLoad,
+                maxLoad: comprehensiveResult.agentNetwork.totalCapacity,
+                taskRoutes: comprehensiveResult.agentRouting ? [{
                   from: 'web-user',
-                  to: responseData.agentRouting.selectedAgent,
-                  reason: responseData.agentRouting.routingReason
+                  to: comprehensiveResult.agentRouting.selectedAgent,
+                  reason: comprehensiveResult.agentRouting.routingReason
                 }] : undefined
               } : undefined}
-              specialistConsultation={responseData.specialistConsultation}
-              agentBadges={responseData.agentBadges}
-              hasSpecialistConsultation={responseData.hasSpecialistConsultation}
-              rawConsultationData={responseData.rawConsultationData}
+              specialistConsultation={comprehensiveResult.specialistConsultation}
+              agentBadges={comprehensiveResult.agentBadges}
+              hasSpecialistConsultation={comprehensiveResult.hasSpecialistConsultation}
+              rawConsultationData={comprehensiveResult.rawConsultationData}
+              researchState={effectiveResearchState}
               onFeedbackSubmitted={setFeedbackSubmitted}
             />
-            
+
+            {/* PROMIS — shown after results so they don't compete for attention */}
+
+            {/* Completion summary: baseline recorded */}
+            {promisCompleted && promisResult && (
+              <div className="mt-4 mb-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                <span className="text-green-600 text-lg">✅</span>
+                <div>
+                  <p className="text-xs font-semibold text-green-800">Recovery baseline recorded</p>
+                  <p className="text-xs text-green-700">
+                    Physical Function T-Score: {promisResult.scores.physicalFunctionTScore}
+                    {promisResult.scores.painInterferenceTScore != null && ` · Pain Interference: ${promisResult.scores.painInterferenceTScore}`}
+                    {' '}· We&apos;ll check in at 2, 4, and 8 weeks
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Second-chance PROMIS button — shown after results if not yet started */}
+            {!showPromisQuestionnaire && !promisCompleted && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 mb-2"
+              >
+                <button
+                  onClick={() => setShowPromisQuestionnaire(true)}
+                  className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                >
+                  <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                  <p className="text-xs text-gray-500 mt-0.5">2-minute questionnaire to track your progress over time</p>
+                </button>
+              </motion.div>
+            )}
+
+            {/* Inline PROMIS questionnaire for second-chance path (started after results revealed) */}
+            {showPromisQuestionnaire && !promisCompleted && !promisStartedDuringLoading && (
+              <div className="mt-4 mb-2">
+                <PROMISQuestionnaire
+                  timepoint="baseline"
+                  consultationId={comprehensiveResult.consultationId || triageResult?.consultationId || ''}
+                  isPainRelated={isPainRelatedConsultation(
+                    comprehensiveResult.rawConsultationData?.caseData || { rawQuery: currentQuestion }
+                  )}
+                  patientId={user?.id || 'web-guest'}
+                  onComplete={(result) => {
+                    setPromisResult(result);
+                    setPromisCompleted(true);
+                  }}
+                  onSkip={() => setShowPromisQuestionnaire(false)}
+                />
+              </div>
+            )}
+
+            {/* Post-consultation chatbot — placed directly below agent responses */}
+            {comprehensiveResult.consultationId && (
+              <ConsultationChatbot
+                consultationId={comprehensiveResult.consultationId}
+                consultationContext={{ response: comprehensiveResult.response, rawConsultationData: comprehensiveResult.rawConsultationData }}
+                specialistContext="triage"
+                userQuestion={currentQuestion}
+                fid={user?.id || 'web-guest'}
+                suggestedFollowUp={comprehensiveResult.suggestedFollowUp || triageResult?.suggestedFollowUp || []}
+              />
+            )}
+
             {/* Action Menu */}
             <ActionMenu
-              response={responseData.response}
+              response={comprehensiveResult.response}
               question={currentQuestion}
               onAskAnother={handleAskAnother}
               onViewArtwork={() => setShowPrescriptionModal(true)}
               canAskAnother={getRemainingQuestions() > 0}
               questionsRemaining={getRemainingQuestions()}
-              inquiry={responseData.inquiry}
-              keyPoints={responseData.keyPoints}
+              inquiry={comprehensiveResult.inquiry}
+              keyPoints={comprehensiveResult.keyPoints}
               feedbackSubmitted={feedbackSubmitted}
-              requiresFeedback={responseData.hasSpecialistConsultation || false}
+              requiresFeedback={comprehensiveResult.hasSpecialistConsultation || false}
             />
 
-            {/* Mini App Handoff Prompt - Show for web users without Farcaster auth */}
-            {!user?.authType && responseData.consultationId && (
+            {/* Mini App Handoff Prompt */}
+            {!user?.authType && comprehensiveResult.consultationId && (
               <div className="mt-6 p-5 bg-gradient-to-r from-purple-50 via-blue-50 to-teal-50 border-2 border-purple-300 rounded-xl shadow-md">
                 <div className="flex items-start mb-3">
                   <span className="text-3xl mr-3">🚀</span>
@@ -930,13 +1153,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                     <div className="text-xs font-semibold text-purple-900">Milestone Tracking</div>
                     <div className="text-xs text-purple-700">Day 3, 7, 14, 21, 30 check-ins</div>
                   </div>
-
                   <div className="bg-white bg-opacity-70 p-3 rounded-lg border border-blue-200">
                     <div className="text-2xl mb-1">🪙</div>
                     <div className="text-xs font-semibold text-blue-900">Token Rewards</div>
                     <div className="text-xs text-blue-700">Earn tokens for feedback</div>
                   </div>
-
                   <div className="bg-white bg-opacity-70 p-3 rounded-lg border border-teal-200">
                     <div className="text-2xl mb-1">🔔</div>
                     <div className="text-xs font-semibold text-teal-900">Smart Reminders</div>
@@ -954,10 +1175,83 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 </div>
 
                 <p className="text-xs text-purple-600 text-center mt-3">
-                  Your consultation ID: <span className="font-mono bg-white px-2 py-1 rounded">{responseData.consultationId}</span>
+                  Your consultation ID: <span className="font-mono bg-white px-2 py-1 rounded">{comprehensiveResult.consultationId}</span>
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── EXITED ── */}
+        {consultationStage === 'exited' && (
+          <div className="mb-6">
+            <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
+              <p className="text-3xl mb-3">✅</p>
+              <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
+              <p className="text-sm text-green-700 mb-4">We hope the triage assessment was helpful.</p>
+
+              {/* Post-consultation chatbot */}
+              {triageResult?.consultationId && (
+                <div className="text-left mb-4">
+                  <ConsultationChatbot
+                    consultationId={triageResult.consultationId}
+                    consultationContext={{ response: triageResult.response, rawConsultationData: triageResult.rawConsultationData }}
+                    specialistContext="triage"
+                    userQuestion={currentQuestion}
+                    fid={user?.id || 'web-guest'}
+                    suggestedFollowUp={triageResult.suggestedFollowUp || []}
+                  />
+                </div>
+              )}
+
+              {/* PROMIS opt-in for triage-exit users (after feedback) */}
+              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && triageResult?.consultationId && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => setShowTriagePromis(true)}
+                    className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                  >
+                    <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                    <p className="text-xs text-gray-500 mt-0.5">2 minutes &bull; Helps track your progress over time</p>
+                  </button>
+                </div>
+              )}
+
+              {/* PROMIS questionnaire inline for triage-exit */}
+              {showTriagePromis && !triagePromisCompleted && triageResult?.consultationId && (
+                <div className="text-left mb-4">
+                  <PROMISQuestionnaire
+                    timepoint="baseline"
+                    consultationId={triageResult.consultationId}
+                    isPainRelated={isPainRelatedConsultation(triageResult.rawConsultationData?.caseData || { rawQuery: currentQuestion })}
+                    patientId={user?.id || 'web-guest'}
+                    onComplete={(result) => {
+                      setTriagePromisCompleted(true);
+                      setPromisResult(result);
+                    }}
+                    onSkip={() => setShowTriagePromis(false)}
+                  />
+                </div>
+              )}
+
+              {/* PROMIS completion for triage-exit */}
+              {triagePromisCompleted && (
+                <div className="mb-4 p-3 bg-green-100 border border-green-200 rounded-lg">
+                  <p className="text-xs text-green-700">Baseline questionnaire complete</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleAskAnother}
+                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                  feedbackSubmitted && !triagePromisCompleted && !showTriagePromis
+                    ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Ask Another Question
+              </button>
+            </div>
           </div>
         )}
 
@@ -966,12 +1260,23 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           isOpen={showPrescriptionModal}
           onClose={() => setShowPrescriptionModal(false)}
           question={currentQuestion}
-          response={responseData?.response || ''}
+          response={comprehensiveResult?.response || triageResult?.response || ''}
           fid={user?.id || 'web-guest'}
-          inquiry={responseData?.inquiry}
-          keyPoints={responseData?.keyPoints}
-          rawConsultationData={responseData?.rawConsultationData}
+          inquiry={comprehensiveResult?.inquiry || triageResult?.inquiry}
+          keyPoints={comprehensiveResult?.keyPoints || triageResult?.keyPoints}
+          rawConsultationData={comprehensiveResult?.rawConsultationData || triageResult?.rawConsultationData}
         />
+
+        {/* FeedbackModal for triage exit */}
+        {consultationStage === 'exited' && triageResult && (
+          <FeedbackModal
+            isOpen={showFeedbackModal}
+            onClose={() => setShowFeedbackModal(false)}
+            consultationId={triageResult.consultationId || triageResult.specialistConsultation?.consultationId || ''}
+            patientId={user?.id || 'web-guest'}
+            mode="fast"
+          />
+        )}
 
         {/* Call to Action */}
         <div className="text-center mt-8 p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-teal-50 border-2 border-blue-300 rounded-xl shadow-lg">
@@ -986,19 +1291,16 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               <div className="text-xs font-semibold text-blue-900">Unlimited</div>
               <div className="text-xs text-blue-700">Questions</div>
             </div>
-
             <div className="bg-white bg-opacity-80 p-3 rounded-lg border border-purple-200">
               <div className="text-2xl mb-1">📊</div>
               <div className="text-xs font-semibold text-purple-900">Progress</div>
               <div className="text-xs text-purple-700">Tracking</div>
             </div>
-
             <div className="bg-white bg-opacity-80 p-3 rounded-lg border border-teal-200">
               <div className="text-2xl mb-1">🎁</div>
               <div className="text-xs font-semibold text-teal-900">Token</div>
               <div className="text-xs text-teal-700">Rewards</div>
             </div>
-
             <div className="bg-white bg-opacity-80 p-3 rounded-lg border border-indigo-200">
               <div className="text-2xl mb-1">🔔</div>
               <div className="text-xs font-semibold text-indigo-900">Smart</div>
@@ -1032,9 +1334,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                       </svg>
                     </div>
                     <h3 className="text-lg font-semibold mb-2">Check your email</h3>
-                    <p className="text-sm text-gray-600">
-                      We sent a magic link to
-                    </p>
+                    <p className="text-sm text-gray-600">We sent a magic link to</p>
                     <p className="text-blue-600 font-medium text-sm">{upgradeSentEmail}</p>
                   </div>
 
@@ -1109,7 +1409,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         <div className="text-center text-xs text-gray-500 mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="font-medium text-yellow-800 mb-1">⚠️ Medical Disclaimer</p>
           <p>
-            This AI provides educational information only and should not replace professional medical advice. 
+            This AI provides educational information only and should not replace professional medical advice.
             Always consult with a qualified healthcare provider for medical concerns, diagnosis, or treatment decisions.
           </p>
         </div>
