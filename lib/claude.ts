@@ -395,7 +395,7 @@ function extractPatientDataFromQuestion(
   // Build case data
   const caseData: CaseData = {
     primaryComplaint: question.split('.')[0] || question, // Use first sentence as primary complaint
-    symptoms: question,
+    symptoms: location ? `${location} symptoms` : undefined,
     ...(age && { age }),
     ...(painLevel && { painLevel }),
     ...(duration && { duration }),
