@@ -50,9 +50,8 @@ export function useResearchPolling({
     if (abortRef.current) return;
 
     if (!triggerResult.success) {
-      setResearchState({ status: 'failed', result: null, error: triggerResult.error || 'Trigger failed' });
-      setIsPolling(false);
-      return;
+      // Don't bail — auto-trigger may have already completed. Fall through to polling.
+      console.warn(`[useResearchPolling] Trigger returned error: ${triggerResult.error}, polling anyway`);
     }
 
     // Poll

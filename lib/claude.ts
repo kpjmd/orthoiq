@@ -198,7 +198,7 @@ async function tryOrthoIQAgents(
     // Health check first
     const healthResponse = await fetch(`${AGENTS_ENDPOINT}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000) // 5 second timeout for health check
+      signal: AbortSignal.timeout(10000) // 10 second timeout for health check
     });
 
     if (!healthResponse.ok) {
