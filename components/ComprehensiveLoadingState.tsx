@@ -11,7 +11,7 @@ const specialists = [
   { type: 'mindMender', message: 'Mind Mender is reviewing psychological factors' },
 ];
 
-const TOTAL_SECONDS = 55;
+const TOTAL_SECONDS = 90;
 
 export default function ComprehensiveLoadingState() {
   const [visibleCount, setVisibleCount] = useState(0);
@@ -76,7 +76,9 @@ export default function ComprehensiveLoadingState() {
         />
       </div>
       <p className="text-xs text-gray-500 mb-4">
-        Estimated time remaining: ~{remaining}s
+        {remaining > 0
+          ? `Estimated time remaining: ~${remaining}s`
+          : 'Agents are finalizing their responses...'}
       </p>
 
       <div id="promis-slot" className="mt-4" />

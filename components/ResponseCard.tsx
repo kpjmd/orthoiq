@@ -631,72 +631,6 @@ export default function ResponseCard({
           </div>
         )}
         
-        {/* Premium Specialist Consultation Section */}
-        {hasSpecialistConsultation && agentBadges.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-4"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <motion.span
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  className="text-xl"
-                >
-                  🏥
-                </motion.span>
-                <span className="text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  Multi-Specialist Consultation
-                </span>
-                <span className="px-2 py-0.5 bg-premium-100 text-premium-700 text-xs font-medium rounded-full">
-                  Premium
-                </span>
-              </div>
-            </div>
-            
-            {/* Specialist Badges Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <AnimatePresence>
-                {agentBadges.map((badge, index) => {
-                  const shouldShow = consultationStage === 'complete' ||
-                                    (consultationStage === 'analyzing' && index < completedSpecialists);
-
-                  // Find the enrichment for this specialist to get real confidence
-                  const specialistEnrichment = enrichments?.find(
-                    e => e.metadata?.specialist === badge.type || e.metadata?.agentType === badge.type
-                  );
-                  const realConfidence = specialistEnrichment?.metadata?.confidence || 0.85;
-
-                  // Debug logging to track confidence values
-                  if (process.env.NODE_ENV === 'development' && specialistEnrichment) {
-                    console.log(`[ResponseCard] Specialist ${badge.type}:`, {
-                      found: !!specialistEnrichment,
-                      confidence: specialistEnrichment?.metadata?.confidence,
-                      specialist: specialistEnrichment?.metadata?.specialist,
-                      agentType: specialistEnrichment?.metadata?.agentType
-                    });
-                  }
-
-                  return shouldShow ? (
-                    <SpecialistBadge
-                      key={badge.type}
-                      name={badge.name}
-                      type={badge.type}
-                      specialty={badge.specialty}
-                      status={index < completedSpecialists ? 'completed' :
-                              consultationStage === 'analyzing' ? 'active' : 'pending'}
-                      confidence={realConfidence}
-                      animationDelay={index * 0.1}
-                    />
-                  ) : null;
-                })}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
       </motion.div>
       
       {/* Confidence Display */}
@@ -850,22 +784,6 @@ export default function ResponseCard({
         />
       )}
 
-      {/* Coordination Metadata - Shows after consultation completes */}
-      {hasSpecialistConsultation && specialistConsultation && consultationStage === 'complete' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="px-4 pb-4"
-        >
-          <CoordinationMetadata
-            consultationId={specialistConsultation.consultationId}
-            specialistCount={specialistConsultation.specialistCount}
-            totalTime={24}
-            confidence={confidence}
-          />
-        </motion.div>
-      )}
 
       {/* Intelligence Card Gating - Tiered based on platform and auth */}
       {/* Wrapped in ClientOnly to prevent SSR hydration mismatch */}
