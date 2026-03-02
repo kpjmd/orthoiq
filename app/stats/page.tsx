@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+interface ResearchPublicStats {
+  totalSyntheses: number;
+  totalStudiesAnalyzed: number;
+  avgImpactFactor: number;
+  evidenceDistribution: Array<{ strength: string; count: number }>;
+  rarityDistribution: Array<{ tier: string; count: number }>;
+}
+
 interface PublicStats {
   totalConsultations: number;
   averageAgents: number;
@@ -25,6 +33,7 @@ interface PublicStats {
     averageAccuracy: number;
     totalTokensDistributed: number;
   };
+  researchStats: ResearchPublicStats | null;
 }
 
 export default function PublicStatsPage() {
@@ -38,16 +47,18 @@ export default function PublicStatsPage() {
   const fetchStats = async () => {
     try {
       // Fetch from multiple endpoints and combine
-      const [overviewRes, marketRes, cardsRes] = await Promise.all([
+      const [overviewRes, marketRes, cardsRes, researchRes] = await Promise.all([
         fetch('/api/admin/metrics/overview'),
         fetch('/api/admin/prediction-market/performance'),
-        fetch('/api/admin/cards/distribution')
+        fetch('/api/admin/cards/distribution'),
+        fetch('/api/admin/research/metrics'),
       ]);
 
-      const [overview, market, cards] = await Promise.all([
+      const [overview, market, cards, research] = await Promise.all([
         overviewRes.ok ? overviewRes.json() : null,
         marketRes.ok ? marketRes.json() : null,
-        cardsRes.ok ? cardsRes.json() : null
+        cardsRes.ok ? cardsRes.json() : null,
+        researchRes.ok ? researchRes.json() : null,
       ]);
 
       setStats({
@@ -65,7 +76,14 @@ export default function PublicStatsPage() {
           totalPredictions: market?.totalPredictions || 0,
           averageAccuracy: market?.averageAccuracy || 0,
           totalTokensDistributed: market?.totalTokensDistributed || 0
-        }
+        },
+        researchStats: research ? {
+          totalSyntheses: research.totalSyntheses || 0,
+          totalStudiesAnalyzed: research.totalStudiesAnalyzed || 0,
+          avgImpactFactor: research.avgImpactFactor || 0,
+          evidenceDistribution: research.evidenceDistribution || [],
+          rarityDistribution: research.rarityDistribution || [],
+        } : null,
       });
     } catch (error) {
       console.error('Failed to fetch public stats:', error);
@@ -226,6 +244,77 @@ export default function PublicStatsPage() {
           </div>
         </div>
 
+        {/* Research Synthesis Network */}
+        {stats.researchStats && stats.researchStats.totalSyntheses > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Research Synthesis Network</h2>
+            <p className="text-sm text-gray-500 mb-6">AI-powered evidence synthesis from peer-reviewed literature</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-cyan-600 mb-2">
+                  {stats.researchStats.totalSyntheses.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600">Evidence Syntheses</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-cyan-600 mb-2">
+                  {stats.researchStats.totalStudiesAnalyzed.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-600">Studies Analyzed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-cyan-600 mb-2">
+                  {stats.researchStats.avgImpactFactor > 0
+                    ? stats.researchStats.avgImpactFactor.toFixed(1)
+                    : '—'}
+                </div>
+                <div className="text-sm text-gray-600">Avg Journal Impact Factor</div>
+              </div>
+            </div>
+
+            {/* Evidence strength bar */}
+            {stats.researchStats.evidenceDistribution.length > 0 && (() => {
+              const evidenceColors: Record<string, string> = {
+                strong: 'bg-green-500', moderate: 'bg-blue-500',
+                weak: 'bg-yellow-400', insufficient: 'bg-red-400', unknown: 'bg-gray-300',
+              };
+              const totalEv = stats.researchStats!.evidenceDistribution.reduce((s, r) => s + r.count, 0);
+              return (
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-gray-600 mb-2">Evidence Strength Distribution</div>
+                  <div className="flex h-6 rounded-lg overflow-hidden">
+                    {stats.researchStats!.evidenceDistribution.map(({ strength, count }) => {
+                      const pct = totalEv > 0 ? (count / totalEv) * 100 : 0;
+                      if (pct === 0) return null;
+                      return (
+                        <div
+                          key={strength}
+                          className={`${evidenceColors[strength] || 'bg-gray-300'} flex items-center justify-center text-white text-xs font-medium`}
+                          style={{ width: `${pct}%` }}
+                          title={`${strength}: ${Math.round(pct)}%`}
+                        >
+                          {pct >= 20 && `${strength}`}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-4 mt-2 flex-wrap">
+                    {stats.researchStats!.evidenceDistribution.map(({ strength, count }) => {
+                      const pct = totalEv > 0 ? Math.round((count / totalEv) * 100) : 0;
+                      return (
+                        <div key={strength} className="flex items-center gap-1 text-xs text-gray-600">
+                          <div className={`w-2.5 h-2.5 rounded-sm ${evidenceColors[strength] || 'bg-gray-300'}`} />
+                          <span className="capitalize">{strength}: {pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Prediction Market Stats */}
         <div className="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Prediction Market Statistics</h2>
@@ -247,6 +336,21 @@ export default function PublicStatsPage() {
                 {stats.networkStats.totalTokensDistributed.toLocaleString()}
               </div>
               <div className="text-sm text-gray-600">Total Tokens Distributed</div>
+            </div>
+          </div>
+
+          {/* Token Economics Teaser */}
+          <div className="mt-6 pt-6 border-t border-blue-200">
+            <div className="text-center">
+              <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold mb-3">
+                COMING SOON
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">On-Chain Token Economics</h3>
+              <p className="text-sm text-gray-600 max-w-md mx-auto">
+                Agent performance tokens will be tradeable on-chain. Stake on agent accuracy,
+                earn rewards for correct predictions, and participate in decentralized
+                orthopedic intelligence.
+              </p>
             </div>
           </div>
         </div>

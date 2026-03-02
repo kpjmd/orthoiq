@@ -7,6 +7,9 @@ import { EngagementMetrics } from './components/EngagementMetrics';
 import { MDReviewQueue } from './components/MDReviewQueue';
 import { RecentActivity } from './components/RecentActivity';
 import { QueueAlert } from './components/QueueAlert';
+import { PROMISMetrics } from './components/PROMISMetrics';
+import { ResearchAgentMetrics } from './components/ResearchAgentMetrics';
+import { ChatbotMetrics } from './components/ChatbotMetrics';
 
 export default function AdminDashboard() {
   return (
@@ -41,6 +44,15 @@ export default function AdminDashboard() {
           <PredictionMarketAnalytics />
           <CardDistribution />
         </div>
+
+        {/* PROMIS Capture Rates & Chatbot Usage */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PROMISMetrics />
+          <ChatbotMetrics />
+        </div>
+
+        {/* Research Agent Performance */}
+        <ResearchAgentMetrics />
 
         {/* Engagement Metrics */}
         <EngagementMetrics />
