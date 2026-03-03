@@ -18,6 +18,7 @@ interface IntelligenceCardModalProps {
   mdReview?: any;
   fid: string;
   isMiniApp?: boolean;
+  researchCompleted?: boolean;
 }
 
 export default function IntelligenceCardModal({
@@ -27,7 +28,8 @@ export default function IntelligenceCardModal({
   userFeedback,
   mdReview,
   fid,
-  isMiniApp = false
+  isMiniApp = false,
+  researchCompleted = false,
 }: IntelligenceCardModalProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -70,10 +72,24 @@ export default function IntelligenceCardModal({
     console.log('[IntelligenceCardModal] Generating card data with:', {
       hasRawData: !!rawConsultationData,
       hasUserFeedback: !!userFeedback,
-      hasMdReview: !!mdReview
+      hasMdReview: !!mdReview,
+      researchCompleted,
     });
-    return mapConsultationToCardData(rawConsultationData, userFeedback, mdReview);
-  }, [rawConsultationData, userFeedback, mdReview]);
+    const data = mapConsultationToCardData(rawConsultationData, userFeedback, mdReview);
+    if (researchCompleted && data) {
+      data.agentStakes.push({
+        specialist: 'research',
+        agentName: 'Research',
+        tokenStake: 2.0,
+        participated: true,
+        color: '#06b6d4',
+        confidence: 0.8,
+      });
+      data.totalStake = Math.round((data.totalStake + 2.0) * 10) / 10;
+      data.participatingCount = data.agentStakes.length;
+    }
+    return data;
+  }, [rawConsultationData, userFeedback, mdReview, researchCompleted]);
 
   const tierConfig = getTierConfig(cardData.tier);
 

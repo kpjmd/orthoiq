@@ -241,6 +241,7 @@ function MiniAppContent() {
   const [comprehensiveResult, setComprehensiveResult] = useState<ResponseData | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [comprehensiveFeedbackSubmitted, setComprehensiveFeedbackSubmitted] = useState(false);
   const isLoading = consultationStage === 'triage_loading' || consultationStage === 'comprehensive_loading';
   const [error, setError] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
@@ -735,6 +736,7 @@ function MiniAppContent() {
     setError('');
     setShowFeedbackModal(false);
     setFeedbackSubmitted(false);
+    setComprehensiveFeedbackSubmitted(false);
     setShowPromisButton(false);
     setShowPromisQuestionnaire(false);
     setPromisCompleted(false);
@@ -1215,27 +1217,6 @@ function MiniAppContent() {
               </div>
             )}
 
-            {/* PROMIS completion summary */}
-            {promisCompleted && promisResult && !pendingComprehensiveReveal && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
-                <p className="text-xs text-green-700">
-                  Baseline questionnaire complete — T-Score: {promisResult.scores.physicalFunctionTScore}
-                </p>
-              </div>
-            )}
-
-            {/* Second-chance PROMIS button on structured brief */}
-            {!showPromisQuestionnaire && !promisCompleted && !pendingComprehensiveReveal && (
-              <div className="mb-4">
-                <button
-                  onClick={() => setShowPromisQuestionnaire(true)}
-                  className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
-                >
-                  <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire to track your progress over time</p>
-                </button>
-              </div>
-            )}
             {/* Data Completeness Indicator */}
             {comprehensiveResult.dataCompleteness !== undefined && (
               <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
@@ -1347,7 +1328,31 @@ function MiniAppContent() {
               hasSpecialistConsultation={comprehensiveResult.hasSpecialistConsultation || false}
               rawConsultationData={comprehensiveResult.rawConsultationData}
               researchState={researchPolling.researchState}
+              initialFeedbackSubmitted={comprehensiveFeedbackSubmitted}
+              onFeedbackSubmitted={() => setComprehensiveFeedbackSubmitted(true)}
             />
+
+            {/* PROMIS completion summary — after ResponseCard, near feedback section */}
+            {promisCompleted && promisResult && !pendingComprehensiveReveal && (
+              <div className="mt-3 mb-2 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                <p className="text-xs text-green-700">
+                  Baseline questionnaire complete — T-Score: {promisResult.scores.physicalFunctionTScore}
+                </p>
+              </div>
+            )}
+
+            {/* Second-chance PROMIS button — after ResponseCard, near feedback section */}
+            {!showPromisQuestionnaire && !promisCompleted && !pendingComprehensiveReveal && (
+              <div className="mt-3 mb-2">
+                <button
+                  onClick={() => setShowPromisQuestionnaire(true)}
+                  className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
+                >
+                  <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire to track your progress over time</p>
+                </button>
+              </div>
+            )}
 
             {/* Post-consultation chatbot — placed directly below agent responses */}
             {comprehensiveResult.consultationId && (

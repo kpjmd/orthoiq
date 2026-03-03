@@ -19,13 +19,13 @@ export async function GET() {
     // Test both models used in the app
     const tests = [
       {
-        name: 'Haiku (content filter)',
-        model: 'claude-3-haiku-20240307',
+        name: 'Haiku 4.5 (content filter)',
+        model: 'claude-haiku-4-5-20251001',
         prompt: 'Is this orthopedic related: knee pain? Answer YES or NO.'
       },
       {
-        name: 'Sonnet (main responses)',
-        model: 'claude-sonnet-4-20250514', 
+        name: 'Haiku 4.5 (main responses)',
+        model: 'claude-haiku-4-5-20251001',
         prompt: 'Say "Claude API is working"'
       }
     ];
@@ -103,7 +103,7 @@ export async function POST() {
     });
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 100,
       messages: [{ 
         role: 'user', 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSql } from '@/lib/database';
-import { getUserCollectionSummary } from '@/lib/database';
 import { upsertUserProfile, getUserProfile, getUserPromisHistory } from '@/lib/promisDb';
 
 const MILESTONE_DAYS = [
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
     const sql = getSql();
 
     // Fetch all data in parallel
-    const [profile, consultations, promisHistory, prescriptions] = await Promise.all([
+    const [profile, consultations, promisHistory, icCountResult] = await Promise.all([
       getUserProfile(fid),
       sql`
         SELECT
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
         LIMIT 20
       `,
       getUserPromisHistory(fid),
-      getUserCollectionSummary(fid),
+      sql`SELECT COUNT(*) as count FROM prescriptions WHERE fid = ${fid}`,
     ]);
 
     // Derive pending milestones from PROMIS baseline consultations
@@ -112,9 +111,8 @@ export async function GET(request: NextRequest) {
         mode: c.mode,
         question: c.question,
       })),
-      prescriptions: {
-        totalPrescriptions: prescriptions.totalPrescriptions || 0,
-        rarityCounts: prescriptions.rarityCounts || {},
+      intelligenceCards: {
+        total: Number(icCountResult[0]?.count || 0),
       },
       promisHistory: promisHistory.map((r: any) => ({
         consultationId: r.consultation_id,

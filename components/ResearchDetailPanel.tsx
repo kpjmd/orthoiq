@@ -8,6 +8,7 @@ import { ResearchState, ResearchCitation } from '@/lib/types';
 
 interface ResearchDetailPanelProps {
   researchState: ResearchState;
+  isMiniApp?: boolean;
 }
 
 const qualityConfig = {
@@ -16,7 +17,7 @@ const qualityConfig = {
   low: { label: 'Low Quality', bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
 };
 
-function CitationCard({ citation }: { citation: ResearchCitation }) {
+function CitationCard({ citation, isMiniApp }: { citation: ResearchCitation; isMiniApp?: boolean }) {
   const quality = qualityConfig[citation.quality] || qualityConfig.moderate;
   const authorDisplay = citation.authors.length > 3
     ? `${citation.authors.slice(0, 3).join(', ')} et al.`
@@ -29,14 +30,27 @@ function CitationCard({ citation }: { citation: ResearchCitation }) {
           {quality.label}
         </span>
         {citation.pubmedUrl && (
-          <a
-            href={citation.pubmedUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-          >
-            PubMed &rsaquo;
-          </a>
+          isMiniApp ? (
+            <button
+              onClick={() => {
+                import('@farcaster/miniapp-sdk').then(({ sdk }) => {
+                  sdk.actions.openUrl(citation.pubmedUrl!);
+                });
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            >
+              PubMed &rsaquo;
+            </button>
+          ) : (
+            <a
+              href={citation.pubmedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            >
+              PubMed &rsaquo;
+            </a>
+          )
         )}
       </div>
       <h5 className="text-sm font-semibold text-gray-900 mb-1 leading-snug">{citation.title}</h5>
@@ -50,7 +64,7 @@ function CitationCard({ citation }: { citation: ResearchCitation }) {
   );
 }
 
-export default function ResearchDetailPanel({ researchState }: ResearchDetailPanelProps) {
+export default function ResearchDetailPanel({ researchState, isMiniApp }: ResearchDetailPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (researchState.status !== 'complete' || !researchState.result) return null;
@@ -108,7 +122,7 @@ export default function ResearchDetailPanel({ researchState }: ResearchDetailPan
               {result.citations.length > 0 && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {result.citations.map((citation) => (
-                    <CitationCard key={citation.pmid} citation={citation} />
+                    <CitationCard key={citation.pmid} citation={citation} isMiniApp={isMiniApp} />
                   ))}
                 </div>
               )}

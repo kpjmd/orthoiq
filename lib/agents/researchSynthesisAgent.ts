@@ -120,7 +120,7 @@ export class ResearchSynthesisAgent implements Agent {
       );
       
       const apiPromise = anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 500,
         temperature: 0.1,
         messages: [{ role: 'user', content: prompt }]
@@ -274,7 +274,7 @@ Maintain educational tone - this is information, not medical advice.`;
       );
       
       const apiPromise = anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
         temperature: 0.2,
         messages: [{ role: 'user', content: prompt }]

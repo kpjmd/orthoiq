@@ -81,6 +81,8 @@ interface ResponseCardProps {
   researchState?: ResearchState;
   // Callback for when feedback is submitted
   onFeedbackSubmitted?: (submitted: boolean) => void;
+  // Lift feedbackSubmitted state to prevent reset on unmount/remount
+  initialFeedbackSubmitted?: boolean;
 }
 
 export default function ResponseCard({
@@ -111,7 +113,8 @@ export default function ResponseCard({
   hasSpecialistConsultation = false,
   rawConsultationData,
   researchState,
-  onFeedbackSubmitted
+  onFeedbackSubmitted,
+  initialFeedbackSubmitted,
 }: ResponseCardProps) {
   // Debug logging for rawConsultationData
   console.log('[ResponseCard] rawConsultationData received:', rawConsultationData);
@@ -131,7 +134,7 @@ export default function ResponseCard({
 
   // Feedback system state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(initialFeedbackSubmitted ?? false);
   const [tokenRewards, setTokenRewards] = useState<Array<{agent: string; reward: number; accuracy: number}>>([]);
   const [expandedSpecialists, setExpandedSpecialists] = useState<Set<number>>(new Set());
 
@@ -781,6 +784,7 @@ export default function ResponseCard({
           rawConsultationData={rawConsultationData}
           fid={fid}
           isMiniApp={isMiniApp}
+          researchCompleted={researchState?.status === 'complete'}
         />
       )}
 
@@ -1052,7 +1056,7 @@ export default function ResponseCard({
       {/* Research Detail Panel - after specialist accordions */}
       {hasSpecialistConsultation && defaultResearchState.status === 'complete' && (
         <div id="research-detail-panel">
-          <ResearchDetailPanel researchState={defaultResearchState} />
+          <ResearchDetailPanel researchState={defaultResearchState} isMiniApp={isMiniApp} />
         </div>
       )}
 

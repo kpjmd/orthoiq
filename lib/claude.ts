@@ -55,7 +55,7 @@ export async function getOrthoResponse(
   console.log(`[${requestId || 'unknown'}] Using Claude AI fallback`);
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
       temperature: 0.3,
       messages: [
@@ -150,7 +150,7 @@ export async function getOrthoResponse(
 export async function filterContent(question: string): Promise<boolean> {
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 100,
       temperature: 0,
       messages: [

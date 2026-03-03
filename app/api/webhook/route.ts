@@ -92,10 +92,15 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleMiniappAdded(requestId: string, data: any) {
-  const { fid } = data;
+  const { fid, notificationDetails } = data;
   const fidString = typeof fid === 'number' ? fid.toString() : fid;
 
-  console.log(`[Webhook:${requestId}] Mini app added for FID ${fidString} - awaiting explicit notification opt-in`);
+  if (notificationDetails?.token && notificationDetails?.url) {
+    console.log(`[Webhook:${requestId}] miniapp_added WITH notifications - saving token for FID ${fidString}`);
+    await saveNotificationToken(requestId, fidString, notificationDetails.token, notificationDetails.url);
+  } else {
+    console.log(`[Webhook:${requestId}] Mini app added for FID ${fidString} - awaiting explicit notification opt-in`);
+  }
 }
 
 async function handleMiniappRemoved(requestId: string, data: any) {

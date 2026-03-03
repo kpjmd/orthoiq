@@ -226,37 +226,36 @@ export async function sendMilestoneEmail(
   const trackingLink = `${APP_URL}/track/${consultationId}`;
 
   const weekNumber = Math.round(milestoneDay / 7);
-  const milestoneType = milestoneDay === 14 ? 'pain level' : milestoneDay === 28 ? 'functional progress' : 'movement quality';
 
   try {
     const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: `Week ${weekNumber} Check-in: How is your recovery?`,
+      subject: `Week ${weekNumber} PROMIS Check-in: How is your recovery?`,
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Week ${weekNumber} Check-in</title>
+          <title>Week ${weekNumber} PROMIS Check-in</title>
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Week ${weekNumber} Check-in</h1>
-            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Time to assess your ${milestoneType}</p>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Week ${weekNumber} PROMIS Check-in</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Track your recovery progress</p>
           </div>
 
           <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; margin-bottom: 20px;">Hi there,</p>
 
             <p style="font-size: 16px; margin-bottom: 20px;">
-              It's been ${weekNumber} weeks since your consultation. We'd love to hear how you're progressing.
+              It's been ${weekNumber} weeks since your consultation. Please complete your brief PROMIS questionnaire — it takes under 2 minutes and helps validate your recovery trajectory.
             </p>
 
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
               <p style="margin: 0; font-size: 14px; color: #666;">
-                <strong>This check-in focuses on:</strong> ${milestoneType.charAt(0).toUpperCase() + milestoneType.slice(1)}
+                <strong>PROMIS</strong> (Patient-Reported Outcomes Measurement Information System) is a validated tool used to measure physical function and pain over time.
               </p>
             </div>
 
@@ -270,12 +269,12 @@ export async function sendMilestoneEmail(
                         font-weight: 600;
                         font-size: 16px;
                         display: inline-block;">
-                Complete Your Check-in
+                Complete Your PROMIS Check-in
               </a>
             </div>
 
             <p style="font-size: 14px; color: #666; margin-top: 20px;">
-              Your feedback helps our AI specialists learn and improve recommendations for future patients.
+              Your responses help our AI specialists learn and improve recommendations for future patients.
             </p>
 
             <p style="font-size: 16px; color: #333; margin-top: 20px;">
@@ -295,14 +294,12 @@ export async function sendMilestoneEmail(
       text: `
 Hi there,
 
-It's been ${weekNumber} weeks since your consultation. We'd love to hear how you're progressing.
+It's been ${weekNumber} weeks since your consultation. Please complete your brief PROMIS questionnaire — it takes under 2 minutes and helps validate your recovery trajectory.
 
-This check-in focuses on: ${milestoneType}
-
-Click below to complete your check-in:
+Click below to complete your PROMIS check-in:
 ${trackingLink}
 
-Your feedback helps our AI specialists learn and improve recommendations for future patients.
+Your responses help our AI specialists learn and improve recommendations for future patients.
 
 Keep up the great work on your recovery!
 

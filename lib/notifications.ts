@@ -144,20 +144,10 @@ export async function sendMilestoneNotification(
 ): Promise<boolean> {
   const weekNumber = Math.floor(milestoneDay / 7);
 
-  // Customize message based on milestone
-  let focus = 'recovery progress';
-  if (milestoneDay === 14) {
-    focus = 'pain level and initial progress';
-  } else if (milestoneDay === 28) {
-    focus = 'functional improvements';
-  } else if (milestoneDay === 56) {
-    focus = 'long-term recovery and movement quality';
-  }
-
   const notification: NotificationData = {
     title: `Week ${weekNumber} Check-in: How are you doing?`,
-    body: `Time for your ${weekNumber}-week follow-up! Share your ${focus} to help track your recovery journey.`,
-    targetUrl: `/miniapp?track=${consultationId}`,
+    body: `Time for your ${weekNumber}-week PROMIS check-in. Complete a short questionnaire to track your recovery progress.`,
+    targetUrl: `/miniapp?track=${consultationId}&milestone=${milestoneDay}`,
     imageUrl: 'https://orthoiq.vercel.app/icon.png'
   };
 

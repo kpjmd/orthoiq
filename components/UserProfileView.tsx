@@ -20,9 +20,8 @@ export interface ProfileData {
     mode: string;
     question: string;
   }>;
-  prescriptions: {
-    totalPrescriptions: number;
-    rarityCounts: Record<string, number>;
+  intelligenceCards: {
+    total: number;
   };
   promisHistory: Array<{
     consultationId: string;
@@ -97,7 +96,7 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
     );
   }
 
-  const { profile, stats, consultations, prescriptions, promisHistory, pendingMilestones } = profileData;
+  const { profile, stats, consultations, intelligenceCards, promisHistory, pendingMilestones } = profileData;
 
   // Group PROMIS history by consultation
   const promisGrouped = new Map<string, typeof promisHistory>();
@@ -162,8 +161,8 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
           <p className="text-xs text-gray-500 mt-1">PROMIS Baselines</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-purple-600">{prescriptions.totalPrescriptions}</p>
-          <p className="text-xs text-gray-500 mt-1">Prescriptions</p>
+          <p className="text-2xl font-bold text-purple-600">{intelligenceCards.total}</p>
+          <p className="text-xs text-gray-500 mt-1">Intelligence Cards</p>
         </div>
       </div>
 
