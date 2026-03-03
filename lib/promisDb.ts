@@ -77,3 +77,78 @@ export async function getPromisBaseline(consultationId: string): Promise<any | n
     throw error;
   }
 }
+
+// ── User Profile Functions ──
+
+export async function upsertUserProfile(data: {
+  fid: string;
+  walletAddress?: string | null;
+  displayName?: string | null;
+  username?: string | null;
+  pfpUrl?: string | null;
+}): Promise<void> {
+  const sql = getSql();
+
+  try {
+    await sql`
+      INSERT INTO user_profiles (fid, wallet_address, display_name, username, pfp_url, last_seen)
+      VALUES (
+        ${data.fid},
+        ${data.walletAddress ?? null},
+        ${data.displayName ?? null},
+        ${data.username ?? null},
+        ${data.pfpUrl ?? null},
+        NOW()
+      )
+      ON CONFLICT (fid) DO UPDATE SET
+        wallet_address = COALESCE(EXCLUDED.wallet_address, user_profiles.wallet_address),
+        display_name = COALESCE(EXCLUDED.display_name, user_profiles.display_name),
+        username = COALESCE(EXCLUDED.username, user_profiles.username),
+        pfp_url = COALESCE(EXCLUDED.pfp_url, user_profiles.pfp_url),
+        last_seen = NOW()
+    `;
+  } catch (error) {
+    console.error('Error upserting user profile:', error);
+    throw error;
+  }
+}
+
+export async function getUserProfile(fid: string): Promise<any | null> {
+  const sql = getSql();
+
+  try {
+    const rows = await sql`
+      SELECT * FROM user_profiles WHERE fid = ${fid} LIMIT 1
+    `;
+    return rows.length > 0 ? rows[0] : null;
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    return null;
+  }
+}
+
+export async function getUserPromisHistory(fid: string): Promise<any[]> {
+  const sql = getSql();
+
+  try {
+    const rows = await sql`
+      SELECT
+        pr.consultation_id,
+        pr.timepoint,
+        pr.physical_function_t_score,
+        pr.pain_interference_t_score,
+        pr.created_at AS response_date,
+        c.created_at AS consultation_date,
+        q.question AS consultation_question
+      FROM promis_responses pr
+      JOIN consultations c ON pr.consultation_id = c.consultation_id
+      JOIN questions q ON c.question_id = q.id
+      WHERE pr.patient_id = ${fid}
+      ORDER BY c.created_at DESC, pr.timepoint ASC
+    `;
+    return rows;
+  } catch (error) {
+    console.error('Error getting user PROMIS history:', error);
+    return [];
+  }
+}

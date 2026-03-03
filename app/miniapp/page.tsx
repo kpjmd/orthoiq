@@ -16,9 +16,10 @@ import TriageResponseCard from '@/components/TriageResponseCard';
 import ComprehensiveLoadingState from '@/components/ComprehensiveLoadingState';
 import ConsultationChatbot from '@/components/ConsultationChatbot';
 import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
+import UserProfileView, { ProfileData } from '@/components/UserProfileView';
 import { useResearchPolling } from '@/hooks/useResearchPolling';
 import { isPainRelatedConsultation } from '@/lib/promis';
-import { PROMISCompletionResult } from '@/lib/promisTypes';
+import { PROMISCompletionResult, PROMISTimepoint } from '@/lib/promisTypes';
 import { UserTier } from '@/lib/rateLimit';
 
 // Farcaster SDK Context Types
@@ -256,6 +257,16 @@ function MiniAppContent() {
   const [showTriagePromis, setShowTriagePromis] = useState(false);
   const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
 
+  // Follow-up PROMIS tracking mode (for Farcaster notification deep-links)
+  const [trackingMode, setTrackingMode] = useState<{ consultationId: string; timepoint: PROMISTimepoint } | null>(null);
+  const [trackingComplete, setTrackingComplete] = useState(false);
+  const [trackingAlreadyDone, setTrackingAlreadyDone] = useState(false);
+
+  // User profile state
+  const [showProfile, setShowProfile] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
   // Memoize full caseData so the backend can build precise PubMed queries.
   const researchCaseData = useMemo(() => {
     const raw = comprehensiveResult?.rawConsultationData;
@@ -421,6 +432,19 @@ function MiniAppContent() {
             loadRateLimitStatus(context.user.fid.toString(), getUserTier()),
             loadUserPreferences(context.user.fid.toString())
           ]);
+
+          // Fire-and-forget profile upsert
+          fetch('/api/user/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fid: context.user.fid.toString(),
+              walletAddress: context.user.verifications?.[0] || null,
+              displayName: context.user.displayName || null,
+              username: context.user.username || null,
+              pfpUrl: context.user.pfpUrl || null,
+            }),
+          }).catch(() => {});
         }
       } catch (err) {
         console.error('Error loading Farcaster SDK:', err);
@@ -463,6 +487,36 @@ function MiniAppContent() {
       loadUserPreferences(fid);
     }
   }, [isAuthenticated, authUser, context, getUserTier, isSDKLoaded]);
+
+  // Handle notification deep-link: ?track=<consultationId>&milestone=<day>
+  useEffect(() => {
+    if (!isSDKLoaded) return;
+    const url = new URL(window.location.href);
+    const trackConsultationId = url.searchParams.get('track');
+    const milestoneParam = url.searchParams.get('milestone');
+    if (!trackConsultationId || !milestoneParam) return;
+
+    const milestoneDay = parseInt(milestoneParam, 10);
+    const timepointMap: Record<number, PROMISTimepoint> = { 14: '2week', 28: '4week', 56: '8week' };
+    const timepoint = timepointMap[milestoneDay];
+    if (!timepoint) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/feedback/promis?consultationId=${encodeURIComponent(trackConsultationId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const done: string[] = (data.responses || []).map((r: any) => r.timepoint);
+          if (done.includes(timepoint)) {
+            setTrackingAlreadyDone(true);
+          }
+        }
+      } catch {
+        // ignore — proceed to show questionnaire
+      }
+      setTrackingMode({ consultationId: trackConsultationId, timepoint });
+    })();
+  }, [isSDKLoaded]);
 
   const loadRateLimitStatus = async (fid: string, tier: UserTier = 'basic') => {
     try {
@@ -739,6 +793,94 @@ function MiniAppContent() {
     );
   }
 
+  // Follow-up PROMIS view — rendered when user taps a milestone notification deep-link
+  if (trackingMode) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <OrthoIQLogo size="medium" variant="blue" className="text-white" />
+              <h1 className="text-3xl font-bold">OrthoIQ</h1>
+            </div>
+            <p className="text-lg opacity-90">Recovery Check-in</p>
+          </div>
+        </div>
+        <div className="p-6 max-w-2xl mx-auto">
+          {trackingAlreadyDone ? (
+            <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
+              <p className="text-4xl mb-3">✅</p>
+              <p className="text-lg font-semibold text-green-800 mb-1">You&apos;re up to date!</p>
+              <p className="text-sm text-green-600 mb-4">
+                You&apos;ve already completed this check-in. Thanks for tracking your recovery.
+              </p>
+              <button
+                onClick={() => setTrackingMode(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Back to Home
+              </button>
+            </div>
+          ) : trackingComplete ? (
+            <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl text-center">
+              <p className="text-4xl mb-3">🎉</p>
+              <p className="text-lg font-semibold text-blue-800 mb-1">Check-in complete!</p>
+              <p className="text-sm text-blue-600 mb-4">
+                Your PROMIS questionnaire has been recorded. Thank you for tracking your recovery.
+              </p>
+              <button
+                onClick={() => setTrackingMode(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Back to Home
+              </button>
+            </div>
+          ) : (
+            <PROMISQuestionnaire
+              timepoint={trackingMode.timepoint}
+              consultationId={trackingMode.consultationId}
+              isPainRelated={true}
+              patientId={context?.user?.fid?.toString() || 'anonymous'}
+              onComplete={() => setTrackingComplete(true)}
+              onSkip={() => setTrackingMode(null)}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Profile view — rendered when user taps "Profile" in header
+  if (showProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <OrthoIQLogo size="medium" variant="blue" className="text-white" />
+              <h1 className="text-3xl font-bold">OrthoIQ</h1>
+            </div>
+            <p className="text-lg opacity-90">Your Profile</p>
+            <button
+              onClick={() => setShowProfile(false)}
+              className="mt-3 px-4 py-1.5 text-sm rounded-full bg-blue-800 bg-opacity-50 hover:bg-opacity-70 transition-colors"
+            >
+              ← Back to Home
+            </button>
+          </div>
+        </div>
+        <UserProfileView
+          profileData={profileData}
+          isLoading={profileLoading}
+          onSelectMilestone={(cId, tp) => {
+            setShowProfile(false);
+            setTrackingMode({ consultationId: cId, timepoint: tp });
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -777,6 +919,27 @@ function MiniAppContent() {
                 >
                   📊 Stats
                 </a>
+                <button
+                  onClick={async () => {
+                    setShowProfile(true);
+                    setProfileLoading(true);
+                    try {
+                      const fid = context?.user?.fid?.toString();
+                      if (!fid) return;
+                      const res = await fetch(`/api/user/profile?fid=${fid}`);
+                      if (res.ok) {
+                        setProfileData(await res.json());
+                      }
+                    } catch (err) {
+                      console.error('Failed to load profile:', err);
+                    } finally {
+                      setProfileLoading(false);
+                    }
+                  }}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-800 bg-opacity-50 hover:bg-opacity-70 transition-colors"
+                >
+                  👤 Profile
+                </button>
               </div>
             </div>
           </div>

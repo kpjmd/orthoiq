@@ -829,6 +829,23 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_user_preferences_last_consultation ON user_preferences(last_consultation_id);
     `;
 
+    // User profile table — FID-keyed identity cache for returning users
+    await sql`
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        fid            VARCHAR(255) PRIMARY KEY,
+        wallet_address VARCHAR(255),
+        display_name   VARCHAR(255),
+        username       VARCHAR(255),
+        pfp_url        TEXT,
+        created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_seen      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_user_profiles_last_seen ON user_profiles(last_seen);
+    `;
+
     // Platform handoff table for web-to-miniapp transitions
     await sql`
       CREATE TABLE IF NOT EXISTS platform_handoffs (
