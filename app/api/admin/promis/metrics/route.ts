@@ -25,6 +25,8 @@ export async function GET(_request: NextRequest) {
     let tScoreTrend: Array<{ timepoint: string; avgPf: number | null; avgPi: number | null; count: number }> = [];
     let responsesLast7Days = 0;
     let painInterferenceAssessed = 0;
+    let clinicallyImprovedCount = 0;
+    let totalWithFollowup = 0;
 
     try {
       // Baseline capture count
@@ -120,6 +122,42 @@ export async function GET(_request: NextRequest) {
       `;
       painInterferenceAssessed = Number(piAssessedResult[0]?.count || 0);
 
+      // Clinically meaningful improvement: patients with ≥5 T-score improvement
+      // (PF improves by ≥5 OR PI decreases by ≥5) from baseline to their latest follow-up
+      const improvementResult = await sql`
+        WITH baseline AS (
+          SELECT consultation_id,
+                 physical_function_t_score AS pf_base,
+                 pain_interference_t_score  AS pi_base
+          FROM promis_responses
+          WHERE timepoint = 'baseline'
+            AND physical_function_t_score IS NOT NULL
+        ),
+        latest_followup AS (
+          SELECT DISTINCT ON (consultation_id)
+                 consultation_id,
+                 physical_function_t_score AS pf_follow,
+                 pain_interference_t_score  AS pi_follow
+          FROM promis_responses
+          WHERE timepoint IN ('2week', '4week', '8week')
+          ORDER BY consultation_id,
+            CASE timepoint WHEN '8week' THEN 3 WHEN '4week' THEN 2 WHEN '2week' THEN 1 END DESC
+        )
+        SELECT
+          COUNT(*) AS total_with_followup,
+          COUNT(
+            CASE
+              WHEN (lf.pf_follow - b.pf_base >= 5)
+                OR (b.pi_base IS NOT NULL AND lf.pi_follow IS NOT NULL AND b.pi_base - lf.pi_follow >= 5)
+              THEN 1
+            END
+          ) AS clinically_improved
+        FROM baseline b
+        JOIN latest_followup lf USING (consultation_id)
+      `;
+      clinicallyImprovedCount = Number(improvementResult[0]?.clinically_improved || 0);
+      totalWithFollowup = Number(improvementResult[0]?.total_with_followup || 0);
+
     } catch (error) {
       console.warn('promis_responses table may not exist yet:', error);
     }
@@ -143,6 +181,15 @@ export async function GET(_request: NextRequest) {
       week8: baselineCount > 0 ? Math.round((week8Count / baselineCount) * 1000) / 10 : 0,
     };
 
+    const clinicallyImprovedRate = totalWithFollowup > 0
+      ? Math.round((clinicallyImprovedCount / totalWithFollowup) * 1000) / 10
+      : 0;
+
+    // Extract avg baseline T-scores from trend data
+    const baselineTrend = tScoreTrend.find(r => r.timepoint === 'baseline');
+    const avgBaselinePfScore = baselineTrend?.avgPf ?? null;
+    const avgBaselinePiScore = baselineTrend?.avgPi ?? null;
+
     return NextResponse.json({
       totalConsultations,
       baselineCaptureCount,
@@ -159,6 +206,11 @@ export async function GET(_request: NextRequest) {
       painInterferenceDistribution: piDistribution,
       tScoreTrend,
       responsesLast7Days,
+      clinicallyImprovedCount,
+      clinicallyImprovedRate,
+      totalWithFollowup,
+      avgBaselinePfScore,
+      avgBaselinePiScore,
       generatedAt: new Date().toISOString(),
     });
 

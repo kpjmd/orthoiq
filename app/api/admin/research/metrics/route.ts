@@ -1,12 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
+const ORTHOIQ_AGENTS_URL = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+
 function getSql() {
   const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('Database URL not configured');
   }
   return neon(databaseUrl);
+}
+
+async function fetchAgentLiveStats(): Promise<{
+  totalSearches: number;
+  totalCitations: number;
+  avgResponseTime: number;
+  tokenBalance: number;
+} | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(`${ORTHOIQ_AGENTS_URL}/status`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const stats = data?.researchAgent?.statistics;
+    if (!stats) return null;
+    return {
+      totalSearches: Number(stats.totalSearches || 0),
+      totalCitations: Number(stats.totalCitations || 0),
+      avgResponseTime: Number(stats.avgResponseTime || 0),
+      tokenBalance: Number(stats.tokenBalance || 0),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(_request: NextRequest) {
@@ -161,6 +189,9 @@ export async function GET(_request: NextRequest) {
       ? Math.round((mdReviewedCount / totalSyntheses) * 1000) / 10
       : 0;
 
+    // Fetch live stats from agents service (non-blocking, best-effort)
+    const agentLiveStats = await fetchAgentLiveStats();
+
     return NextResponse.json({
       totalSyntheses,
       synthesesLast7Days,
@@ -176,6 +207,7 @@ export async function GET(_request: NextRequest) {
       volumeTrend,
       topConditions,
       subscriptionsByTier,
+      agentLiveStats,
       generatedAt: new Date().toISOString(),
     });
 

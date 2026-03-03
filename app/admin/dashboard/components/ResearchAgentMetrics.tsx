@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
+interface AgentLiveStats {
+  totalSearches: number;
+  totalCitations: number;
+  avgResponseTime: number;
+  tokenBalance: number;
+}
+
 interface ResearchData {
   totalSyntheses: number;
   synthesesLast7Days: number;
@@ -17,6 +24,7 @@ interface ResearchData {
   volumeTrend: Array<{ date: string; count: number }>;
   topConditions: Array<{ condition: string; count: number }>;
   subscriptionsByTier: Array<{ tier: string; total: number; active: number }>;
+  agentLiveStats: AgentLiveStats | null;
 }
 
 const EVIDENCE_COLORS: Record<string, string> = {
@@ -139,11 +147,41 @@ export function ResearchAgentMetrics() {
           </div>
         </div>
 
-        {!hasAnyData ? (
+        {!hasAnyData && data.agentLiveStats && data.agentLiveStats.totalSearches > 0 && (
+          <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+            <div className="text-xs font-semibold text-cyan-700 mb-3 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
+              Live Session — Research Agent (agents service)
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-cyan-700">{data.agentLiveStats.totalSearches}</div>
+                <div className="text-xs text-gray-600">Searches This Session</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-cyan-700">{data.agentLiveStats.totalCitations}</div>
+                <div className="text-xs text-gray-600">Citations Found</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-cyan-700">
+                  {data.agentLiveStats.avgResponseTime > 0 ? `${(data.agentLiveStats.avgResponseTime / 1000).toFixed(1)}s` : '—'}
+                </div>
+                <div className="text-xs text-gray-600">Avg Response Time</div>
+              </div>
+            </div>
+            <p className="text-xs text-cyan-600 mt-3 text-center">
+              Live data from running agent session. Detailed synthesis records appear here after DB persistence is complete.
+            </p>
+          </div>
+        )}
+
+        {!hasAnyData && (!data.agentLiveStats || data.agentLiveStats.totalSearches === 0) && (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-sm text-gray-500">
             No research syntheses generated yet.
           </div>
-        ) : (
+        )}
+
+        {hasAnyData && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Evidence Strength Distribution */}
