@@ -85,7 +85,16 @@ export default function TriageResponseCard({
       {/* Response body */}
       <div className="p-4">
         <div className="prose prose-sm max-w-none text-gray-800">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{response}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table: ({ children }) => (
+                <div className="overflow-x-auto w-full">
+                  <table>{children}</table>
+                </div>
+              ),
+            }}
+          >{response}</ReactMarkdown>
         </div>
       </div>
 

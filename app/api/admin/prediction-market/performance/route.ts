@@ -66,7 +66,11 @@ export async function GET(request: NextRequest) {
       // Market Overview
       totalPredictions: marketStats.totalPredictions || 0,
       averageAccuracy: normalizedMarketAccuracy,
-      totalTokensDistributed: marketStats.totalTokensDistributed || tokenStats?.totalTokens || 0,
+      totalTokensDistributed:
+        marketStats.totalTokensDistributed ||
+        tokenStats?.statistics?.totalTokensIssued ||
+        tokenStats?.statistics?.totalTokenBalance ||
+        0,
 
       // Agent Leaderboard
       topPerformers,

@@ -295,9 +295,18 @@ export default function PublicStatsPage() {
                         <span>•</span>
                         <span>{agent.totalPredictions} predictions</span>
                         <span>•</span>
-                        <span className={`font-medium ${consensusScore >= 1 ? 'text-green-600' : 'text-orange-500'}`}>
-                          {(consensusScore * 100).toFixed(0)}% consensus alignment
-                        </span>
+                        {(() => {
+                          const deltaPp = (agent.accuracyRate - meanAccuracy) * 100;
+                          const absDelta = Math.abs(deltaPp);
+                          if (absDelta <= 1) {
+                            return <span className="font-medium text-gray-400">avg</span>;
+                          }
+                          return (
+                            <span className={`font-medium ${deltaPp > 0 ? 'text-green-600' : 'text-orange-500'}`}>
+                              {deltaPp > 0 ? '+' : ''}{deltaPp.toFixed(0)}pp vs avg
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="mt-2">
                         <div className="w-full bg-gray-200 rounded-full h-2">
