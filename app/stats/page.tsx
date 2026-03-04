@@ -288,21 +288,21 @@ export default function PublicStatsPage() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <span>{Math.round(agent.accuracyRate * 100)}% accuracy</span>
-                        <span>•</span>
-                        <span>{agent.tokensEarned} tokens</span>
-                        <span>•</span>
-                        <span>{agent.totalPredictions} predictions</span>
-                        <span>•</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-gray-600">
+                        <span className="whitespace-nowrap">{Math.round(agent.accuracyRate * 100)}% accuracy</span>
+                        <span className="whitespace-nowrap">•</span>
+                        <span className="whitespace-nowrap">{agent.tokensEarned} tokens</span>
+                        <span className="whitespace-nowrap">•</span>
+                        <span className="whitespace-nowrap">{agent.totalPredictions} predictions</span>
+                        <span className="whitespace-nowrap">•</span>
                         {(() => {
                           const deltaPp = (agent.accuracyRate - meanAccuracy) * 100;
                           const absDelta = Math.abs(deltaPp);
                           if (absDelta <= 1) {
-                            return <span className="font-medium text-gray-400">avg</span>;
+                            return <span className="font-medium text-gray-400 whitespace-nowrap">avg</span>;
                           }
                           return (
-                            <span className={`font-medium ${deltaPp > 0 ? 'text-green-600' : 'text-orange-500'}`}>
+                            <span className={`font-medium whitespace-nowrap ${deltaPp > 0 ? 'text-green-600' : 'text-orange-500'}`}>
                               {deltaPp > 0 ? '+' : ''}{deltaPp.toFixed(0)}pp vs avg
                             </span>
                           );
