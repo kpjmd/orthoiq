@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 // Dynamically import auth-dependent components with SSR disabled
@@ -23,7 +22,7 @@ export default function WebHomePage() {
       <div className="medical-gradient text-white p-8 rounded-lg mb-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-4xl font-bold">OrthoIQ</h1>
-          <Link
+          <a
             href="/stats"
             target="_blank"
             rel="noopener noreferrer"
@@ -31,7 +30,7 @@ export default function WebHomePage() {
           >
             <span>📊</span>
             <span>Platform Stats</span>
-          </Link>
+          </a>
         </div>
         <p className="text-xl mb-2">AI-Powered Orthopedic Intelligence</p>
         <p className="text-lg opacity-90 mb-4">

@@ -98,22 +98,24 @@ export default function TriageResponseCard({
         </div>
       </div>
 
-      {/* Specialist routing preview */}
-      <div className="px-4 pb-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Based on your case, a full consultation would include:
-        </p>
-        <div className="space-y-1.5">
-          {nonTriageSpecialists.map((s) => (
-            <div key={s.type} className="flex items-center space-x-2 text-sm">
-              <span>{specialistIcons[s.type]}</span>
-              <span className="font-medium text-gray-800">{s.name}</span>
-              <span className="text-gray-400">—</span>
-              <span className="text-gray-500 text-xs">{s.description}</span>
-            </div>
-          ))}
+      {/* Specialist routing preview — only when full analysis is available */}
+      {onSeeFullAnalysis && (
+        <div className="px-4 pb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Based on your case, a full consultation would include:
+          </p>
+          <div className="space-y-1.5">
+            {nonTriageSpecialists.map((s) => (
+              <div key={s.type} className="flex items-center space-x-2 text-sm">
+                <span>{specialistIcons[s.type]}</span>
+                <span className="font-medium text-gray-800">{s.name}</span>
+                <span className="text-gray-400">—</span>
+                <span className="text-gray-500 text-xs">{s.description}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Follow-up questions */}
       {suggestedFollowUp.length > 0 && (
@@ -132,25 +134,31 @@ export default function TriageResponseCard({
         </div>
       )}
 
-      {/* Decision CTAs */}
-      <div className="px-4 pb-4 border-t border-gray-100 pt-4 space-y-3">
-        <button
-          onClick={onSeeFullAnalysis}
-          className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition-all shadow-md flex items-center justify-center space-x-2"
-        >
-          <span>See Full Analysis</span>
-          <span>→</span>
-          <span className="text-xs font-normal opacity-80">(~50s)</span>
-        </button>
-        <div className="text-center">
-          <button
-            onClick={onExit}
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            This answers my question — exit
-          </button>
+      {/* Decision CTAs — only when callbacks are provided */}
+      {(onSeeFullAnalysis || onExit) && (
+        <div className="px-4 pb-4 border-t border-gray-100 pt-4 space-y-3">
+          {onSeeFullAnalysis && (
+            <button
+              onClick={onSeeFullAnalysis}
+              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition-all shadow-md flex items-center justify-center space-x-2"
+            >
+              <span>See Full Analysis</span>
+              <span>→</span>
+              <span className="text-xs font-normal opacity-80">(~50s)</span>
+            </button>
+          )}
+          {onExit && (
+            <div className="text-center">
+              <button
+                onClick={onExit}
+                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                This answers my question — exit
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
     </motion.div>
   );

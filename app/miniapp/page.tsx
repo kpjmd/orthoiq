@@ -1383,14 +1383,13 @@ function MiniAppContent() {
         {/* ── EXITED ── */}
         {consultationStage === 'exited' && (
           <div className="mb-6">
-            {/* Collapsed triage response — persists after feedback modal */}
+            {/* Full triage response — persists after feedback modal */}
             {triageResult && (
               <TriageResponseCard
                 response={triageResult.response}
                 confidence={triageResult.confidence}
                 urgencyLevel={triageResult.urgencyLevel || 'routine'}
-                suggestedFollowUp={[]}
-                collapsed={true}
+                suggestedFollowUp={triageResult.suggestedFollowUp || []}
               />
             )}
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
@@ -1450,16 +1449,18 @@ function MiniAppContent() {
                 </div>
               )}
 
-              <button
-                onClick={handleAskAnother}
-                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
-                  feedbackSubmitted && !triagePromisCompleted && !showTriagePromis
-                    ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                Ask Another Question
-              </button>
+              <div className="mt-8 pt-4 border-t border-green-200">
+                <button
+                  onClick={handleAskAnother}
+                  className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                    feedbackSubmitted && !triagePromisCompleted && !showTriagePromis
+                      ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  Ask Another Question
+                </button>
+              </div>
             </div>
           </div>
         )}
