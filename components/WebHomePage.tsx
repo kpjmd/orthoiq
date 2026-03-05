@@ -25,6 +25,8 @@ export default function WebHomePage() {
           <h1 className="text-4xl font-bold">OrthoIQ</h1>
           <Link
             href="/stats"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
           >
             <span>📊</span>

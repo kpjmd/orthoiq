@@ -1196,27 +1196,6 @@ function MiniAppContent() {
               </div>
             )}
 
-            {/* PROMIS questionnaire inline if started during loading and still active */}
-            {showPromisQuestionnaire && !promisCompleted && (
-              <div className="mb-4">
-                <PROMISQuestionnaire
-                  timepoint="baseline"
-                  consultationId={comprehensiveResult.consultationId || triageResult?.consultationId || ''}
-                  isPainRelated={isPainRelatedConsultation(comprehensiveResult.rawConsultationData?.caseData || { rawQuery: currentQuestion })}
-                  patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous'}
-                  onComplete={(result) => {
-                    setPromisResult(result);
-                    setPromisCompleted(true);
-                    setPendingComprehensiveReveal(false);
-                  }}
-                  onSkip={() => {
-                    setShowPromisQuestionnaire(false);
-                    setPendingComprehensiveReveal(false);
-                  }}
-                />
-              </div>
-            )}
-
             {/* Data Completeness Indicator */}
             {comprehensiveResult.dataCompleteness !== undefined && (
               <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
@@ -1354,6 +1333,27 @@ function MiniAppContent() {
               </div>
             )}
 
+            {/* PROMIS questionnaire — rendered here so it appears below the response, not at the top */}
+            {showPromisQuestionnaire && !promisCompleted && (
+              <div className="mt-3 mb-2">
+                <PROMISQuestionnaire
+                  timepoint="baseline"
+                  consultationId={comprehensiveResult.consultationId || triageResult?.consultationId || ''}
+                  isPainRelated={isPainRelatedConsultation(comprehensiveResult.rawConsultationData?.caseData || { rawQuery: currentQuestion })}
+                  patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous'}
+                  onComplete={(result) => {
+                    setPromisResult(result);
+                    setPromisCompleted(true);
+                    setPendingComprehensiveReveal(false);
+                  }}
+                  onSkip={() => {
+                    setShowPromisQuestionnaire(false);
+                    setPendingComprehensiveReveal(false);
+                  }}
+                />
+              </div>
+            )}
+
             {/* Post-consultation chatbot — placed directly below agent responses */}
             {comprehensiveResult.consultationId && (
               <ConsultationChatbot
@@ -1383,6 +1383,16 @@ function MiniAppContent() {
         {/* ── EXITED ── */}
         {consultationStage === 'exited' && (
           <div className="mb-6">
+            {/* Collapsed triage response — persists after feedback modal */}
+            {triageResult && (
+              <TriageResponseCard
+                response={triageResult.response}
+                confidence={triageResult.confidence}
+                urgencyLevel={triageResult.urgencyLevel || 'routine'}
+                suggestedFollowUp={[]}
+                collapsed={true}
+              />
+            )}
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-3xl mb-3">✅</p>
               <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
@@ -1398,6 +1408,7 @@ function MiniAppContent() {
                     userQuestion={currentQuestion}
                     fid={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
                     suggestedFollowUp={triageResult.suggestedFollowUp || []}
+                    defaultOpen={true}
                   />
                 </div>
               )}
@@ -1473,6 +1484,7 @@ function MiniAppContent() {
             consultationId={triageResult.consultationId || triageResult.specialistConsultation?.consultationId || ''}
             patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
             mode="fast"
+            onFeedbackSubmitted={(_rewards) => setFeedbackSubmitted(true)}
           />
         )}
 

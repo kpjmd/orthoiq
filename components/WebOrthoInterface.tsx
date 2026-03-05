@@ -1185,6 +1185,16 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         {/* ── EXITED ── */}
         {consultationStage === 'exited' && (
           <div className="mb-6">
+            {/* Collapsed triage response — persists after feedback modal */}
+            {triageResult && (
+              <TriageResponseCard
+                response={triageResult.response}
+                confidence={triageResult.confidence}
+                urgencyLevel={triageResult.urgencyLevel || 'routine'}
+                suggestedFollowUp={[]}
+                collapsed={true}
+              />
+            )}
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-3xl mb-3">✅</p>
               <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
@@ -1200,6 +1210,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                     userQuestion={currentQuestion}
                     fid={user?.id || 'web-guest'}
                     suggestedFollowUp={triageResult.suggestedFollowUp || []}
+                    defaultOpen={true}
                   />
                 </div>
               )}
@@ -1275,6 +1286,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             consultationId={triageResult.consultationId || triageResult.specialistConsultation?.consultationId || ''}
             patientId={user?.id || 'web-guest'}
             mode="fast"
+            onFeedbackSubmitted={(_rewards) => setFeedbackSubmitted(true)}
           />
         )}
 

@@ -14,6 +14,7 @@ interface ConsultationChatbotProps {
   fid: string;
   suggestedFollowUp?: string[];
   messageLimit?: number;
+  defaultOpen?: boolean;
 }
 
 export default function ConsultationChatbot({
@@ -24,8 +25,9 @@ export default function ConsultationChatbot({
   fid,
   suggestedFollowUp = [],
   messageLimit = 5,
+  defaultOpen = false,
 }: ConsultationChatbotProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
