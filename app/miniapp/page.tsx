@@ -914,7 +914,7 @@ function MiniAppContent() {
                   </div>
                 )}
                 <button
-                  onClick={() => sdk.actions.openUrl(`${window.location.origin}/stats`)}
+                  onClick={() => sdk.actions.openUrl(`${window.location.origin}/stats?from=miniapp`)}
                   className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-indigo-800 bg-opacity-50 hover:bg-opacity-70 transition-colors"
                 >
                   📊 Stats
@@ -1532,7 +1532,7 @@ function MiniAppContent() {
             </div>
             <div className="pt-2 border-t border-gray-200">
               <button
-                onClick={() => sdk.actions.openUrl(`${window.location.origin}/stats`)}
+                onClick={() => sdk.actions.openUrl(`${window.location.origin}/stats?from=miniapp`)}
                 className="text-xs text-blue-600 hover:text-blue-800 flex items-center justify-center space-x-1"
               >
                 <span>📊</span>

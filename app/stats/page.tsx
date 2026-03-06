@@ -75,6 +75,14 @@ interface PublicStats {
 export default function PublicStatsPage() {
   const [stats, setStats] = useState<PublicStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [backHref, setBackHref] = useState('/miniapp');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('from') === 'web') {
+      setBackHref('/');
+    }
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -215,7 +223,7 @@ export default function PublicStatsPage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <Link
-              href="/miniapp"
+              href={backHref}
               className="inline-flex items-center px-3 py-1.5 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full text-sm transition-colors"
             >
               ← Back to App
@@ -597,7 +605,7 @@ export default function PublicStatsPage() {
         <div className="text-center text-sm text-gray-500 py-6">
           <p>Statistics update in real-time based on consultation data and agent performance.</p>
           <p className="mt-2">
-            <Link href="/miniapp" className="text-blue-600 hover:text-blue-800">
+            <Link href={backHref} className="text-blue-600 hover:text-blue-800">
               ← Return to OrthoIQ
             </Link>
           </p>

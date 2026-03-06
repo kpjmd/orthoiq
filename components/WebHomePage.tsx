@@ -23,7 +23,7 @@ export default function WebHomePage() {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-4xl font-bold">OrthoIQ</h1>
           <a
-            href="/stats"
+            href="/stats?from=web"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
