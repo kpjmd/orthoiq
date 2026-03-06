@@ -913,14 +913,12 @@ function MiniAppContent() {
                     ✅ Verified MD
                   </div>
                 )}
-                <a
-                  href="/stats"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => sdk.actions.openUrl(`${window.location.origin}/stats`)}
                   className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-indigo-800 bg-opacity-50 hover:bg-opacity-70 transition-colors"
                 >
                   📊 Stats
-                </a>
+                </button>
                 <button
                   onClick={async () => {
                     setShowProfile(true);
@@ -1533,15 +1531,13 @@ function MiniAppContent() {
               </div>
             </div>
             <div className="pt-2 border-t border-gray-200">
-              <a
-                href="/stats"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => sdk.actions.openUrl(`${window.location.origin}/stats`)}
                 className="text-xs text-blue-600 hover:text-blue-800 flex items-center justify-center space-x-1"
               >
                 <span>📊</span>
                 <span>View Network Statistics & Agent Leaderboard</span>
-              </a>
+              </button>
             </div>
           </div>
         </details>

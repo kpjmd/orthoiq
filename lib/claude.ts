@@ -511,7 +511,13 @@ function transformFastModeConsultation(result: any, requestId?: string, userQues
     consultationId: consultation.consultationId,
     participatingSpecialists: ['triage'],
     fromAgentsSystem: true,
-    suggestedFollowUp: triage.followUpQuestions || [],
+    suggestedFollowUp: triage.followUpQuestions?.length > 0
+      ? triage.followUpQuestions
+      : [
+          'How long have you been experiencing these symptoms?',
+          'What makes the pain better or worse?',
+          'Have you tried any treatments so far?',
+        ],
     triageConfidence: triage.confidence,
     urgencyLevel: triage.urgencyLevel || 'routine',
   };
@@ -582,7 +588,13 @@ function transformFastModeResponse(result: any, requestId?: string, userQuestion
     participatingSpecialists: ['triage'],
     fromAgentsSystem: true,
     // Fast mode specific
-    suggestedFollowUp: triage.followUpQuestions || [],
+    suggestedFollowUp: triage.followUpQuestions?.length > 0
+      ? triage.followUpQuestions
+      : [
+          'How long have you been experiencing these symptoms?',
+          'What makes the pain better or worse?',
+          'Have you tried any treatments so far?',
+        ],
     triageConfidence: triage.confidence,
     urgencyLevel: triage.urgencyLevel || 'routine',
   };
