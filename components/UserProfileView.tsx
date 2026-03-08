@@ -1,7 +1,29 @@
 'use client';
 
+import { useState } from 'react';
 import { getPhysicalFunctionBand, getPainInterferenceBand } from '@/lib/promis';
 import { PROMISTimepoint } from '@/lib/promisTypes';
+import { reconstructCardDataFromDB, getTierConfig, IntelligenceCardData } from '@/lib/intelligenceCardUtils';
+import IntelligenceCard from './IntelligenceCard';
+import IntelligenceCardModal from './IntelligenceCardModal';
+
+export interface ConsultationRecord {
+  consultationId: string;
+  createdAt: string;
+  mode: string;
+  question: string;
+  // IC gallery fields (only present for mode='normal')
+  participatingSpecialists?: string[] | null;
+  specialistCount?: number;
+  tier?: string | null;
+  consensusPercentage?: number | null;
+  totalTokenStake?: number | null;
+  mdReviewed?: boolean;
+  mdApproved?: boolean;
+  confidence?: number | null;
+  responseText?: string | null;
+  hasFeedback?: boolean;
+}
 
 export interface ProfileData {
   profile: {
@@ -14,12 +36,7 @@ export interface ProfileData {
     lastSeen: string;
   } | null;
   stats: { totalConsultations: number };
-  consultations: Array<{
-    consultationId: string;
-    createdAt: string;
-    mode: string;
-    question: string;
-  }>;
+  consultations: ConsultationRecord[];
   intelligenceCards: {
     total: number;
   };
@@ -66,6 +83,11 @@ function formatDate(iso: string): string {
 }
 
 export default function UserProfileView({ profileData, isLoading, onSelectMilestone }: UserProfileViewProps) {
+  const [selectedCard, setSelectedCard] = useState<{
+    cardData: IntelligenceCardData;
+    consultation: ConsultationRecord;
+  } | null>(null);
+
   if (isLoading) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
@@ -165,6 +187,81 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
           <p className="text-xs text-gray-500 mt-1">Intelligence Cards</p>
         </div>
       </div>
+
+      {/* Intelligence Card Gallery */}
+      {(() => {
+        const normalConsultations = consultations.filter(c => c.mode === 'normal');
+        if (normalConsultations.length === 0) return null;
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Intelligence Cards</h3>
+            <div className="grid grid-cols-2 gap-3 max-h-[480px] overflow-y-auto">
+              {normalConsultations.map((c) => {
+                const cardData = reconstructCardDataFromDB(c);
+                const tierConfig = getTierConfig(cardData.tier);
+                return (
+                  <button
+                    key={c.consultationId}
+                    onClick={() => setSelectedCard({ cardData, consultation: c })}
+                    className="relative rounded-lg overflow-hidden border border-gray-200 hover:border-purple-300 transition-colors bg-slate-900"
+                    style={{ height: '200px' }}
+                  >
+                    <div className="transform scale-[0.42] origin-top-left">
+                      <IntelligenceCard data={cardData} size="small" animated={false} />
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-2 pt-6">
+                      <div className="flex items-center gap-1 mb-1">
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white"
+                          style={{ backgroundColor: tierConfig.borderColor }}
+                        >
+                          {tierConfig.label}
+                        </span>
+                        <span className="text-[10px] text-white/60">
+                          {cardData.consensusPercentage}%
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white truncate">{c.question}</p>
+                      <p className="text-[10px] text-white/50">{formatDate(c.createdAt)}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Intelligence Card Modal for gallery selection */}
+      {selectedCard && (
+        <IntelligenceCardModal
+          isOpen={!!selectedCard}
+          onClose={() => setSelectedCard(null)}
+          rawConsultationData={{
+            consultationId: selectedCard.consultation.consultationId,
+            participatingSpecialists: selectedCard.consultation.participatingSpecialists || [],
+            responses: (selectedCard.consultation.participatingSpecialists || []).map((spec: string) => ({
+              response: {
+                specialistType: spec,
+                specialist: spec,
+                confidence: selectedCard.consultation.confidence || 0.8,
+                response: selectedCard.consultation.responseText || '',
+              }
+            })),
+            synthesizedRecommendations: {
+              synthesis: selectedCard.consultation.responseText || '',
+              confidenceFactors: {
+                overallConfidence: selectedCard.consultation.confidence || 0.75,
+                interAgentAgreement: selectedCard.consultation.consensusPercentage || 0.85,
+              },
+            },
+          }}
+          userFeedback={selectedCard.consultation.hasFeedback ? { satisfied: true } : undefined}
+          mdReview={selectedCard.consultation.mdReviewed && selectedCard.consultation.mdApproved ? { approved: true } : undefined}
+          fid={profile?.fid || ''}
+          isMiniApp={false}
+        />
+      )}
 
       {/* Pending Milestones */}
       {pendingMilestones.length > 0 && (

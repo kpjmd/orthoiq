@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
         )
         AND (c.consensus_percentage >= 0.80 OR c.specialist_count >= 4 OR c.consensus_percentage IS NULL OR c.requires_md_review = true)
       ORDER BY
+        CASE WHEN c.requires_md_review = true THEN 0 ELSE 1 END,
         CASE
           WHEN c.created_at < CURRENT_DATE - INTERVAL '3 days' THEN 0
           ELSE 1
@@ -150,6 +151,7 @@ export async function GET(request: NextRequest) {
         urgencyLevel,
         userSatisfaction: row.user_satisfaction,
         outcomeSuccess: row.outcome_success,
+        userRequestedReview: !!row.requires_md_review,
         redFlags: [], // Could be populated from response analysis
         clinicalConcerns: [] // Could be populated from response analysis
       };

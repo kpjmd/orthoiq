@@ -12,6 +12,7 @@ interface PendingConsultation {
   consensus: number;
   tier: string;
   userSatisfaction?: number;
+  userRequestedReview?: boolean;
 }
 
 export function MDReviewQueue() {
@@ -170,6 +171,11 @@ export function MDReviewQueue() {
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                       {consultation.tier || 'complete'} → verified
                     </span>
+                    {consultation.userRequestedReview && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                        User Requested
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-600 line-clamp-2 mb-2">
                     {consultation.userQuestion || 'No question available'}

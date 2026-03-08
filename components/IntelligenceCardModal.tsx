@@ -300,18 +300,23 @@ export default function IntelligenceCardModal({
           className="relative max-w-lg w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close button */}
+          {/* Close button - inside card on miniapp, above card on desktop */}
           <button
             onClick={onClose}
-            className="absolute -top-12 right-0 text-white/70 hover:text-white transition-colors z-10"
+            className={`absolute z-10 text-white/70 hover:text-white transition-colors ${
+              isMiniApp ? 'top-2 right-2 bg-black/40 rounded-full p-1' : '-top-12 right-0'
+            }`}
           >
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
 
-          {/* Tier badge */}
-          <div className="absolute -top-12 left-0 flex items-center gap-2">
+          {/* Tier badge - inside content on miniapp, above card on desktop */}
+          <div className={isMiniApp
+            ? 'flex items-center gap-2 mb-3 justify-center'
+            : 'absolute -top-12 left-0 flex items-center gap-2'
+          }>
             <span
               className="px-3 py-1 rounded-full text-sm font-bold"
               style={{
@@ -443,6 +448,14 @@ export default function IntelligenceCardModal({
               </p>
             )}
           </div>
+
+          {/* Bottom close button - always visible, easy dismiss target on mobile */}
+          <button
+            onClick={onClose}
+            className="mt-6 w-full py-3 rounded-xl bg-white/10 text-white/80 hover:bg-white/20 transition-colors font-medium text-sm border border-white/20"
+          >
+            Close
+          </button>
         </motion.div>
       </motion.div>
     </AnimatePresence>

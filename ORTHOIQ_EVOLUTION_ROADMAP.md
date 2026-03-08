@@ -282,6 +282,71 @@ Once both wearables data and PROMIS scores are being collected, there is an oppo
 
 ---
 
+## Future Consideration: Consensus Market for Informational Queries + Panel Discussion
+
+**Status**: Deferred — post-testnet, data-driven decision
+
+### Background
+
+During Phase 3 development and testnet preparation, a structural distinction emerged in the types of queries users submit to OrthoIQ:
+
+- **Outcome-based queries** — Injury reports, pain symptoms, recovery tracking. These have a natural resolution event (diagnosis, recovery milestone, clinical outcome). The current prediction market mechanic handles these well.
+- **Informational queries** — General orthopedic knowledge questions (e.g., "What is the recommended treatment for an ACL tear?", "What's the difference between ACL reconstruction techniques?"). These have no inherent outcome to settle. The platform currently has no distinct pathway for these.
+
+The OrthoTriage Master already generates inter-agent questions (Section 6 of the structured brief) directing domain-specific questions at each specialist in the panel. These are generated but **not utilized** — specialists do not receive or respond to them. For informational queries especially, these represent an untapped mechanism for generating expert dialogue.
+
+### Proposed Two-Tier Query Routing
+
+#### Query Classification at Triage
+
+Add a classification field to the triage structured response:
+
+```
+query_type: 'outcome' | 'informational'
+```
+
+The signal is usually unambiguous — symptom reports → `outcome`, general knowledge questions → `informational`. A confidence threshold with fallback to `outcome` handles edge cases.
+
+#### User Opt-In for Outcome Tracking
+
+Even for injury/symptom queries, users may not wish to participate in outcome tracking. A prompt at triage completion — "Do you want to track your outcome over time?" — serves two purposes:
+- Respects user autonomy
+- Routes opted-out users to the informational pathway regardless of query type
+
+#### The Consensus Market (Informational Pathway)
+
+For informational queries, replace the prediction market with a **consensus market**:
+
+- Specialists receive the triage master's inter-agent questions and produce targeted responses
+- Resolution signals come from:
+  - **User engagement** — which specialist's response the user found most useful (explicit rating or implicit follow-up behavior)
+  - **Peer alignment** — whether other specialists' responses converge on or diverge from each position
+- Token exchanges occur based on these consensus signals rather than outcome settlement
+
+#### The "Panel Discussion" UX
+
+Surface the inter-agent dialogue to users as a visible, multi-voice discussion — similar to watching a multidisciplinary team conference. This creates an experience no general-purpose AI tool offers.
+
+Suggested UX:
+- Collapsible section or dedicated tab within the comprehensive consult view
+- Sequential reveal of specialist responses to each triage-directed question
+- Clear specialist attribution with domain labels visible
+
+### Strategic Value
+
+1. **Competitive differentiation** — Multi-agent expert dialogue with token-staked positions is unavailable from ChatGPT or any general-purpose chatbot.
+2. **Expanded token utility** — Consensus market extends token-based learning to queries without clinical outcomes, increasing the proportion of platform activity that feeds the learning loop.
+3. **User acquisition pathway** — Informational queries are a natural entry point for users not ready to commit to outcome tracking. A compelling panel discussion converts curious visitors into engaged participants.
+4. **Training signal quality** — Structured specialist disagreement data across query types helps tune agent weights and identify which framing users find most useful over time.
+
+### Decision Trigger
+
+**Do not build until after testnet launch.** Monitor the ratio of outcome-based vs. informational queries in production. If a significant proportion of queries are informational and lack a natural outcome, the consensus market pathway becomes necessary. Let real user behavior drive the prioritization.
+
+The triage master already generates and stores inter-agent questions in the structured brief — this data is not lost. When the time comes to implement, a backlog of real production examples will be available to design against.
+
+---
+
 ## Summary
 
 OrthoIQ is evolving through five phases from a dual-track consultation tool into a unified clinical AI platform with standardized outcome tracking. The consolidated flow keeps users engaged, the Structured Brief scales with new agents, PROMIS integration makes data research-grade, and the predictive market token exchanges become validatable through real patient outcomes. Each phase builds on the previous, minimizing risk while steadily advancing the platform's clinical and research capabilities.

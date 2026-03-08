@@ -31,15 +31,26 @@ export async function GET(request: NextRequest) {
           c.consultation_id,
           c.created_at,
           c.mode,
-          q.question
+          c.participating_specialists,
+          c.specialist_count,
+          c.tier,
+          c.consensus_percentage,
+          c.total_token_stake,
+          c.md_reviewed,
+          c.md_approved,
+          q.question,
+          q.response,
+          q.confidence,
+          cf.user_satisfaction
         FROM consultations c
         JOIN questions q ON c.question_id = q.id
+        LEFT JOIN consultation_feedback cf ON c.consultation_id = cf.consultation_id
         WHERE c.fid = ${fid}
         ORDER BY c.created_at DESC
         LIMIT 20
       `,
       getUserPromisHistory(fid),
-      sql`SELECT COUNT(*) as count FROM prescriptions WHERE fid = ${fid}`,
+      sql`SELECT COUNT(*) as count FROM consultations WHERE fid = ${fid} AND mode = 'normal'`,
     ]);
 
     // Derive pending milestones from PROMIS baseline consultations
@@ -110,6 +121,18 @@ export async function GET(request: NextRequest) {
         createdAt: c.created_at,
         mode: c.mode,
         question: c.question,
+        ...(c.mode === 'normal' ? {
+          participatingSpecialists: c.participating_specialists,
+          specialistCount: c.specialist_count,
+          tier: c.tier,
+          consensusPercentage: c.consensus_percentage,
+          totalTokenStake: c.total_token_stake,
+          mdReviewed: c.md_reviewed,
+          mdApproved: c.md_approved,
+          confidence: c.confidence,
+          responseText: c.response,
+          hasFeedback: c.user_satisfaction != null,
+        } : {}),
       })),
       intelligenceCards: {
         total: Number(icCountResult[0]?.count || 0),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiLogger } from '@/lib/monitoring';
-import { storeConsultationFeedback, getConsultation } from '@/lib/database';
+import { storeConsultationFeedback, getConsultation, getSql } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -67,6 +67,21 @@ export async function POST(request: NextRequest) {
         completedPhases: feedbackData.feedback?.followUpDataProvided?.completedPhases
       });
       console.log(`[${requestId}] Feedback stored in database`);
+
+      // Flag consultation for MD review if user requested it
+      if (feedbackData.feedback?.mdReview) {
+        try {
+          const sql = getSql();
+          await sql`
+            UPDATE consultations
+            SET requires_md_review = true
+            WHERE consultation_id = ${feedbackData.consultationId}
+          `;
+          console.log(`[${requestId}] Consultation ${feedbackData.consultationId} flagged for MD review (user-requested)`);
+        } catch (flagError) {
+          console.error(`[${requestId}] Failed to flag for MD review:`, flagError);
+        }
+      }
     } catch (dbError) {
       console.error(`[${requestId}] Failed to store feedback in database:`, dbError);
       // Continue even if local storage fails

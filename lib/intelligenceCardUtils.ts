@@ -472,6 +472,112 @@ function createFallbackCardData(): IntelligenceCardData {
 }
 
 /**
+ * Reconstruct IntelligenceCardData from database-stored consultation fields.
+ * Used for the intelligence card gallery in user profiles where raw consultation
+ * data from the agents backend is not available.
+ */
+export function reconstructCardDataFromDB(consultation: {
+  consultationId: string;
+  createdAt: string;
+  participatingSpecialists?: string[] | null;
+  specialistCount?: number;
+  tier?: string | null;
+  consensusPercentage?: number | null;
+  totalTokenStake?: number | null;
+  confidence?: number | null;
+  responseText?: string | null;
+  hasFeedback?: boolean;
+  mdReviewed?: boolean;
+  mdApproved?: boolean;
+}): IntelligenceCardData {
+  // Build agent stakes from participating specialists
+  const specialists = consultation.participatingSpecialists || [];
+  const defaultConfidence = consultation.confidence
+    ? Math.min(consultation.confidence, 1)
+    : 0.8;
+
+  const agentStakes: AgentStakeData[] = specialists.map((spec: string) => {
+    const specialistType = normalizeSpecialistType(spec);
+    return {
+      specialist: specialistType,
+      agentName: getAgentDisplayName(specialistType),
+      tokenStake: calculateStakeFromConfidence(defaultConfidence),
+      participated: true,
+      color: getAgentColor(specialistType),
+      confidence: defaultConfidence,
+    };
+  });
+
+  // Sort by stake (highest first)
+  agentStakes.sort((a, b) => b.tokenStake - a.tokenStake);
+
+  const totalStake = consultation.totalTokenStake
+    ? Math.round(consultation.totalTokenStake * 10) / 10
+    : Math.round(agentStakes.reduce((sum, a) => sum + a.tokenStake, 0) * 10) / 10;
+
+  const consensusPercentage = consultation.consensusPercentage
+    ? Math.round(consultation.consensusPercentage * 100)
+    : 85;
+
+  // Extract primary prediction from response text if available
+  const highestStakeAgent = agentStakes.length > 0 ? agentStakes[0] : null;
+  let primaryPrediction: PrimaryPrediction;
+
+  if (consultation.responseText && highestStakeAgent) {
+    const painMatch = consultation.responseText.match(/(\d{1,2})-(\d{1,2})%\s*(?:pain\s*)?reduction/i);
+    const timeMatch = consultation.responseText.match(/(?:in|within)\s*(\d{1,2})\s*weeks?/i);
+
+    if (painMatch) {
+      const timeline = timeMatch ? `${timeMatch[1]} weeks` : undefined;
+      primaryPrediction = {
+        text: `${painMatch[1]}-${painMatch[2]}% pain reduction${timeline ? ` in ${timeline}` : ''}`,
+        agent: getAgentFullName(highestStakeAgent.specialist),
+        stake: highestStakeAgent.tokenStake,
+        timeline,
+      };
+    } else {
+      primaryPrediction = {
+        text: 'Specialist analysis complete',
+        agent: getAgentFullName(highestStakeAgent.specialist),
+        stake: highestStakeAgent.tokenStake,
+      };
+    }
+  } else {
+    primaryPrediction = {
+      text: 'Consultation analysis complete',
+      agent: highestStakeAgent ? getAgentFullName(highestStakeAgent.specialist) : 'OrthoTriage Master',
+      stake: highestStakeAgent?.tokenStake || 0,
+    };
+  }
+
+  const mdVerified = !!(consultation.mdReviewed && consultation.mdApproved);
+  const userFeedbackComplete = !!consultation.hasFeedback;
+
+  const tier = (consultation.tier as CardTier) || calculateRarityTier({
+    participatingCount: agentStakes.length,
+    consensusPercentage,
+    mdVerified,
+    outcomeValidated: false,
+  });
+
+  return {
+    caseId: consultation.consultationId,
+    timestamp: consultation.createdAt,
+    agentStakes,
+    totalStake,
+    participatingCount: agentStakes.length,
+    consensusPercentage,
+    confidenceScore: defaultConfidence,
+    primaryPrediction,
+    userFeedbackComplete,
+    mdReviewComplete: mdVerified,
+    outcomeValidated: false,
+    mdVerified,
+    tier,
+  };
+}
+
+/**
  * Format timestamp for display
  */
 export function formatCardTimestamp(isoTimestamp: string): string {
