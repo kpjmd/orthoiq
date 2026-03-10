@@ -40,6 +40,9 @@ export interface ClaudeResponse {
   researchData?: any; // Inline research data returned by agents system alongside consultation
   // Phase 3.1: Two-stage consultation UX
   urgencyLevel?: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
+  // Informational Query Pathway (backend v0.7.0)
+  queryType?: 'clinical' | 'informational';
+  querySubtype?: string | null;
   // Scope validation for out-of-scope queries
   isOutOfScope?: boolean;
   scopeValidation?: {

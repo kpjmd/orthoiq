@@ -274,10 +274,17 @@ async function tryOrthoIQAgents(
     }
 
     // Handle response - OrthoIQ-Agents can return either format:
-    // 1. Direct triage response with mode='fast' and triage object (documented format)
-    // 2. Consultation object (alternative format)
+    // 1. Informational response with mode='informational' and triage object (v0.7.0)
+    // 2. Direct triage response with mode='fast' and triage object (documented format)
+    // 3. Consultation object (alternative format)
 
-    if (result.mode === 'fast' && result.triage) {
+    if (result.mode === 'informational' && result.triage) {
+      console.log(`[${requestId || 'unknown'}] Processing informational query response`);
+      const transformed = transformFastModeResponse(result, requestId, question);
+      transformed.queryType = 'informational';
+      transformed.querySubtype = result.querySubtype || null;
+      return transformed;
+    } else if (result.mode === 'fast' && result.triage) {
       console.log(`[${requestId || 'unknown'}] Processing direct fast mode triage response`);
       return transformFastModeResponse(result, requestId, question);
     } else if (result.mode === 'normal' && result.consultation) {

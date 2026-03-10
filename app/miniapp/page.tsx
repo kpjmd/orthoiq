@@ -111,6 +111,9 @@ interface ResponseData {
   consultationId?: string;
   fromAgentsSystem?: boolean;
   urgencyLevel?: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
+  // Informational Query Pathway
+  queryType?: 'clinical' | 'informational';
+  querySubtype?: string | null;
 }
 
 type ConsultationStage =
@@ -227,6 +230,8 @@ const parseApiResponse = (data: any): ResponseData => {
     agentNetwork: data.agentNetwork,
     rawConsultationData: data.rawConsultationData,
     urgencyLevel: data.urgencyLevel,
+    queryType: data.queryType || 'clinical',
+    querySubtype: data.querySubtype || null,
   };
 };
 
@@ -258,6 +263,10 @@ function MiniAppContent() {
   const [showTriagePromis, setShowTriagePromis] = useState(false);
   const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
 
+  // Informational Query Pathway state
+  const [queryType, setQueryType] = useState<'clinical' | 'informational'>('clinical');
+  const [querySubtype, setQuerySubtype] = useState<string | null>(null);
+
   // Follow-up PROMIS tracking mode (for Farcaster notification deep-links)
   const [trackingMode, setTrackingMode] = useState<{ consultationId: string; timepoint: PROMISTimepoint } | null>(null);
   const [trackingComplete, setTrackingComplete] = useState(false);
@@ -270,7 +279,7 @@ function MiniAppContent() {
 
   // Memoize full caseData so the backend can build precise PubMed queries.
   const researchCaseData = useMemo(() => {
-    const raw = comprehensiveResult?.rawConsultationData;
+    const raw = comprehensiveResult?.rawConsultationData || (queryType === 'informational' ? triageResult?.rawConsultationData : undefined);
     if (!raw) return undefined;
     const cd = raw.caseData;
     if (!cd) return undefined;
@@ -283,27 +292,30 @@ function MiniAppContent() {
       age: cd.age,
       rawQuery: cd.rawQuery,
     };
-  }, [comprehensiveResult?.rawConsultationData]);
+  }, [comprehensiveResult?.rawConsultationData, triageResult?.rawConsultationData, queryType]);
 
-  // Research polling — gate on comprehensive_complete
+  // Research polling — gate on comprehensive_complete, or triage_complete for informational queries
   const researchPolling = useResearchPolling({
-    enabled: !!(consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId),
-    consultationId: comprehensiveResult?.consultationId,
+    enabled: !!(
+      (consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId) ||
+      (consultationStage === 'triage_complete' && queryType === 'informational' && triageResult?.consultationId)
+    ),
+    consultationId: comprehensiveResult?.consultationId || (queryType === 'informational' ? triageResult?.consultationId : undefined),
     caseData: researchCaseData,
-    consultationResult: comprehensiveResult?.rawConsultationData,
-    userTier: comprehensiveResult?.userTier,
+    consultationResult: comprehensiveResult?.rawConsultationData || (queryType === 'informational' ? triageResult?.rawConsultationData : undefined),
+    userTier: comprehensiveResult?.userTier || triageResult?.userTier,
   });
 
-  // Show PROMIS button after 5s during comprehensive loading
+  // Show PROMIS button after 5s during comprehensive loading (not for informational queries)
   useEffect(() => {
-    if (consultationStage === 'comprehensive_loading' && !promisCompleted) {
+    if (consultationStage === 'comprehensive_loading' && !promisCompleted && queryType !== 'informational') {
       const timer = setTimeout(() => setShowPromisButton(true), 5000);
       return () => clearTimeout(timer);
     }
     if (consultationStage !== 'comprehensive_loading' && consultationStage !== 'comprehensive_complete') {
       setShowPromisButton(false);
     }
-  }, [consultationStage, promisCompleted]);
+  }, [consultationStage, promisCompleted, queryType]);
 
   const getUserTier = useCallback((): UserTier => {
     // Prioritize authUser from Quick Auth
@@ -635,6 +647,8 @@ function MiniAppContent() {
       const data = await res.json();
       const result = parseApiResponse(data);
       setTriageResult(result);
+      setQueryType(result.queryType === 'informational' ? 'informational' : 'clinical');
+      setQuerySubtype(result.querySubtype || null);
       setConsultationStage('triage_complete');
       setQuestion('');
 
@@ -744,6 +758,8 @@ function MiniAppContent() {
     setPendingComprehensiveReveal(false);
     setShowTriagePromis(false);
     setTriagePromisCompleted(false);
+    setQueryType('clinical');
+    setQuerySubtype(null);
     document.getElementById('question')?.focus();
   };
 
@@ -1122,9 +1138,18 @@ function MiniAppContent() {
               urgencyLevel={triageResult.urgencyLevel || 'routine'}
               suggestedFollowUp={triageResult.suggestedFollowUp || []}
               consultationId={triageResult.consultationId}
-              onSeeFullAnalysis={handleComprehensiveUpgrade}
+              onSeeFullAnalysis={queryType !== 'informational' ? handleComprehensiveUpgrade : undefined}
               onExit={handleTriageExit}
             />
+
+            {/* Research results for informational queries */}
+            {queryType === 'informational' && researchPolling.researchState.status !== 'idle' && (
+              <div className="mt-4">
+                {researchPolling.researchState.status === 'pending' && (
+                  <p className="text-sm text-blue-500 animate-pulse">Searching research literature...</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1410,8 +1435,8 @@ function MiniAppContent() {
                 </div>
               )}
 
-              {/* PROMIS opt-in for triage-exit users (after feedback) */}
-              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && triageResult?.consultationId && (
+              {/* PROMIS opt-in for triage-exit users (after feedback) — not for informational queries */}
+              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && queryType !== 'informational' && triageResult?.consultationId && (
                 <div className="mb-4">
                   <button
                     onClick={() => setShowTriagePromis(true)}

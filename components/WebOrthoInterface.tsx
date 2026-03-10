@@ -99,6 +99,9 @@ interface ResponseData {
   researchData?: any;
   // Phase 3.1: urgency level from triage
   urgencyLevel?: 'emergency' | 'urgent' | 'semi-urgent' | 'routine';
+  // Informational Query Pathway
+  queryType?: 'clinical' | 'informational';
+  querySubtype?: string | null;
 }
 
 // Helper function to format structured response objects into readable text
@@ -208,6 +211,8 @@ const parseApiResponse = (data: any): ResponseData => {
     rawConsultationData: data.rawConsultationData,
     researchData: data.researchData || null,
     urgencyLevel: data.urgencyLevel,
+    queryType: data.queryType || 'clinical',
+    querySubtype: data.querySubtype || null,
   };
 };
 
@@ -248,6 +253,10 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const [showTriagePromis, setShowTriagePromis] = useState(false);
   const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
 
+  // Informational Query Pathway state
+  const [queryType, setQueryType] = useState<'clinical' | 'informational'>('clinical');
+  const [querySubtype, setQuerySubtype] = useState<string | null>(null);
+
   // Scope validation for out-of-scope queries
   const [scopeValidationData, setScopeValidationData] = useState<{
     category: string;
@@ -276,7 +285,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   // which would cause the useResearchPolling abort ref race condition.
   // Pass full structured fields so the backend can build precise PubMed queries.
   const researchCaseData = useMemo(() => {
-    const raw = comprehensiveResult?.rawConsultationData;
+    const raw = comprehensiveResult?.rawConsultationData || (queryType === 'informational' ? triageResult?.rawConsultationData : undefined);
     if (!raw) return undefined;
     const cd = raw.caseData;
     if (!cd) return undefined;
@@ -289,16 +298,20 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       age: cd.age,
       rawQuery: cd.rawQuery,
     };
-  }, [comprehensiveResult?.rawConsultationData]);
+  }, [comprehensiveResult?.rawConsultationData, triageResult?.rawConsultationData, queryType]);
   const researchConsultationResult = comprehensiveResult?.rawConsultationData;
 
   // Research Agent polling — disabled only when inline research already has real citations
+  // For informational queries, polling starts at triage_complete (no comprehensive stage)
   const researchPolling = useResearchPolling({
-    enabled: !!(consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId && !hasCompletedInlineResearch),
-    consultationId: comprehensiveResult?.consultationId,
+    enabled: !!(
+      (consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId && !hasCompletedInlineResearch) ||
+      (consultationStage === 'triage_complete' && queryType === 'informational' && triageResult?.consultationId)
+    ),
+    consultationId: comprehensiveResult?.consultationId || (queryType === 'informational' ? triageResult?.consultationId : undefined),
     caseData: researchCaseData,
-    consultationResult: researchConsultationResult,
-    userTier: comprehensiveResult?.userTier,
+    consultationResult: researchConsultationResult || (queryType === 'informational' ? triageResult?.rawConsultationData : undefined),
+    userTier: comprehensiveResult?.userTier || triageResult?.userTier,
   });
 
   // Use inline research only when it has real citations; otherwise fall back to polling
@@ -342,16 +355,16 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     }));
   }, [isVerified]);
 
-  // Show PROMIS button after 5s during comprehensive loading
+  // Show PROMIS button after 5s during comprehensive loading (not for informational queries)
   useEffect(() => {
-    if (consultationStage === 'comprehensive_loading' && !promisCompleted) {
+    if (consultationStage === 'comprehensive_loading' && !promisCompleted && queryType !== 'informational') {
       const timer = setTimeout(() => setShowPromisButton(true), 5000);
       return () => clearTimeout(timer);
     }
     if (consultationStage !== 'comprehensive_loading' && consultationStage !== 'comprehensive_complete') {
       setShowPromisButton(false);
     }
-  }, [consultationStage, promisCompleted]);
+  }, [consultationStage, promisCompleted, queryType]);
 
   // Stage 1: Triage submit
   const handleTriageSubmit = async (e: React.FormEvent) => {
@@ -435,6 +448,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
       const result = parseApiResponse(data);
       setTriageResult(result);
+      setQueryType(result.queryType === 'informational' ? 'informational' : 'clinical');
+      setQuerySubtype(result.querySubtype || null);
       setConsultationStage('triage_complete');
       setQuestion('');
 
@@ -544,6 +559,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     setPendingComprehensiveReveal(false);
     setShowTriagePromis(false);
     setTriagePromisCompleted(false);
+    setQueryType('clinical');
+    setQuerySubtype(null);
     document.getElementById('web-question')?.focus();
   };
 
@@ -849,9 +866,18 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               urgencyLevel={triageResult.urgencyLevel || 'routine'}
               suggestedFollowUp={triageResult.suggestedFollowUp || []}
               consultationId={triageResult.consultationId}
-              onSeeFullAnalysis={handleComprehensiveUpgrade}
+              onSeeFullAnalysis={queryType !== 'informational' ? handleComprehensiveUpgrade : undefined}
               onExit={handleTriageExit}
             />
+
+            {/* Research results for informational queries */}
+            {queryType === 'informational' && researchPolling.researchState.status !== 'idle' && (
+              <div className="mt-4">
+                {researchPolling.researchState.status === 'pending' && (
+                  <p className="text-sm text-blue-500 animate-pulse">Searching research literature...</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1214,8 +1240,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 </div>
               )}
 
-              {/* PROMIS opt-in for triage-exit users (after feedback) */}
-              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && triageResult?.consultationId && (
+              {/* PROMIS opt-in for triage-exit users (after feedback) — not for informational queries */}
+              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && queryType !== 'informational' && triageResult?.consultationId && (
                 <div className="mb-4">
                   <button
                     onClick={() => setShowTriagePromis(true)}

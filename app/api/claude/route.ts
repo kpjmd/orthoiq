@@ -524,6 +524,9 @@ export async function POST(request: NextRequest) {
           }
         }
       }),
+      // Informational Query Pathway fields
+      queryType: claudeResponse.queryType || 'clinical',
+      querySubtype: claudeResponse.querySubtype || null,
       // Agent coordination fields
       agentNetwork: {
         activeAgents: networkStats.activeAgents,
