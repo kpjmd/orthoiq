@@ -15,6 +15,8 @@ import ComprehensiveLoadingState from './ComprehensiveLoadingState';
 import ConsultationChatbot from './ConsultationChatbot';
 import { getWebSessionUsage, generateSessionId } from '@/lib/webTracking';
 import { useResearchPolling } from '@/hooks/useResearchPolling';
+import ResearchStatusRow from '@/components/ResearchStatusRow';
+import ResearchDetailPanel from '@/components/ResearchDetailPanel';
 import { normalizeResearchResponse } from '@/lib/researchService';
 import PROMISQuestionnaire from './PROMISQuestionnaire';
 import { isPainRelatedConsultation } from '@/lib/promis';
@@ -286,19 +288,24 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   // Pass full structured fields so the backend can build precise PubMed queries.
   const researchCaseData = useMemo(() => {
     const raw = comprehensiveResult?.rawConsultationData || (queryType === 'informational' ? triageResult?.rawConsultationData : undefined);
-    if (!raw) return undefined;
-    const cd = raw.caseData;
-    if (!cd) return undefined;
-    return {
-      primaryComplaint: cd.primaryComplaint || '',
-      symptoms: cd.symptoms,
-      duration: cd.duration,
-      location: cd.location,
-      painLevel: cd.painLevel,
-      age: cd.age,
-      rawQuery: cd.rawQuery,
-    };
-  }, [comprehensiveResult?.rawConsultationData, triageResult?.rawConsultationData, queryType]);
+    const cd = raw?.caseData;
+    if (cd) {
+      return {
+        primaryComplaint: cd.primaryComplaint || '',
+        symptoms: cd.symptoms,
+        duration: cd.duration,
+        location: cd.location,
+        painLevel: cd.painLevel,
+        age: cd.age,
+        rawQuery: cd.rawQuery,
+      };
+    }
+    // Informational queries may not have structured caseData — use the question text
+    if (queryType === 'informational' && currentQuestion) {
+      return { primaryComplaint: currentQuestion, rawQuery: currentQuestion };
+    }
+    return undefined;
+  }, [comprehensiveResult?.rawConsultationData, triageResult?.rawConsultationData, queryType, currentQuestion]);
   const researchConsultationResult = comprehensiveResult?.rawConsultationData;
 
   // Research Agent polling — disabled only when inline research already has real citations
@@ -306,7 +313,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const researchPolling = useResearchPolling({
     enabled: !!(
       (consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId && !hasCompletedInlineResearch) ||
-      (consultationStage === 'triage_complete' && queryType === 'informational' && triageResult?.consultationId)
+      (
+        (consultationStage === 'triage_complete' || consultationStage === 'exited') &&
+        queryType === 'informational' &&
+        triageResult?.consultationId
+      )
     ),
     consultationId: comprehensiveResult?.consultationId || (queryType === 'informational' ? triageResult?.consultationId : undefined),
     caseData: researchCaseData,
@@ -873,9 +884,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             {/* Research results for informational queries */}
             {queryType === 'informational' && researchPolling.researchState.status !== 'idle' && (
               <div className="mt-4">
-                {researchPolling.researchState.status === 'pending' && (
-                  <p className="text-sm text-blue-500 animate-pulse">Searching research literature...</p>
-                )}
+                <ResearchStatusRow researchState={researchPolling.researchState} />
+                <ResearchDetailPanel researchState={researchPolling.researchState} isMiniApp={false} />
               </div>
             )}
           </div>
@@ -1220,6 +1230,15 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 suggestedFollowUp={triageResult.suggestedFollowUp || []}
               />
             )}
+
+            {/* Research results for informational queries (persists after exit) */}
+            {queryType === 'informational' && researchPolling.researchState.status !== 'idle' && (
+              <div className="mb-4">
+                <ResearchStatusRow researchState={researchPolling.researchState} />
+                <ResearchDetailPanel researchState={researchPolling.researchState} isMiniApp={false} />
+              </div>
+            )}
+
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-3xl mb-3">✅</p>
               <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>

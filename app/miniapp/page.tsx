@@ -18,6 +18,8 @@ import ConsultationChatbot from '@/components/ConsultationChatbot';
 import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
 import UserProfileView, { ProfileData } from '@/components/UserProfileView';
 import { useResearchPolling } from '@/hooks/useResearchPolling';
+import ResearchStatusRow from '@/components/ResearchStatusRow';
+import ResearchDetailPanel from '@/components/ResearchDetailPanel';
 import { isPainRelatedConsultation } from '@/lib/promis';
 import { PROMISCompletionResult, PROMISTimepoint } from '@/lib/promisTypes';
 import { UserTier } from '@/lib/rateLimit';
@@ -280,25 +282,34 @@ function MiniAppContent() {
   // Memoize full caseData so the backend can build precise PubMed queries.
   const researchCaseData = useMemo(() => {
     const raw = comprehensiveResult?.rawConsultationData || (queryType === 'informational' ? triageResult?.rawConsultationData : undefined);
-    if (!raw) return undefined;
-    const cd = raw.caseData;
-    if (!cd) return undefined;
-    return {
-      primaryComplaint: cd.primaryComplaint || '',
-      symptoms: cd.symptoms,
-      duration: cd.duration,
-      location: cd.location,
-      painLevel: cd.painLevel,
-      age: cd.age,
-      rawQuery: cd.rawQuery,
-    };
-  }, [comprehensiveResult?.rawConsultationData, triageResult?.rawConsultationData, queryType]);
+    const cd = raw?.caseData;
+    if (cd) {
+      return {
+        primaryComplaint: cd.primaryComplaint || '',
+        symptoms: cd.symptoms,
+        duration: cd.duration,
+        location: cd.location,
+        painLevel: cd.painLevel,
+        age: cd.age,
+        rawQuery: cd.rawQuery,
+      };
+    }
+    // Informational queries may not have structured caseData — use the question text
+    if (queryType === 'informational' && currentQuestion) {
+      return { primaryComplaint: currentQuestion, rawQuery: currentQuestion };
+    }
+    return undefined;
+  }, [comprehensiveResult?.rawConsultationData, triageResult?.rawConsultationData, queryType, currentQuestion]);
 
   // Research polling — gate on comprehensive_complete, or triage_complete for informational queries
   const researchPolling = useResearchPolling({
     enabled: !!(
       (consultationStage === 'comprehensive_complete' && comprehensiveResult?.consultationId) ||
-      (consultationStage === 'triage_complete' && queryType === 'informational' && triageResult?.consultationId)
+      (
+        (consultationStage === 'triage_complete' || consultationStage === 'exited') &&
+        queryType === 'informational' &&
+        triageResult?.consultationId
+      )
     ),
     consultationId: comprehensiveResult?.consultationId || (queryType === 'informational' ? triageResult?.consultationId : undefined),
     caseData: researchCaseData,
@@ -1145,9 +1156,8 @@ function MiniAppContent() {
             {/* Research results for informational queries */}
             {queryType === 'informational' && researchPolling.researchState.status !== 'idle' && (
               <div className="mt-4">
-                {researchPolling.researchState.status === 'pending' && (
-                  <p className="text-sm text-blue-500 animate-pulse">Searching research literature...</p>
-                )}
+                <ResearchStatusRow researchState={researchPolling.researchState} />
+                <ResearchDetailPanel researchState={researchPolling.researchState} isMiniApp={true} />
               </div>
             )}
           </div>
@@ -1415,6 +1425,15 @@ function MiniAppContent() {
                 suggestedFollowUp={triageResult.suggestedFollowUp || []}
               />
             )}
+
+            {/* Research results for informational queries (persists after exit) */}
+            {queryType === 'informational' && researchPolling.researchState.status !== 'idle' && (
+              <div className="mb-4">
+                <ResearchStatusRow researchState={researchPolling.researchState} />
+                <ResearchDetailPanel researchState={researchPolling.researchState} isMiniApp={true} />
+              </div>
+            )}
+
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-3xl mb-3">✅</p>
               <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
