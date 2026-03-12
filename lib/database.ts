@@ -1030,6 +1030,14 @@ export async function initDatabase() {
     `;
 
     await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS query_type VARCHAR(20) DEFAULT NULL;
+    `;
+
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS query_subtype VARCHAR(20) DEFAULT NULL;
+    `;
+
+    await sql`
       ALTER TABLE feedback_milestones ADD COLUMN IF NOT EXISTS web_user_id UUID REFERENCES web_users(id);
     `;
 
@@ -3306,6 +3314,8 @@ export async function storeConsultation(data: {
   specialistCount: number;
   totalCost?: number;
   executionTime?: number;
+  queryType?: string;
+  querySubtype?: string | null;
 }): Promise<void> {
   const sql = getSql();
 
@@ -3313,7 +3323,8 @@ export async function storeConsultation(data: {
     await sql`
       INSERT INTO consultations (
         consultation_id, question_id, fid, web_user_id, mode, participating_specialists,
-        coordination_summary, specialist_count, total_cost, execution_time
+        coordination_summary, specialist_count, total_cost, execution_time,
+        query_type, query_subtype
       ) VALUES (
         ${data.consultationId},
         ${data.questionId},
@@ -3324,7 +3335,9 @@ export async function storeConsultation(data: {
         ${data.coordinationSummary || null},
         ${data.specialistCount},
         ${data.totalCost || 0},
-        ${data.executionTime || null}
+        ${data.executionTime || null},
+        ${data.queryType || null},
+        ${data.querySubtype || null}
       )
     `;
     console.log(`Stored consultation ${data.consultationId} for question ${data.questionId}`);

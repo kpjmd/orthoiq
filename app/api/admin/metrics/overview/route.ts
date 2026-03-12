@@ -101,6 +101,34 @@ export async function GET(request: NextRequest) {
       console.warn('orthoiq-agents backend unavailable for token statistics:', error);
     }
 
+    // Query type breakdown (clinical vs informational)
+    let queryTypeBreakdown = null;
+    try {
+      const queryTypeRows = await sql`
+        SELECT query_type, COUNT(*) as count
+        FROM consultations
+        WHERE query_type IS NOT NULL
+        GROUP BY query_type
+      `;
+      if (queryTypeRows.length > 0) {
+        const counts: Record<string, number> = {};
+        let total = 0;
+        for (const row of queryTypeRows) {
+          counts[row.query_type] = Number(row.count);
+          total += Number(row.count);
+        }
+        queryTypeBreakdown = {
+          clinical: counts['clinical'] || 0,
+          informational: counts['informational'] || 0,
+          clinicalPct: total > 0 ? Math.round(((counts['clinical'] || 0) / total) * 1000) / 10 : 0,
+          informationalPct: total > 0 ? Math.round(((counts['informational'] || 0) / total) * 1000) / 10 : 0,
+        };
+      }
+    } catch (e) {
+      // Column may not exist yet — graceful degradation
+      console.warn('query_type column not available:', e);
+    }
+
     // Get 30-day consultation trend for chart
     const consultationTrend = await sql`
       SELECT
@@ -138,6 +166,9 @@ export async function GET(request: NextRequest) {
         date: row.date,
         count: Number(row.count)
       })),
+
+      // Query Type Breakdown
+      queryTypeBreakdown,
 
       // Metadata
       agentStatsAvailable: agentStats.agentStatsAvailable,

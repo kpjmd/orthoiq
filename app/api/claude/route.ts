@@ -421,7 +421,9 @@ export async function POST(request: NextRequest) {
             coordinationSummary: specialistConsultation.coordinationSummary,
             specialistCount: specialistConsultation.specialistCount,
             totalCost: agentCost,
-            executionTime: executionTime
+            executionTime: executionTime,
+            queryType: claudeResponse.queryType || 'clinical',
+            querySubtype: claudeResponse.querySubtype || null,
           });
           console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database`);
         } catch (storeError) {

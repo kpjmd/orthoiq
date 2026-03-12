@@ -52,6 +52,13 @@ interface AgentPerformance {
   trend?: 'improving' | 'stable' | 'declining';
 }
 
+interface QueryTypeBreakdown {
+  clinical: number;
+  informational: number;
+  clinicalPct: number;
+  informationalPct: number;
+}
+
 interface PublicStats {
   totalConsultations: number;
   averageAgents: number;
@@ -70,6 +77,7 @@ interface PublicStats {
   };
   researchStats: ResearchPublicStats | null;
   promisStats: PROMISPublicStats | null;
+  queryTypeBreakdown: QueryTypeBreakdown | null;
 }
 
 export default function PublicStatsPage() {
@@ -131,6 +139,7 @@ export default function PublicStatsPage() {
           rarityDistribution: research.rarityDistribution || [],
           agentLiveStats: research.agentLiveStats || null,
         } : null,
+        queryTypeBreakdown: overview?.queryTypeBreakdown || null,
         promisStats: promis ? {
           totalConsultations: promis.totalConsultations || 0,
           baselineCaptureCount: promis.baselineCaptureCount || 0,
@@ -262,6 +271,55 @@ export default function PublicStatsPage() {
             </div>
           </div>
         </div>
+
+        {/* Query Type Breakdown */}
+        {stats.queryTypeBreakdown && (stats.queryTypeBreakdown.clinical + stats.queryTypeBreakdown.informational) > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Query Type Breakdown</h2>
+            <p className="text-sm text-gray-500 mb-6">How queries are routed through the system</p>
+
+            {/* Split bar */}
+            <div className="flex h-8 rounded-lg overflow-hidden mb-3">
+              {stats.queryTypeBreakdown.clinicalPct > 0 && (
+                <div
+                  className="bg-blue-500 flex items-center justify-center text-white text-sm font-medium"
+                  style={{ width: `${stats.queryTypeBreakdown.clinicalPct}%` }}
+                  title={`Clinical: ${stats.queryTypeBreakdown.clinical} (${stats.queryTypeBreakdown.clinicalPct}%)`}
+                >
+                  {stats.queryTypeBreakdown.clinicalPct >= 15 && `${stats.queryTypeBreakdown.clinicalPct}%`}
+                </div>
+              )}
+              {stats.queryTypeBreakdown.informationalPct > 0 && (
+                <div
+                  className="bg-teal-500 flex items-center justify-center text-white text-sm font-medium"
+                  style={{ width: `${stats.queryTypeBreakdown.informationalPct}%` }}
+                  title={`Informational: ${stats.queryTypeBreakdown.informational} (${stats.queryTypeBreakdown.informationalPct}%)`}
+                >
+                  {stats.queryTypeBreakdown.informationalPct >= 15 && `${stats.queryTypeBreakdown.informationalPct}%`}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 mt-4">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <div className="w-3 h-3 rounded-sm bg-blue-500" />
+                  <span className="text-sm font-semibold text-gray-700">Clinical</span>
+                </div>
+                <div className="text-3xl font-bold text-blue-600">{stats.queryTypeBreakdown.clinical}</div>
+                <p className="text-xs text-gray-500 mt-1">Multi-specialist consensus with prediction market</p>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <div className="w-3 h-3 rounded-sm bg-teal-500" />
+                  <span className="text-sm font-semibold text-gray-700">Informational</span>
+                </div>
+                <div className="text-3xl font-bold text-teal-600">{stats.queryTypeBreakdown.informational}</div>
+                <p className="text-xs text-gray-500 mt-1">Lightweight triage for general orthopedic questions</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Agent Consensus Leaderboard */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
