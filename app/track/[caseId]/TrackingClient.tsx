@@ -2,14 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import OutcomeValidationForm, { OutcomeValidationData, MilestoneType } from '@/components/OutcomeValidationForm';
 import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
-import { isPainRelatedConsultation } from '@/lib/promis';
-import { PROMISCompletionResult, PROMISDelta } from '@/lib/promisTypes';
+import { PROMISDelta } from '@/lib/promisTypes';
 
 interface MilestoneStatus {
   day: number;
-  type: 'pain' | 'functional' | 'movement';
   label: string;
   completed: boolean;
   due: boolean;
@@ -29,6 +26,7 @@ interface TrackingClientProps {
   currentMilestone: MilestoneStatus | null;
   completedCount: number;
   totalMilestones: number;
+  questionText: string | null;
 }
 
 const SPECIALIST_COLORS: Record<string, string> = {
@@ -59,13 +57,11 @@ export default function TrackingClient({
   milestoneStatus: initialMilestoneStatus,
   currentMilestone: initialCurrentMilestone,
   completedCount: initialCompletedCount,
-  totalMilestones
+  totalMilestones,
+  questionText
 }: TrackingClientProps) {
   const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showValidationForm, setShowValidationForm] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [milestoneStatus, setMilestoneStatus] = useState(initialMilestoneStatus);
   const [currentMilestone, setCurrentMilestone] = useState(initialCurrentMilestone);
@@ -75,22 +71,35 @@ export default function TrackingClient({
   const [showPromisForm, setShowPromisForm] = useState(false);
   const [promisCompleted, setPromisCompleted] = useState(false);
   const [promisDelta, setPromisDelta] = useState<PROMISDelta | null>(null);
-  const [hasPromisBaseline, setHasPromisBaseline] = useState(false);
 
-  // Check if a PROMIS baseline exists for this consultation
+  // Check PROMIS responses to mark milestones as completed (prevents re-submission on reload)
   useEffect(() => {
-    const checkBaseline = async () => {
+    const checkPromisCompletion = async () => {
       try {
         const res = await fetch(`/api/feedback/promis?consultationId=${caseId}`);
         if (res.ok) {
           const data = await res.json();
-          setHasPromisBaseline(data.responses?.some((r: any) => r.timepoint === 'baseline') || false);
+          const responses = data.responses || [];
+          const completedTimepoints = responses.map((r: any) => r.timepoint);
+          const timepointMap: Record<number, string> = { 14: '2week', 28: '4week', 56: '8week' };
+          setMilestoneStatus(prev => {
+            const updated = prev.map(ms => {
+              const tp = timepointMap[ms.day];
+              if (tp && completedTimepoints.includes(tp) && !ms.completed) {
+                return { ...ms, completed: true };
+              }
+              return ms;
+            });
+            setCompletedCount(updated.filter(ms => ms.completed).length);
+            setCurrentMilestone(updated.find(ms => !ms.completed) || null);
+            return updated;
+          });
         }
       } catch {
-        // Baseline check is best-effort
+        // best-effort
       }
     };
-    checkBaseline();
+    checkPromisCompletion();
   }, [caseId]);
 
   const handlePrivacyToggle = async () => {
@@ -109,66 +118,6 @@ export default function TrackingClient({
       }
     } catch (error) {
       console.error('Error updating privacy:', error);
-    }
-  };
-
-  const handleValidationSubmit = async (data: OutcomeValidationData) => {
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      const response = await fetch('/api/predictions/resolve/follow-up', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          consultationId: caseId,
-          followUpData: {
-            painLevel: data.painLevel,
-            functionalScore: data.functionalScore,
-            movementQuality: data.movementQuality,
-            adherence: data.adherence / 100, // Convert to 0-1 scale
-            completedInterventions: data.completedInterventions,
-            newSymptoms: data.newSymptoms,
-            concernFlags: data.concernFlags,
-            overallProgress: data.overallProgress,
-            returnToActivity: data.returnToActivity,
-            activityLevel: data.activityLevel,
-            rangeOfMotion: data.rangeOfMotion,
-            notes: data.notes
-          },
-          milestoneDay: data.milestoneDay,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setValidationResult(result);
-        setSubmitSuccess(true);
-        setShowValidationForm(false);
-
-        // Update milestone status
-        const updatedMilestones = milestoneStatus.map(ms => {
-          if (ms.day === data.milestoneDay) {
-            return { ...ms, completed: true, data: result };
-          }
-          return ms;
-        });
-        setMilestoneStatus(updatedMilestones);
-        setCompletedCount(prev => prev + 1);
-
-        // Find next milestone
-        const nextMilestone = updatedMilestones.find(ms => !ms.completed);
-        setCurrentMilestone(nextMilestone || null);
-      } else {
-        const error = await response.json();
-        setSubmitError(error.error || 'Failed to submit validation');
-      }
-    } catch (error) {
-      console.error('Error submitting validation:', error);
-      setSubmitError('Network error. Please try again.');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -220,6 +169,14 @@ export default function TrackingClient({
           <p className="text-gray-400">Consultation: {consultationDate}</p>
           <p className="text-gray-400">{daysSince} days since consultation</p>
         </div>
+
+        {/* Original Question */}
+        {questionText && (
+          <div className="bg-gray-800 rounded-xl p-4 mb-6 border border-gray-700">
+            <h3 className="text-sm font-medium text-gray-400 mb-2">Your Original Question</h3>
+            <p className="text-gray-200 text-sm">{questionText}</p>
+          </div>
+        )}
 
         {/* Specialists involved */}
         <div className="bg-gray-800 rounded-xl p-4 mb-6 border border-gray-700">
@@ -393,7 +350,7 @@ export default function TrackingClient({
                 Dismiss
               </button>
             </motion.div>
-          ) : showPromisForm && currentMilestone && hasPromisBaseline ? (
+          ) : showPromisForm && currentMilestone ? (
             <motion.div
               key="promis-form"
               initial={{ opacity: 0, y: 20 }}
@@ -430,33 +387,8 @@ export default function TrackingClient({
                     validationResults: { predictionsValidated: [] },
                   });
                 }}
-                onSkip={() => {
-                  setShowPromisForm(false);
-                  setShowValidationForm(true);
-                }}
+                onSkip={() => setShowPromisForm(false)}
               />
-            </motion.div>
-          ) : showValidationForm && currentMilestone ? (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <OutcomeValidationForm
-                milestoneType={currentMilestone.type as MilestoneType}
-                milestoneDay={currentMilestone.day}
-                consultationId={caseId}
-                patientId={fid}
-                onSubmit={handleValidationSubmit}
-                onCancel={() => setShowValidationForm(false)}
-                isSubmitting={isSubmitting}
-              />
-              {submitError && (
-                <div className="mt-4 p-4 bg-red-900/30 border border-red-600/50 rounded-lg text-red-400">
-                  {submitError}
-                </div>
-              )}
             </motion.div>
           ) : currentMilestone ? (
             <motion.div
@@ -471,11 +403,11 @@ export default function TrackingClient({
               </h3>
               <p className="text-gray-400 mb-4">
                 {currentMilestone.due
-                  ? `Your ${currentMilestone.label} validation is ready. Share how you're doing to validate agent predictions.`
-                  : `Your ${currentMilestone.label} check-in will be available in ${currentMilestone.day - daysSince} days.`}
+                  ? `Your ${currentMilestone.label} is ready. Complete a brief questionnaire to track your recovery.`
+                  : `Your ${currentMilestone.label} will be available in ${currentMilestone.day - daysSince} days.`}
               </p>
               <button
-                onClick={() => hasPromisBaseline ? setShowPromisForm(true) : setShowValidationForm(true)}
+                onClick={() => setShowPromisForm(true)}
                 disabled={!currentMilestone.due}
                 className={`w-full py-3 rounded-lg font-medium transition-colors ${
                   currentMilestone.due

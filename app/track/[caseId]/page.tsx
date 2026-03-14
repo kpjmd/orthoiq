@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getConsultation, getConsultationMilestones } from '@/lib/database';
+import { getConsultation, getConsultationMilestones, getSql } from '@/lib/database';
+import { getPromisResponses } from '@/lib/promisDb';
 import TrackingClient from './TrackingClient';
 
 interface TrackPageProps {
@@ -89,20 +90,29 @@ export default async function TrackPage({ params }: TrackPageProps) {
   const daysSince = calculateDaysSince(consultation.created_at);
   const completedMilestoneDays = milestones.map((m: any) => m.milestone_day);
 
+  // Check PROMIS responses for completion
+  let promisResponses: any[] = [];
+  try {
+    promisResponses = await getPromisResponses(caseId);
+  } catch {
+    // best-effort
+  }
+  const completedPromisTimepoints = promisResponses.map((r: any) => r.timepoint);
+  const timepointMap: Record<number, string> = { 14: '2week', 28: '4week', 56: '8week' };
+
   const milestoneStatus = MILESTONE_DAYS.map(day => {
-    const completed = completedMilestoneDays.includes(day);
+    const completed = completedMilestoneDays.includes(day)
+      || completedPromisTimepoints.includes(timepointMap[day]);
     const milestoneData = milestones.find((m: any) => m.milestone_day === day);
     return {
       day,
-      type: day === 14 ? 'pain' : day === 28 ? 'functional' : 'movement',
-      label: day === 14 ? 'Week 2 - Pain Level' : day === 28 ? 'Week 4 - Functional' : 'Week 8 - Movement',
+      label: `Week ${day / 7} - PROMIS Check-in`,
       completed,
       due: !completed && daysSince >= day,
       data: milestoneData || null
     };
   }) as Array<{
     day: number;
-    type: 'pain' | 'functional' | 'movement';
     label: string;
     completed: boolean;
     due: boolean;
@@ -116,6 +126,20 @@ export default async function TrackPage({ params }: TrackPageProps) {
       currentMilestone = ms;
       break;
     }
+  }
+
+  // Fetch original question text
+  let questionText: string | null = null;
+  try {
+    if (consultation.question_id) {
+      const sql = getSql();
+      const qResult = await sql`
+        SELECT question FROM questions WHERE id = ${consultation.question_id} LIMIT 1
+      `;
+      questionText = qResult[0]?.question || null;
+    }
+  } catch {
+    // best-effort
   }
 
   // Format consultation date
@@ -138,8 +162,9 @@ export default async function TrackPage({ params }: TrackPageProps) {
     coordinationSummary: consultation.coordination_summary,
     milestoneStatus,
     currentMilestone,
-    completedCount: completedMilestoneDays.length,
-    totalMilestones: MILESTONE_DAYS.length
+    completedCount: milestoneStatus.filter(ms => ms.completed).length,
+    totalMilestones: MILESTONE_DAYS.length,
+    questionText,
   };
 
   return <TrackingClient {...trackingData} />;

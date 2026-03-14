@@ -38,10 +38,13 @@ export async function GET(request: NextRequest) {
     };
 
     // For each milestone day, find consultations that are due
+    const timepointMap: Record<number, string> = { 14: '2week', 28: '4week', 56: '8week' };
+
     for (const milestoneDay of MILESTONE_DAYS) {
       try {
         const weekNumber = Math.floor(milestoneDay / 7);
         const weekPattern = `%Week ${weekNumber}%`;
+        const timepoint = timepointMap[milestoneDay];
 
         // ===== WEB EMAIL USERS =====
         // Find web users with verified emails
@@ -62,6 +65,11 @@ export async function GET(request: NextRequest) {
               WHERE fm.consultation_id = c.consultation_id
                 AND fm.milestone_day = ${milestoneDay}
                 AND fm.milestone_achieved = true
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM promis_responses pr
+              WHERE pr.consultation_id = c.consultation_id
+                AND pr.timepoint = ${timepoint}
             )
             AND NOT EXISTS (
               SELECT 1 FROM notification_logs nl
@@ -131,6 +139,11 @@ export async function GET(request: NextRequest) {
               WHERE fm.consultation_id = c.consultation_id
                 AND fm.milestone_day = ${milestoneDay}
                 AND fm.milestone_achieved = true
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM promis_responses pr
+              WHERE pr.consultation_id = c.consultation_id
+                AND pr.timepoint = ${timepoint}
             )
             AND NOT EXISTS (
               SELECT 1 FROM notification_logs nl

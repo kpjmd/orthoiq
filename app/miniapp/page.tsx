@@ -273,6 +273,7 @@ function MiniAppContent() {
   const [trackingMode, setTrackingMode] = useState<{ consultationId: string; timepoint: PROMISTimepoint } | null>(null);
   const [trackingComplete, setTrackingComplete] = useState(false);
   const [trackingAlreadyDone, setTrackingAlreadyDone] = useState(false);
+  const [trackingQuestion, setTrackingQuestion] = useState<string | null>(null);
 
   // User profile state
   const [showProfile, setShowProfile] = useState(false);
@@ -538,6 +539,14 @@ function MiniAppContent() {
       } catch {
         // ignore — proceed to show questionnaire
       }
+      // Fetch original question text (best-effort)
+      try {
+        const cRes = await fetch(`/api/consultations/${encodeURIComponent(trackConsultationId)}/question`);
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          setTrackingQuestion(cData.question || null);
+        }
+      } catch { /* best-effort */ }
       setTrackingMode({ consultationId: trackConsultationId, timepoint });
     })();
   }, [isSDKLoaded]);
@@ -836,6 +845,12 @@ function MiniAppContent() {
           </div>
         </div>
         <div className="p-6 max-w-2xl mx-auto">
+          {trackingQuestion && (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl mb-4">
+              <p className="text-xs font-medium text-gray-500 mb-1">Your Original Question</p>
+              <p className="text-sm text-gray-800">{trackingQuestion}</p>
+            </div>
+          )}
           {trackingAlreadyDone ? (
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-4xl mb-3">✅</p>
@@ -1527,6 +1542,7 @@ function MiniAppContent() {
             consultationId={triageResult.consultationId || triageResult.specialistConsultation?.consultationId || ''}
             patientId={context?.user?.fid?.toString() || authUser?.fid?.toString() || ''}
             mode="fast"
+            queryType={triageResult?.queryType || 'clinical'}
             onFeedbackSubmitted={(_rewards) => setFeedbackSubmitted(true)}
           />
         )}
