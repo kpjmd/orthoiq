@@ -1332,6 +1332,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             consultationId={triageResult.consultationId || triageResult.specialistConsultation?.consultationId || ''}
             patientId={user?.id || 'web-guest'}
             mode="fast"
+            queryType={triageResult?.queryType || 'clinical'}
             onFeedbackSubmitted={(_rewards) => setFeedbackSubmitted(true)}
           />
         )}

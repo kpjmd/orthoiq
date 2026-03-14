@@ -16,6 +16,7 @@ interface FeedbackModalProps {
     specialty: string;
   }>;
   onFeedbackSubmitted?: (tokenRewards: any[]) => void;
+  queryType?: 'clinical' | 'informational';
 }
 
 export default function FeedbackModal({
@@ -26,7 +27,8 @@ export default function FeedbackModal({
   mode,
   hasSpecialistConsultation = false,
   specialists = [],
-  onFeedbackSubmitted
+  onFeedbackSubmitted,
+  queryType = 'clinical'
 }: FeedbackModalProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +48,13 @@ export default function FeedbackModal({
   const [requestMDReview, setRequestMDReview] = useState(false);
   const [mdReviewReason, setMdReviewReason] = useState('');
 
-  const totalSteps = hasSpecialistConsultation ? 4 : 3;
+  const isInformational = queryType === 'informational';
+  const totalSteps = hasSpecialistConsultation ? 4 : isInformational ? 2 : 3;
+
+  const valuableAspectOptions = isInformational
+    ? ['Accuracy', 'Clarity', 'Completeness', 'Practical relevance', 'Sources cited']
+    : ['Diagnosis clarity', 'Treatment recommendations', 'Red flags identified',
+       'Timeline expectations', 'Exercise guidance', 'Pain management tips'];
 
   const handleNext = () => {
     if (step < totalSteps) {
@@ -329,14 +337,7 @@ export default function FeedbackModal({
                           What was most valuable? (optional)
                         </label>
                         <div className="flex flex-wrap gap-2">
-                          {[
-                            'Diagnosis clarity',
-                            'Treatment recommendations',
-                            'Red flags identified',
-                            'Timeline expectations',
-                            'Exercise guidance',
-                            'Pain management tips'
-                          ].map((aspect) => (
+                          {valuableAspectOptions.map((aspect) => (
                             <button
                               key={aspect}
                               onClick={() => toggleValuableAspect(aspect)}
@@ -372,7 +373,7 @@ export default function FeedbackModal({
                   )}
 
                   {/* Step 4: MD Review Request */}
-                  {step === totalSteps && (
+                  {step === totalSteps && !isInformational && (
                     <motion.div
                       key="step4"
                       initial={{ opacity: 0, x: 20 }}
