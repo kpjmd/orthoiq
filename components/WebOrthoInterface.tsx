@@ -259,6 +259,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const [queryType, setQueryType] = useState<'clinical' | 'informational'>('clinical');
   const [querySubtype, setQuerySubtype] = useState<string | null>(null);
 
+  // User-declared query type override (null = auto-detect)
+  const [userQueryType, setUserQueryType] = useState<'clinical' | 'informational' | null>(null);
+
   // Scope validation for out-of-scope queries
   const [scopeValidationData, setScopeValidationData] = useState<{
     category: string;
@@ -415,6 +418,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           mode: 'fast',
           platform: 'web',
           webSessionId: sessionId,
+          ...(userQueryType && { queryType: userQueryType }),
         }),
         signal: controller.signal,
       });
@@ -498,6 +502,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           mode: 'normal',
           platform: 'web',
           webSessionId: sessionId,
+          ...(userQueryType && { queryType: userQueryType }),
         }),
         signal: controller.signal,
       });
@@ -572,6 +577,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     setTriagePromisCompleted(false);
     setQueryType('clinical');
     setQuerySubtype(null);
+    setUserQueryType(null);
     document.getElementById('web-question')?.focus();
   };
 
@@ -773,6 +779,26 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
         {/* Question Form */}
         <form onSubmit={handleTriageSubmit} className="mb-6">
+          {/* Query Type Selector — optional pre-selection; omit for auto-detect */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-gray-500">I&apos;m asking about:</span>
+            {(['clinical', 'informational'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setUserQueryType(userQueryType === type ? null : type)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  userQueryType === type
+                    ? type === 'clinical'
+                      ? 'bg-blue-100 border-blue-500 text-blue-800'
+                      : 'bg-purple-100 border-purple-500 text-purple-800'
+                    : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'
+                }`}
+              >
+                {type === 'clinical' ? 'My Symptoms' : 'General Question'}
+              </button>
+            ))}
+          </div>
           <div className="mb-4">
             <label htmlFor="web-question" className="block text-sm font-medium text-gray-700 mb-2">
               What orthopedic question can I help you with?

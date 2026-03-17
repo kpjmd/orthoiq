@@ -269,6 +269,9 @@ function MiniAppContent() {
   const [queryType, setQueryType] = useState<'clinical' | 'informational'>('clinical');
   const [querySubtype, setQuerySubtype] = useState<string | null>(null);
 
+  // User-declared query type override (null = auto-detect)
+  const [userQueryType, setUserQueryType] = useState<'clinical' | 'informational' | null>(null);
+
   // Follow-up PROMIS tracking mode (for Farcaster notification deep-links)
   const [trackingMode, setTrackingMode] = useState<{ consultationId: string; timepoint: PROMISTimepoint } | null>(null);
   const [trackingComplete, setTrackingComplete] = useState(false);
@@ -636,7 +639,8 @@ function MiniAppContent() {
           } : null,
           tier: getUserTier(),
           mode: 'fast',
-          platform: 'miniapp'
+          platform: 'miniapp',
+          ...(userQueryType && { queryType: userQueryType }),
         }),
         signal: controller.signal,
       });
@@ -712,7 +716,8 @@ function MiniAppContent() {
           } : null,
           tier: getUserTier(),
           mode: 'normal',
-          platform: 'miniapp'
+          platform: 'miniapp',
+          ...(userQueryType && { queryType: userQueryType }),
         }),
         signal: controller.signal,
       });
@@ -780,6 +785,7 @@ function MiniAppContent() {
     setTriagePromisCompleted(false);
     setQueryType('clinical');
     setQuerySubtype(null);
+    setUserQueryType(null);
     document.getElementById('question')?.focus();
   };
 
@@ -1093,6 +1099,27 @@ function MiniAppContent() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Query Type Selector */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-gray-500">I&apos;m asking about:</span>
+            {(['clinical', 'informational'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setUserQueryType(userQueryType === type ? null : type)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  userQueryType === type
+                    ? type === 'clinical'
+                      ? 'bg-blue-100 border-blue-500 text-blue-800'
+                      : 'bg-purple-100 border-purple-500 text-purple-800'
+                    : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'
+                }`}
+              >
+                {type === 'clinical' ? 'My Symptoms' : 'General Question'}
+              </button>
+            ))}
           </div>
 
           <div className="mb-4">

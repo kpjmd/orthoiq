@@ -38,6 +38,7 @@ export async function getOrthoResponse(
     userId?: string;
     isReturningUser?: boolean;
     priorConsultations?: string[];
+    queryType?: string;
   }
 ): Promise<ClaudeResponse> {
   // First, try OrthoIQ-Agents system
@@ -184,6 +185,7 @@ async function tryOrthoIQAgents(
     userId?: string;
     isReturningUser?: boolean;
     priorConsultations?: string[];
+    queryType?: string;
   }
 ): Promise<ClaudeResponse | null> {
   const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
@@ -228,7 +230,8 @@ async function tryOrthoIQAgents(
         }
       },
       requiredSpecialists: undefined, // Let OrthoIQ-Agents routing logic decide based on data completeness and confidence
-      mode
+      mode,
+      ...(options?.queryType && { queryType: options.queryType }),
     };
 
     // Make consultation request

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser, webSessionId } = requestBody;
+    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser, webSessionId, queryType: userQueryType } = requestBody;
 
     if (!question) {
       console.warn(`[${requestId}] Missing required field: question`);
@@ -182,7 +182,8 @@ export async function POST(request: NextRequest) {
         mode: consultationMode,
         userId: fid,
         isReturningUser: false, // TODO: Track returning users
-        priorConsultations: [] // TODO: Track consultation history
+        priorConsultations: [], // TODO: Track consultation history
+        ...(userQueryType && { queryType: userQueryType }),
       });
 
       // Ensure response is always a string
