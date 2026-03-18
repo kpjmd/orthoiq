@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser, webSessionId, queryType: userQueryType } = requestBody;
+    const { question, fid, authUser, tier, mode, platform, isEmailVerified, webUser, webSessionId, queryType: userQueryType, walletAddress } = requestBody;
 
     if (!question) {
       console.warn(`[${requestId}] Missing required field: question`);
@@ -133,41 +133,48 @@ export async function POST(request: NextRequest) {
 
     console.log(`[${requestId}] Processing question - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Tier: ${userTier}, ID: ${rateLimitIdentifier}`);
 
+    // Wallet-connected web users get unlimited access (same as miniapp)
+    const isWalletUser = !!(walletAddress && typeof walletAddress === 'string' && walletAddress.startsWith('0x'));
+
     // Check platform-aware rate limiting — skip for comprehensive (it's a triage continuation, already counted)
     let rateLimitResult;
     if (consultationMode !== 'comprehensive') {
-      try {
-        // Derive verified status from webUser.authType when frontend doesn't send isEmailVerified explicitly
-        const effectiveIsVerified = isEmailVerified ?? (webUser?.authType === 'verified' || webUser?.emailVerified === true);
-        rateLimitResult = await checkPlatformRateLimit(
-          rateLimitIdentifier,
-          detectedPlatform,
-          consultationMode,
-          userTier,
-          effectiveIsVerified // Pass email verification status for web users
-        );
+      if (isWalletUser && detectedPlatform === 'web') {
+        console.log(`[${requestId}] Wallet user — skipping web rate limit for: ${walletAddress}`);
+      } else {
+        try {
+          // Derive verified status from webUser.authType when frontend doesn't send isEmailVerified explicitly
+          const effectiveIsVerified = isEmailVerified ?? (webUser?.authType === 'verified' || webUser?.emailVerified === true);
+          rateLimitResult = await checkPlatformRateLimit(
+            rateLimitIdentifier,
+            detectedPlatform,
+            consultationMode,
+            userTier,
+            effectiveIsVerified // Pass email verification status for web users
+          );
 
-        if (!rateLimitResult.allowed) {
-          console.warn(`[${requestId}] Rate limit exceeded - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Verified: ${effectiveIsVerified}`);
+          if (!rateLimitResult.allowed) {
+            console.warn(`[${requestId}] Rate limit exceeded - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Verified: ${effectiveIsVerified}`);
 
-          // Use soft notification instead of hard block
-          // Return with 200 status but include rate limit info in response
-          return NextResponse.json({
-            rateLimited: true,
-            softWarning: rateLimitResult.softWarning,
-            upgradePrompt: rateLimitResult.upgradePrompt,
-            resetTime: rateLimitResult.resetTime,
-            platform: detectedPlatform,
-            mode: consultationMode,
-            remaining: 0,
-            total: rateLimitResult.total,
-            isVerified: rateLimitResult.isVerified
-          });
+            // Use soft notification instead of hard block
+            // Return with 200 status but include rate limit info in response
+            return NextResponse.json({
+              rateLimited: true,
+              softWarning: rateLimitResult.softWarning,
+              upgradePrompt: rateLimitResult.upgradePrompt,
+              resetTime: rateLimitResult.resetTime,
+              platform: detectedPlatform,
+              mode: consultationMode,
+              remaining: 0,
+              total: rateLimitResult.total,
+              isVerified: rateLimitResult.isVerified
+            });
+          }
+          console.log(`[${requestId}] Rate limit check passed - ${rateLimitResult.remaining}/${rateLimitResult.total} remaining`);
+        } catch (rateLimitError) {
+          console.error(`[${requestId}] Rate limit check failed:`, rateLimitError);
+          // Continue with request but log the error
         }
-        console.log(`[${requestId}] Rate limit check passed - ${rateLimitResult.remaining}/${rateLimitResult.total} remaining`);
-      } catch (rateLimitError) {
-        console.error(`[${requestId}] Rate limit check failed:`, rateLimitError);
-        // Continue with request but log the error
       }
     } else {
       console.log(`[${requestId}] Skipping rate limit check for comprehensive upgrade (continuation of triage)`);

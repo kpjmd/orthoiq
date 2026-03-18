@@ -348,6 +348,10 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
   // Fetch web usage from API
   const fetchWebUsage = useCallback(async () => {
+    if (isWalletConnected) {
+      setWebUsage({ questionsAsked: 0, questionsRemaining: 9999, isLimitReached: false });
+      return;
+    }
     try {
       const usage = await getWebSessionUsage(isVerified);
       setWebUsage(usage);
@@ -361,7 +365,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     } catch (error) {
       console.error('Failed to fetch web usage:', error);
     }
-  }, [isVerified, ctaDismissed]);
+  }, [isVerified, ctaDismissed, isWalletConnected]);
 
   useEffect(() => {
     generateSessionId();
@@ -394,7 +398,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     e.preventDefault();
     if (!question.trim()) return;
 
-    if (webUsage.isLimitReached) {
+    if (!isWalletConnected && webUsage.isLimitReached) {
       const limit = isVerified ? 10 : 1;
       setError(`You've reached your ${limit}-question daily limit. ${isVerified ? 'Try again tomorrow!' : 'Verify your email for 10 questions/day or use our Farcaster Mini App for unlimited access!'}`);
       setShowCTA(true);
@@ -628,16 +632,20 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
           <p className="text-lg opacity-90">Web Experience</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
 
-          {isAuthenticated && user && (
+          {(isAuthenticated && user || isWalletConnected) && (
             <div className="mt-3">
-              <p className="text-xs opacity-60">
-                Welcome, {user.name}! Questions remaining today: {webUsage.questionsRemaining} of {dailyQuestions.limit}
-              </p>
+              {isWalletConnected ? (
+                <p className="text-xs opacity-60">Unlimited access · Wallet connected</p>
+              ) : (
+                <p className="text-xs opacity-60">
+                  Welcome, {user!.name}! Questions remaining today: {webUsage.questionsRemaining} of {dailyQuestions.limit}
+                </p>
+              )}
               <div className="flex items-center justify-center gap-2 mt-2">
                 <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
-                  {isWalletConnected ? '🔗 Wallet' : user.authType === 'email' ? '✉️ Email User' : '👤 Guest User'}
+                  {isWalletConnected ? '🔗 Wallet' : user?.authType === 'email' ? '✉️ Email User' : '👤 Guest User'}
                 </div>
-                {user.authType === 'guest' && !isWalletConnected && (
+                {user?.authType === 'guest' && !isWalletConnected && (
                   <button
                     onClick={() => setShowUpgradeForm(true)}
                     className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-full transition-colors"

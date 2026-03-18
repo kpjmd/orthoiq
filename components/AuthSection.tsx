@@ -1,17 +1,19 @@
 'use client';
 
+import { useAccount } from 'wagmi';
 import { useWebAuth } from './WebAuthProvider';
 import WebOrthoInterface from './WebOrthoInterface';
 import WebSignIn from './WebSignIn';
 
 export default function AuthSection() {
   const { isAuthenticated, user, magicLinkSent } = useWebAuth();
+  const { isConnected: isWalletConnected } = useAccount();
 
   // Show sign-in screen if:
-  // 1. Not authenticated at all, OR
+  // 1. Not authenticated at all AND wallet not connected, OR
   // 2. User entered email but hasn't verified yet (pending state)
   const isPendingEmailVerification = user?.authType === 'email' && !user?.emailVerified;
-  const shouldShowSignIn = !isAuthenticated || (isPendingEmailVerification && magicLinkSent);
+  const shouldShowSignIn = !isWalletConnected && (!isAuthenticated || (isPendingEmailVerification && magicLinkSent));
 
   return (
     <>

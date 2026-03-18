@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useAccount, useConnect } from 'wagmi';
 import { useWebAuth } from './WebAuthProvider';
 import OrthoIQLogo from './OrthoIQLogo';
 
 export default function WebSignIn() {
   const { signInWithEmail, signInAsGuest, isLoading, magicLinkSent, user } = useWebAuth();
+  const { address, isConnected: isWalletConnected } = useAccount();
+  const { connect, connectors, isPending: isConnecting } = useConnect();
   const [email, setEmail] = useState('');
   const [sentEmail, setSentEmail] = useState('');
   const [error, setError] = useState('');
@@ -168,6 +171,35 @@ export default function WebSignIn() {
         </div>
       </div>
 
+      {/* Connect Wallet */}
+      {isWalletConnected ? (
+        <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg text-center">
+          <p className="text-green-800 text-sm font-medium">
+            Wallet connected: {address?.slice(0, 6)}…{address?.slice(-4)}
+          </p>
+          <p className="text-green-700 text-xs mt-1">You&apos;ll proceed automatically with unlimited access.</p>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => connect({ connector: connectors[0] })}
+          disabled={isConnecting}
+          className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors mb-4"
+        >
+          {isConnecting ? 'Connecting…' : 'Connect Wallet (Unlimited access)'}
+        </button>
+      )}
+
+      {/* Second Divider */}
+      <div className="relative mb-4">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300" />
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="px-2 bg-white text-gray-500">Or</span>
+        </div>
+      </div>
+
       {/* Guest Sign In */}
       <button
         onClick={handleGuestSignIn}
@@ -201,7 +233,7 @@ export default function WebSignIn() {
           <strong>Want unlimited access?</strong>
         </p>
         <p className="text-blue-700 text-xs mt-1">
-          Get the full OrthoIQ experience on Farcaster or Base
+          Connect a wallet above, or use OrthoIQ on Farcaster / Base
         </p>
       </div>
     </div>

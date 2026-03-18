@@ -1,5 +1,50 @@
 # OrthoIQ Changelog
 
+## [1.6.0] - 2026-03-10: Informational Query Pathway (Backend v0.7.0)
+
+### Added
+- **Informational Query Pathway**: Frontend now handles the new `mode: 'informational'` response from the backend (v0.7.0)
+  - Queries like "What's the latest on PRP?" are classified at triage and routed to the Research Agent only — no specialists, no prediction market, no token staking
+  - Backend returns `queryType: 'informational'` which the frontend uses to adjust the UX
+
+- **New response routing in `lib/claude.ts`**: Added `mode === 'informational'` branch before existing fast/normal handling
+  - Reuses `transformFastModeResponse` (informational triage has the same shape), then propagates `queryType` and `querySubtype`
+
+- **`queryType` and `querySubtype` fields**: Added to `ClaudeResponse` type, API proxy response, `ResponseData` interfaces, and `parseApiResponse` in both miniapp and web
+
+### Changed
+- **PROMIS guards (4 locations)**: PROMIS questionnaire opt-in is suppressed for informational queries
+  - Comprehensive loading timer (miniapp + web)
+  - Post-triage-exit PROMIS button (miniapp + web)
+
+- **Comprehensive upgrade skipped**: "See Full Analysis" button is hidden for informational queries — the triage response IS the answer
+  - `onSeeFullAnalysis` prop is conditionally omitted from `TriageResponseCard`
+
+- **Research polling starts earlier**: For informational queries, research polling activates at `triage_complete` instead of waiting for `comprehensive_complete`
+  - `useResearchPolling` enabled condition extended with informational + triage_complete gate
+  - `researchCaseData` memo updated to fall back to `triageResult` for informational queries
+
+- **Research status shown at triage**: Informational queries display a "Searching research literature..." indicator in the triage_complete view
+
+- **State reset**: `queryType` and `querySubtype` properly reset to defaults in `handleAskAnother`
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `lib/types.ts` | Added `queryType`, `querySubtype` to `ClaudeResponse` |
+| `lib/claude.ts` | New `mode === 'informational'` branch |
+| `app/api/claude/route.ts` | Pass `queryType`, `querySubtype` in response |
+| `app/miniapp/page.tsx` | State, PROMIS guards, skip comprehensive, research polling |
+| `components/WebOrthoInterface.tsx` | State, PROMIS guards, skip comprehensive, research polling |
+
+### What Was NOT Changed
+- `hooks/useResearchPolling.ts` — same polling mechanism, just different enable conditions
+- `components/ResponseCard.tsx` — not rendered for informational queries
+- `components/ComprehensiveLoadingState.tsx` — not rendered for informational queries
+- `components/TriageResponseCard.tsx` — already handles missing `onSeeFullAnalysis` gracefully
+
+---
+
 ## [1.5.3] - 2026-02-11: Notification Toggle Sync Fix
 
 ### Fixed
