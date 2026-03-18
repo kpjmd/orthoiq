@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useWebAuth } from './WebAuthProvider';
 import ResponseCard from './ResponseCard';
 import ActionMenu from './ActionMenu';
@@ -221,6 +222,14 @@ const parseApiResponse = (data: any): ResponseData => {
 export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceProps) {
   const { user, isAuthenticated, isVerified, signOut, upgradeToEmail, isLoading: authLoading, magicLinkSent } = useWebAuth();
 
+  const { address, isConnected: isWalletConnected } = useAccount();
+  const { connect, connectors, isPending: isConnecting } = useConnect();
+  const { disconnect } = useDisconnect();
+
+  // Wallet address takes precedence over email/guest when connected
+  const effectiveUserId = address || user?.id || 'web-guest';
+  const effectiveTier = isWalletConnected ? 'authenticated' : (user?.authType === 'email' ? 'medical' : 'basic');
+
   const [question, setQuestion] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState('');
 
@@ -399,8 +408,6 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     setScopeValidationData(null);
     setCurrentQuestion(question.trim());
 
-    const userTier = user?.authType === 'email' ? 'medical' : 'authenticated';
-
     try {
       const sessionId = generateSessionId();
       const controller = new AbortController();
@@ -411,13 +418,14 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: question.trim(),
-          fid: user?.id || 'web-guest',
-          tier: userTier,
+          fid: effectiveUserId,
+          tier: effectiveTier,
           isWebUser: true,
           webUser: user,
           mode: 'fast',
           platform: 'web',
           webSessionId: sessionId,
+          ...(address && { walletAddress: address }),
           ...(userQueryType && { queryType: userQueryType }),
         }),
         signal: controller.signal,
@@ -483,8 +491,6 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     setConsultationStage('comprehensive_loading');
     setError('');
 
-    const userTier = user?.authType === 'email' ? 'medical' : 'authenticated';
-
     try {
       const sessionId = generateSessionId();
       const controller = new AbortController();
@@ -495,13 +501,14 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: currentQuestion,
-          fid: user?.id || 'web-guest',
-          tier: userTier,
+          fid: effectiveUserId,
+          tier: effectiveTier,
           isWebUser: true,
           webUser: user,
           mode: 'normal',
           platform: 'web',
           webSessionId: sessionId,
+          ...(address && { walletAddress: address }),
           ...(userQueryType && { queryType: userQueryType }),
         }),
         signal: controller.signal,
@@ -628,15 +635,37 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               </p>
               <div className="flex items-center justify-center gap-2 mt-2">
                 <div className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-800 bg-opacity-50">
-                  {user.authType === 'email' ? '✉️ Email User' : '👤 Guest User'}
+                  {isWalletConnected ? '🔗 Wallet' : user.authType === 'email' ? '✉️ Email User' : '👤 Guest User'}
                 </div>
-                {user.authType === 'guest' && (
+                {user.authType === 'guest' && !isWalletConnected && (
                   <button
                     onClick={() => setShowUpgradeForm(true)}
                     className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded-full transition-colors"
                   >
                     Add Email
                   </button>
+                )}
+                {!isWalletConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => connect({ connector: connectors[0] })}
+                    disabled={isConnecting}
+                    className="text-xs bg-blue-500 hover:bg-blue-400 text-white px-2 py-1 rounded-full transition-colors disabled:opacity-60"
+                  >
+                    {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+                  </button>
+                ) : (
+                  <span className="text-xs text-blue-200">
+                    {address?.slice(0, 6)}…{address?.slice(-4)}
+                    {' · '}
+                    <button
+                      type="button"
+                      onClick={() => disconnect()}
+                      className="underline hover:text-white"
+                    >
+                      Disconnect
+                    </button>
+                  </span>
                 )}
                 <button
                   onClick={signOut}

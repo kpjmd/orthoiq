@@ -1,5 +1,6 @@
 import { fetchMetadata } from "frames.js/next";
 import { WebAuthProvider } from '@/components/WebAuthProvider';
+import { WagmiProviders } from '@/components/WagmiProviders';
 import WebHomePage from '@/components/WebHomePage';
 import Script from 'next/script';
 
@@ -87,6 +88,7 @@ export async function generateMetadata() {
 export default function HomePage() {
   return (
     <WebAuthProvider>
+      <WagmiProviders>
       <main className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8">
           <WebHomePage />
@@ -172,6 +174,7 @@ export default function HomePage() {
         `}
       </Script>
       </main>
+      </WagmiProviders>
     </WebAuthProvider>
   );
 }
