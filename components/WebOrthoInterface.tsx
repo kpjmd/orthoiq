@@ -226,8 +226,9 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
 
-  // Wallet address takes precedence over email/guest when connected
-  const effectiveUserId = address || user?.id || 'web-guest';
+  // fid is a session identifier — never use wallet address here (it fails FID format validation)
+  // The wallet address is sent separately as walletAddress for rate-limit bypass
+  const effectiveUserId = user?.id || 'web-guest';
   const effectiveTier = isWalletConnected ? 'authenticated' : (user?.authType === 'email' ? 'medical' : 'basic');
 
   const [question, setQuestion] = useState('');

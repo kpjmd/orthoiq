@@ -94,15 +94,20 @@ export async function POST(request: NextRequest) {
 
     // Sanitize input
     const sanitizedQuestion = sanitizeInput(question);
-    
-    // Validate FID format
-    const fidValidation = validateRateLimitRequest(fid);
-    if (!fidValidation.isValid) {
-      console.warn(`[${requestId}] Invalid FID format: ${fid}`);
-      return NextResponse.json(
-        { error: fidValidation.reason },
-        { status: 400 }
-      );
+
+    // Wallet-connected web users bypass FID format validation (wallet address ≠ Farcaster ID)
+    const isWalletUser = !!(walletAddress && typeof walletAddress === 'string' && walletAddress.startsWith('0x'));
+
+    // Validate FID format — skip for wallet users
+    if (!isWalletUser) {
+      const fidValidation = validateRateLimitRequest(fid);
+      if (!fidValidation.isValid) {
+        console.warn(`[${requestId}] Invalid FID format: ${fid}`);
+        return NextResponse.json(
+          { error: fidValidation.reason },
+          { status: 400 }
+        );
+      }
     }
 
     // Enhanced content validation
@@ -132,9 +137,6 @@ export async function POST(request: NextRequest) {
     const consultationMode: ConsultationMode = mode === 'normal' ? 'comprehensive' : 'fast';
 
     console.log(`[${requestId}] Processing question - Platform: ${detectedPlatform}, Mode: ${consultationMode}, Tier: ${userTier}, ID: ${rateLimitIdentifier}`);
-
-    // Wallet-connected web users get unlimited access (same as miniapp)
-    const isWalletUser = !!(walletAddress && typeof walletAddress === 'string' && walletAddress.startsWith('0x'));
 
     // Check platform-aware rate limiting — skip for comprehensive (it's a triage continuation, already counted)
     let rateLimitResult;
