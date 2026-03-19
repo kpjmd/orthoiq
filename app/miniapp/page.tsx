@@ -865,7 +865,7 @@ function MiniAppContent() {
                 You&apos;ve already completed this check-in. Thanks for tracking your recovery.
               </p>
               <button
-                onClick={() => setTrackingMode(null)}
+                onClick={() => { setTrackingMode(null); setTrackingComplete(false); setTrackingAlreadyDone(false); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
                 Back to Home
@@ -879,7 +879,7 @@ function MiniAppContent() {
                 Your PROMIS questionnaire has been recorded. Thank you for tracking your recovery.
               </p>
               <button
-                onClick={() => setTrackingMode(null)}
+                onClick={() => { setTrackingMode(null); setTrackingComplete(false); setTrackingAlreadyDone(false); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
                 Back to Home
@@ -923,6 +923,8 @@ function MiniAppContent() {
           profileData={profileData}
           isLoading={profileLoading}
           onSelectMilestone={(cId, tp) => {
+            setTrackingComplete(false);
+            setTrackingAlreadyDone(false);
             setShowProfile(false);
             setTrackingMode({ consultationId: cId, timepoint: tp });
           }}

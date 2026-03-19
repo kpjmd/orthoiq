@@ -206,7 +206,7 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
                     className="relative rounded-lg overflow-hidden border border-gray-200 hover:border-purple-300 transition-colors bg-slate-900"
                     style={{ height: '200px' }}
                   >
-                    <div className="transform scale-[0.42] origin-top-left">
+                    <div className="absolute top-0 left-0 transform scale-[0.48] origin-top-left">
                       <IntelligenceCard data={cardData} size="small" animated={false} />
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-2 pt-6">
