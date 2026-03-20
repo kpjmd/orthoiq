@@ -1038,6 +1038,14 @@ export async function initDatabase() {
     `;
 
     await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS wallet_address VARCHAR(255);
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_wallet_address ON consultations(wallet_address);
+    `;
+
+    await sql`
       ALTER TABLE feedback_milestones ADD COLUMN IF NOT EXISTS web_user_id UUID REFERENCES web_users(id);
     `;
 
@@ -3316,6 +3324,7 @@ export async function storeConsultation(data: {
   executionTime?: number;
   queryType?: string;
   querySubtype?: string | null;
+  walletAddress?: string;
 }): Promise<void> {
   const sql = getSql();
 
@@ -3324,7 +3333,7 @@ export async function storeConsultation(data: {
       INSERT INTO consultations (
         consultation_id, question_id, fid, web_user_id, mode, participating_specialists,
         coordination_summary, specialist_count, total_cost, execution_time,
-        query_type, query_subtype
+        query_type, query_subtype, wallet_address
       ) VALUES (
         ${data.consultationId},
         ${data.questionId},
@@ -3337,7 +3346,8 @@ export async function storeConsultation(data: {
         ${data.totalCost || 0},
         ${data.executionTime || null},
         ${data.queryType || null},
-        ${data.querySubtype || null}
+        ${data.querySubtype || null},
+        ${data.walletAddress || null}
       )
     `;
     console.log(`Stored consultation ${data.consultationId} for question ${data.questionId}`);

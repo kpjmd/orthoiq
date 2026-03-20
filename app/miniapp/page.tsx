@@ -641,6 +641,7 @@ function MiniAppContent() {
           mode: 'fast',
           platform: 'miniapp',
           ...(userQueryType && { queryType: userQueryType }),
+          ...(context?.user?.verifications?.[0] && { walletAddress: context.user.verifications[0] }),
         }),
         signal: controller.signal,
       });
@@ -718,6 +719,7 @@ function MiniAppContent() {
           mode: 'normal',
           platform: 'miniapp',
           ...(userQueryType && { queryType: userQueryType }),
+          ...(context?.user?.verifications?.[0] && { walletAddress: context.user.verifications[0] }),
         }),
         signal: controller.signal,
       });

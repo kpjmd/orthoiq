@@ -23,6 +23,10 @@ export async function GET(request: NextRequest) {
 
     const sql = getSql();
 
+    // Look up wallet address for cross-platform consultation matching
+    const profileRow = await sql`SELECT wallet_address FROM user_profiles WHERE fid = ${fid}`;
+    const walletAddress = profileRow[0]?.wallet_address || null;
+
     // Fetch all data in parallel
     const [profile, consultations, promisHistory, icCountResult] = await Promise.all([
       getUserProfile(fid),
@@ -45,12 +49,12 @@ export async function GET(request: NextRequest) {
         FROM consultations c
         JOIN questions q ON c.question_id = q.id
         LEFT JOIN consultation_feedback cf ON c.consultation_id = cf.consultation_id
-        WHERE c.fid = ${fid}
+        WHERE (c.fid = ${fid} OR (${walletAddress} IS NOT NULL AND c.wallet_address = ${walletAddress}))
         ORDER BY c.created_at DESC
         LIMIT 20
       `,
       getUserPromisHistory(fid),
-      sql`SELECT COUNT(*) as count FROM consultations WHERE fid = ${fid} AND mode = 'normal'`,
+      sql`SELECT COUNT(*) as count FROM consultations WHERE (fid = ${fid} OR (${walletAddress} IS NOT NULL AND wallet_address = ${walletAddress})) AND mode = 'normal'`,
     ]);
 
     // Derive pending milestones from PROMIS baseline consultations

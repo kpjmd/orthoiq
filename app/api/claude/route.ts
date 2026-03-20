@@ -434,6 +434,7 @@ export async function POST(request: NextRequest) {
             executionTime: executionTime,
             queryType: claudeResponse.queryType || 'clinical',
             querySubtype: claudeResponse.querySubtype || null,
+            walletAddress: walletAddress || undefined,
           });
           console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database`);
         } catch (storeError) {
