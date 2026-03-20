@@ -28,33 +28,41 @@ export async function GET(request: NextRequest) {
     const walletAddress = profileRow[0]?.wallet_address || null;
 
     // Fetch all data in parallel
+    // Note: wallet_address check is done in JS because postgres.js cannot determine
+    // the data type of a parameterized NULL in "${null} IS NOT NULL" expressions.
     const [profile, consultations, promisHistory, icCountResult] = await Promise.all([
       getUserProfile(fid),
-      sql`
-        SELECT
-          c.consultation_id,
-          c.created_at,
-          c.mode,
-          c.participating_specialists,
-          c.specialist_count,
-          c.tier,
-          c.consensus_percentage,
-          c.total_token_stake,
-          c.md_reviewed,
-          c.md_approved,
-          q.question,
-          q.response,
-          q.confidence,
-          cf.user_satisfaction
-        FROM consultations c
-        JOIN questions q ON c.question_id = q.id
-        LEFT JOIN consultation_feedback cf ON c.consultation_id = cf.consultation_id
-        WHERE (c.fid = ${fid} OR (${walletAddress} IS NOT NULL AND c.wallet_address = ${walletAddress}))
-        ORDER BY c.created_at DESC
-        LIMIT 20
-      `,
+      walletAddress
+        ? sql`
+            SELECT
+              c.consultation_id, c.created_at, c.mode, c.participating_specialists,
+              c.specialist_count, c.tier, c.consensus_percentage, c.total_token_stake,
+              c.md_reviewed, c.md_approved, q.question, q.response, q.confidence,
+              cf.user_satisfaction
+            FROM consultations c
+            JOIN questions q ON c.question_id = q.id
+            LEFT JOIN consultation_feedback cf ON c.consultation_id = cf.consultation_id
+            WHERE (c.fid = ${fid} OR c.wallet_address = ${walletAddress})
+            ORDER BY c.created_at DESC
+            LIMIT 20
+          `
+        : sql`
+            SELECT
+              c.consultation_id, c.created_at, c.mode, c.participating_specialists,
+              c.specialist_count, c.tier, c.consensus_percentage, c.total_token_stake,
+              c.md_reviewed, c.md_approved, q.question, q.response, q.confidence,
+              cf.user_satisfaction
+            FROM consultations c
+            JOIN questions q ON c.question_id = q.id
+            LEFT JOIN consultation_feedback cf ON c.consultation_id = cf.consultation_id
+            WHERE c.fid = ${fid}
+            ORDER BY c.created_at DESC
+            LIMIT 20
+          `,
       getUserPromisHistory(fid),
-      sql`SELECT COUNT(*) as count FROM consultations WHERE (fid = ${fid} OR (${walletAddress} IS NOT NULL AND wallet_address = ${walletAddress})) AND mode = 'normal'`,
+      walletAddress
+        ? sql`SELECT COUNT(*) as count FROM consultations WHERE (fid = ${fid} OR wallet_address = ${walletAddress}) AND mode = 'normal'`
+        : sql`SELECT COUNT(*) as count FROM consultations WHERE fid = ${fid} AND mode = 'normal'`,
     ]);
 
     // Derive pending milestones from PROMIS baseline consultations
