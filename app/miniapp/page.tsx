@@ -687,6 +687,22 @@ function MiniAppContent() {
     }
   };
 
+  // Poll /api/claude/status/:id every 4s until completed or error
+  const pollConsultationStatus = async (consultationId: string, maxWaitMs = 150000): Promise<any> => {
+    const POLL_INTERVAL = 4000;
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      const res = await fetch(`/api/claude/status/${consultationId}`);
+      const data = await res.json();
+      if (data.status === 'completed') return data;
+      if (data.status === 'error') throw new Error(data.error || 'Consultation failed');
+      if (data.status === 'not_found') throw new Error('Consultation not found — please try again');
+      // status === 'processing' → continue polling
+    }
+    throw new Error('Consultation timed out. Please try again.');
+  };
+
   // Stage 2: Comprehensive upgrade
   const handleComprehensiveUpgrade = async () => {
     // Re-validate FID
@@ -701,7 +717,7 @@ function MiniAppContent() {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // short timeout — Railway replies quickly now
 
       const res = await fetch('/api/claude', {
         method: 'POST',
@@ -749,7 +765,17 @@ function MiniAppContent() {
         return;
       }
 
-      const data = await res.json();
+      const initial = await res.json();
+
+      let data: any;
+      if (initial.status === 'processing' && initial.consultationId) {
+        // Background processing — poll until complete
+        data = await pollConsultationStatus(initial.consultationId);
+      } else {
+        // Synchronous response (cache hit or legacy path)
+        data = initial;
+      }
+
       const result = parseApiResponse(data);
       setComprehensiveResult(result);
       if (showPromisQuestionnaire && !promisCompleted) {

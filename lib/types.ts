@@ -43,6 +43,8 @@ export interface ClaudeResponse {
   // Informational Query Pathway (backend v0.7.0)
   queryType?: 'clinical' | 'informational';
   querySubtype?: string | null;
+  // Async polling: set when Railway returned processing state (normal mode fire-and-forget)
+  processingAsync?: boolean;
   // Scope validation for out-of-scope queries
   isOutOfScope?: boolean;
   scopeValidation?: {

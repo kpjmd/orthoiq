@@ -205,6 +205,16 @@ export async function POST(request: NextRequest) {
 
       console.log(`[${requestId}] Response received, confidence: ${claudeResponse.confidence}, fromAgents: ${claudeResponse.fromAgentsSystem}`);
 
+      // Async polling case: Railway is processing normal-mode consultation in background
+      if (claudeResponse.processingAsync && claudeResponse.consultationId) {
+        console.log(`[${requestId}] Normal mode consultation async, consultationId: ${claudeResponse.consultationId}`);
+        return NextResponse.json({
+          status: 'processing',
+          consultationId: claudeResponse.consultationId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       // Check for scope validation (out-of-scope queries) - return early
       if (claudeResponse.isOutOfScope && claudeResponse.scopeValidation) {
         console.log(`[${requestId}] Returning scope validation response: ${claudeResponse.scopeValidation.category}`);

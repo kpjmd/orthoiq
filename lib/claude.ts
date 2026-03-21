@@ -258,6 +258,19 @@ async function tryOrthoIQAgents(
     console.log(`[${requestId || 'unknown'}] OrthoIQ-Agents raw response keys:`, Object.keys(result));
     console.log(`[${requestId || 'unknown'}] Response mode:`, result.mode, 'Success:', result.success, 'Requested mode:', mode);
 
+    // Handle async processing response (normal mode fire-and-forget on Railway)
+    if (result.status === 'processing' && result.consultationId) {
+      console.log(`[${requestId || 'unknown'}] Normal mode consultation processing async: ${result.consultationId}`);
+      return {
+        response: '',
+        isRelevant: true,
+        confidence: 0,
+        fromAgentsSystem: true,
+        processingAsync: true,
+        consultationId: result.consultationId,
+      };
+    }
+
     if (!result.success) {
       // Check for scope validation response (out-of-scope queries)
       if (result.scopeValidation) {
@@ -611,7 +624,7 @@ function transformFastModeResponse(result: any, requestId?: string, userQuestion
 }
 
 // Transform Normal Mode response to ClaudeResponse format
-function transformNormalModeResponse(result: any, requestId?: string, userQuestion?: string): ClaudeResponse {
+export function transformNormalModeResponse(result: any, requestId?: string, userQuestion?: string): ClaudeResponse {
   console.log(`[${requestId || 'unknown'}] Transforming normal mode consultation with ${result.consultation.responses?.length || 0} specialists`);
 
   const consultation = result.consultation;
@@ -742,4 +755,24 @@ function formatResponseContent(content: any): string {
   }
   
   return String(content);
+}
+/**
+ * Fetch the current status of a background normal-mode consultation from Railway.
+ * Returns: { status: 'processing' | 'completed' | 'error' | 'not_found', ... }
+ */
+export async function fetchConsultationStatus(consultationId: string): Promise<any> {
+  const agentsUrl = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+
+  const res = await fetch(`${agentsUrl}/consultation/${consultationId}/status`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Status check failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
 }
