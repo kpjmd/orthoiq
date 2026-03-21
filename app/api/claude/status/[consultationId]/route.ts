@@ -70,9 +70,9 @@ function getSpecialtyDescription(specialist: string): string {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { consultationId: string } }
+  { params }: { params: Promise<{ consultationId: string }> }
 ) {
-  const { consultationId } = params;
+  const { consultationId } = await params;
 
   try {
     const data = await fetchConsultationStatus(consultationId);
