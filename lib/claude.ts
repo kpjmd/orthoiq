@@ -259,7 +259,9 @@ async function tryOrthoIQAgents(
     console.log(`[${requestId || 'unknown'}] Response mode:`, result.mode, 'Success:', result.success, 'Requested mode:', mode);
 
     // Handle async processing response (normal mode fire-and-forget on Railway)
-    if (result.status === 'processing' && result.consultationId) {
+    // Fast mode also returns status:'processing' (background comprehensive fires in parallel),
+    // but it includes a 'triage' key. Only treat as async if there is NO triage response.
+    if (result.status === 'processing' && result.consultationId && !result.triage) {
       console.log(`[${requestId || 'unknown'}] Normal mode consultation processing async: ${result.consultationId}`);
       return {
         response: '',

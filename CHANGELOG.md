@@ -1,5 +1,78 @@
 # OrthoIQ Changelog
 
+## [1.7.0] - 2026-03-21: Async Consultation Polling Architecture
+
+### Changed — Comprehensive Consultation Flow (Breaking for Farcaster)
+
+Comprehensive (normal-mode) consultations now use an async fire-and-forget + HTTP polling
+architecture instead of a single long-held HTTP request. This eliminates the Farcaster WebView
+~90-second hard timeout that was aborting consultations before results arrived.
+
+**Before**: Frontend → `/api/claude` (POST, mode:normal) → Railway waits ~85–95s → response
+**After**: Frontend → `/api/claude` (POST, mode:normal) → returns `consultationId` in <2s →
+frontend polls `/api/claude/status/:id` every 4s → renders result when `status: 'completed'`
+
+### Added
+
+- **`app/api/claude/status/[consultationId]/route.ts`** — New Next.js proxy route. Forwards
+  status requests to Railway's `GET /consultation/:id/status`, transforms the completed
+  consultation into the same response shape as the synchronous `/api/claude` POST so the
+  frontend can use `parseApiResponse()` unchanged.
+
+- **`fetchConsultationStatus(consultationId)`** in `lib/claude.ts` — Fetches consultation
+  status from Railway with 10s timeout.
+
+- **`pollConsultationStatus(consultationId, maxWaitMs=150000)`** helper in both
+  `app/miniapp/page.tsx` and `components/WebOrthoInterface.tsx` — Polls every 4s until
+  `status: 'completed'`, `'error'`, or `'not_found'`.
+
+- **`processingAsync?: boolean`** added to `ClaudeResponse` type in `lib/types.ts` — Set by
+  `tryOrthoIQAgents()` when Railway returns the new async processing response.
+
+### Changed
+
+- **`handleComprehensiveUpgrade`** (miniapp + web) — POST timeout reduced from 120s to 30s;
+  detects `initial.status === 'processing'` and enters polling loop instead of awaiting full
+  response inline.
+
+- **`tryOrthoIQAgents()`** in `lib/claude.ts` — Added handler for Railway's async processing
+  response (`status: 'processing'`, no `triage` key). Returns `processingAsync: true` to signal
+  the route handler to return early with the consultationId.
+
+- **`/api/claude` route.ts** — Added early return for `processingAsync` responses before the
+  normal response-building block, returning `{ status: 'processing', consultationId }`.
+
+### Fixed
+
+- **Fast mode triage response blank after async deployment** — Railway's fast mode response has
+  always included `status: 'processing'` (it fires background comprehensive immediately after
+  returning triage). The new `processingAsync` check in `tryOrthoIQAgents` was accidentally
+  matching fast mode responses too, causing the triage card to render with an empty response.
+  Fixed by adding `&& !result.triage` to the check — fast mode always has a `triage` key,
+  normal-mode async never does.
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `lib/types.ts` | Added `processingAsync?: boolean` to `ClaudeResponse` |
+| `lib/claude.ts` | `processingAsync` handler in `tryOrthoIQAgents()`, exported `fetchConsultationStatus()`, `&& !result.triage` fast-mode guard |
+| `app/api/claude/route.ts` | Early return for `processingAsync` responses |
+| `app/api/claude/status/[consultationId]/route.ts` | New — Railway status proxy |
+| `app/miniapp/page.tsx` | `pollConsultationStatus` helper, POST timeout 120s→30s, polling loop |
+| `components/WebOrthoInterface.tsx` | Same as miniapp |
+
+### Architecture Notes
+
+- **Cache hits remain synchronous** — The Railway cache check runs before the async path, so
+  returning users get instant responses without polling overhead.
+- **Railway in-memory TTL** — Consultation results are held in a `Map` for 30 minutes post-
+  completion, then cleaned up. Railway restarts lose in-flight jobs; those would return
+  `not_found` on next poll and surface as a user-visible error ("please try again").
+- **Fast/triage mode unchanged** — Only `mode: 'normal'` is async. The triage step still
+  returns synchronously (typically <20s).
+
+---
+
 ## [1.6.0] - 2026-03-10: Informational Query Pathway (Backend v0.7.0)
 
 ### Added
