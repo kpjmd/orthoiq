@@ -656,6 +656,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   };
 
   const getRemainingQuestions = () => {
+    if (isWalletConnected) return 9999;
     return Math.max(0, dailyQuestions.limit - dailyQuestions.used);
   };
 
