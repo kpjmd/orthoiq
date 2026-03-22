@@ -374,6 +374,10 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   }, [isVerified, fetchWebUsage]);
 
   useEffect(() => {
+    if (isWalletConnected) {
+      setWebUsage({ questionsAsked: 0, questionsRemaining: 9999, isLimitReached: false });
+      return;
+    }
     const limit = isVerified ? 10 : 1;
     setDailyQuestions(prev => ({ ...prev, limit }));
     setWebUsage(prev => ({
@@ -381,7 +385,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       questionsRemaining: Math.max(0, limit - prev.questionsAsked),
       isLimitReached: prev.questionsAsked >= limit
     }));
-  }, [isVerified]);
+  }, [isVerified, isWalletConnected]);
 
   // Show PROMIS button after 5s during comprehensive loading (not for informational queries)
   useEffect(() => {
