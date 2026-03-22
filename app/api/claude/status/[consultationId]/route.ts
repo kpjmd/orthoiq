@@ -114,6 +114,7 @@ export async function GET(
       : null;
 
     return NextResponse.json({
+      status: 'completed',
       response: claudeResponse.response || '',
       confidence: claudeResponse.confidence,
       isFiltered: false,
