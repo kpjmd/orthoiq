@@ -513,68 +513,77 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
     setError('');
 
     try {
-      const sessionId = generateSessionId();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // short timeout — Railway replies quickly now
+      let data: any;
 
-      const res = await fetch('/api/claude', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: currentQuestion,
-          fid: effectiveUserId,
-          tier: effectiveTier,
-          isWebUser: true,
-          webUser: user,
-          mode: 'normal',
-          platform: 'web',
-          webSessionId: sessionId,
-          ...(address && { walletAddress: address }),
-          ...(userQueryType && { queryType: userQueryType }),
-        }),
-        signal: controller.signal,
-      });
+      // Fast-mode already fired a background comprehensive — reuse it.
+      // Polling the existing consultationId avoids a second concurrent coordination.
+      if (triageResult?.fromAgentsSystem && triageResult?.consultationId &&
+          !triageResult.consultationId.startsWith('fallback-')) {
+        data = await pollConsultationStatus(triageResult.consultationId);
+      } else {
+        // Non-agents path (Claude fallback) or cache hit — fresh POST
+        const sessionId = generateSessionId();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // short timeout — Railway replies quickly now
 
-      clearTimeout(timeoutId);
+        const res = await fetch('/api/claude', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: currentQuestion,
+            fid: effectiveUserId,
+            tier: effectiveTier,
+            isWebUser: true,
+            webUser: user,
+            mode: 'normal',
+            platform: 'web',
+            webSessionId: sessionId,
+            ...(address && { walletAddress: address }),
+            ...(userQueryType && { queryType: userQueryType }),
+          }),
+          signal: controller.signal,
+        });
 
-      const contentType = res.headers.get('content-type');
+        clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        let errorMessage = `API error (${res.status})`;
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            const errorData = await res.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch {
+        const contentType = res.headers.get('content-type');
+
+        if (!res.ok) {
+          let errorMessage = `API error (${res.status})`;
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              errorMessage = errorData.error || errorMessage;
+            } catch {
+              const errorText = await res.text();
+              errorMessage = errorText || errorMessage;
+            }
+          } else {
             const errorText = await res.text();
             errorMessage = errorText || errorMessage;
           }
-        } else {
-          const errorText = await res.text();
-          errorMessage = errorText || errorMessage;
+          // Fall back to triage_complete on error
+          setError(errorMessage);
+          setConsultationStage('triage_complete');
+          return;
         }
-        // Fall back to triage_complete on error
-        setError(errorMessage);
-        setConsultationStage('triage_complete');
-        return;
-      }
 
-      const initial = await res.json();
+        const initial = await res.json();
 
-      // Handle soft rate-limit block (HTTP 200 with rateLimited flag)
-      if (initial.rateLimited) {
-        setError(initial.softWarning || initial.upgradePrompt || 'Rate limit reached. Please try again later.');
-        setConsultationStage('triage_complete');
-        return;
-      }
+        // Handle soft rate-limit block (HTTP 200 with rateLimited flag)
+        if (initial.rateLimited) {
+          setError(initial.softWarning || initial.upgradePrompt || 'Rate limit reached. Please try again later.');
+          setConsultationStage('triage_complete');
+          return;
+        }
 
-      let data: any;
-      if (initial.status === 'processing' && initial.consultationId) {
-        // Background processing — poll until complete
-        data = await pollConsultationStatus(initial.consultationId);
-      } else {
-        // Synchronous response (cache hit or legacy path)
-        data = initial;
+        if (initial.status === 'processing' && initial.consultationId) {
+          // Background processing — poll until complete
+          data = await pollConsultationStatus(initial.consultationId);
+        } else {
+          // Synchronous response (cache hit or legacy path)
+          data = initial;
+        }
       }
 
       const result = parseApiResponse(data);

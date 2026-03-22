@@ -716,64 +716,73 @@ function MiniAppContent() {
     setError('');
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // short timeout — Railway replies quickly now
+      let data: any;
 
-      const res = await fetch('/api/claude', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: currentQuestion,
-          fid: typeof fid === 'number' ? fid.toString() : fid,
-          authUser: authUser ? {
-            fid: authUser.fid,
-            username: authUser.username,
-            displayName: authUser.displayName,
-            tier: getUserTier()
-          } : null,
-          tier: getUserTier(),
-          mode: 'normal',
-          platform: 'miniapp',
-          ...(userQueryType && { queryType: userQueryType }),
-          ...(context?.user?.verifications?.[0] && { walletAddress: context.user.verifications[0] }),
-        }),
-        signal: controller.signal,
-      });
+      // Fast-mode already fired a background comprehensive — reuse it.
+      // Polling the existing consultationId avoids a second concurrent coordination.
+      if (triageResult?.fromAgentsSystem && triageResult?.consultationId &&
+          !triageResult.consultationId.startsWith('fallback-')) {
+        data = await pollConsultationStatus(triageResult.consultationId);
+      } else {
+        // Non-agents path (Claude fallback) or cache hit — fresh POST
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // short timeout — Railway replies quickly now
 
-      clearTimeout(timeoutId);
+        const res = await fetch('/api/claude', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: currentQuestion,
+            fid: typeof fid === 'number' ? fid.toString() : fid,
+            authUser: authUser ? {
+              fid: authUser.fid,
+              username: authUser.username,
+              displayName: authUser.displayName,
+              tier: getUserTier()
+            } : null,
+            tier: getUserTier(),
+            mode: 'normal',
+            platform: 'miniapp',
+            ...(userQueryType && { queryType: userQueryType }),
+            ...(context?.user?.verifications?.[0] && { walletAddress: context.user.verifications[0] }),
+          }),
+          signal: controller.signal,
+        });
 
-      const contentType = res.headers.get('content-type');
+        clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        let errorMessage = `API error (${res.status})`;
+        const contentType = res.headers.get('content-type');
 
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            const errorData = await res.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch (parseError) {
+        if (!res.ok) {
+          let errorMessage = `API error (${res.status})`;
+
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              const errorData = await res.json();
+              errorMessage = errorData.error || errorMessage;
+            } catch (parseError) {
+              const errorText = await res.text();
+              errorMessage = errorText || errorMessage;
+            }
+          } else {
             const errorText = await res.text();
             errorMessage = errorText || errorMessage;
           }
-        } else {
-          const errorText = await res.text();
-          errorMessage = errorText || errorMessage;
+          // Fall back to triage_complete on error (preserves triage result)
+          setError(errorMessage);
+          setConsultationStage('triage_complete');
+          return;
         }
-        // Fall back to triage_complete on error (preserves triage result)
-        setError(errorMessage);
-        setConsultationStage('triage_complete');
-        return;
-      }
 
-      const initial = await res.json();
+        const initial = await res.json();
 
-      let data: any;
-      if (initial.status === 'processing' && initial.consultationId) {
-        // Background processing — poll until complete
-        data = await pollConsultationStatus(initial.consultationId);
-      } else {
-        // Synchronous response (cache hit or legacy path)
-        data = initial;
+        if (initial.status === 'processing' && initial.consultationId) {
+          // Background processing — poll until complete
+          data = await pollConsultationStatus(initial.consultationId);
+        } else {
+          // Synchronous response (cache hit or legacy path)
+          data = initial;
+        }
       }
 
       const result = parseApiResponse(data);
