@@ -3,6 +3,7 @@ import { UserTier } from './rateLimit';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orthoiq.vercel.app';
 
 export interface NotificationData {
   title: string;
@@ -48,7 +49,9 @@ export async function sendNotification(fid: string, notification: NotificationDa
             notificationId,
             title: notification.title,
             body: notification.body,
-            targetUrl: notification.targetUrl || '/miniapp',
+            targetUrl: (notification.targetUrl?.startsWith('/')
+              ? `${APP_URL}${notification.targetUrl}`
+              : notification.targetUrl) || `${APP_URL}/miniapp`,
             tokens: [token.token]
           })
         });
@@ -57,7 +60,8 @@ export async function sendNotification(fid: string, notification: NotificationDa
           success = true;
           console.log(`Notification sent successfully to FID ${fid}`);
         } else {
-          console.error(`Failed to send notification: ${response.status} ${response.statusText}`);
+          const errorBody = await response.text().catch(() => 'unable to read body');
+          console.error(`Failed to send notification: ${response.status} ${response.statusText}`, errorBody);
         }
       } catch (error) {
         console.error(`Error sending to token ${token.token}:`, error);
@@ -87,10 +91,10 @@ export async function sendResponseReviewNotification(data: ResponseReviewNotific
       title = '✅ Response Approved As-Is';
       body = `Your orthopedic question has been approved without changes by ${data.reviewerName}.`;
     } else if (reviewDetails?.reviewType === 'approve_with_additions') {
-      title = '✅ Response Approved with Additions';
+      title = '✅ Approved with Additions';
       body = `Your response has been approved with helpful additions by ${data.reviewerName}.`;
     } else if (reviewDetails?.reviewType === 'approve_with_corrections') {
-      title = '✅ Response Approved with Corrections';
+      title = '✅ Approved with Corrections';
       body = `Your response has been approved with important corrections by ${data.reviewerName}.`;
     } else {
       title = '✅ Response Approved';
@@ -99,13 +103,13 @@ export async function sendResponseReviewNotification(data: ResponseReviewNotific
   } else {
     // Determine specific rejection reason
     if (reviewDetails?.reviewType === 'reject_medical_inaccuracy') {
-      title = '❌ Response Rejected - Medical Inaccuracy';
+      title = '❌ Rejected: Inaccuracy';
       body = `Your response was rejected for medical inaccuracy. Please consult with a healthcare provider.`;
     } else if (reviewDetails?.reviewType === 'reject_inappropriate_scope') {
-      title = '❌ Response Rejected - Inappropriate Scope';
+      title = '❌ Rejected: Scope Issue';
       body = `Your question falls outside our scope. Please consult with a healthcare provider.`;
     } else if (reviewDetails?.reviewType === 'reject_poor_communication') {
-      title = '❌ Response Rejected - Poor Communication';
+      title = '❌ Rejected: Communication';
       body = `Your response was rejected for communication issues. Please consult with a healthcare provider.`;
     } else {
       title = '❌ Response Rejected';
@@ -145,7 +149,7 @@ export async function sendMilestoneNotification(
   const weekNumber = Math.floor(milestoneDay / 7);
 
   const notification: NotificationData = {
-    title: `Week ${weekNumber} Check-in: How are you doing?`,
+    title: `Week ${weekNumber} PROMIS Check-in`,
     body: `Time for your ${weekNumber}-week PROMIS check-in. Complete a short questionnaire to track your recovery progress.`,
     targetUrl: `/miniapp?track=${consultationId}&milestone=${milestoneDay}`,
     imageUrl: 'https://orthoiq.vercel.app/icon.png'
