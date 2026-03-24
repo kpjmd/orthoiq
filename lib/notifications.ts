@@ -292,26 +292,9 @@ export async function disableNotificationPermissions(fid: string): Promise<boole
   }
 }
 
-// Schedule daily reset notifications for all users
+// Schedule daily reset notifications — DEPRECATED
+// Farcaster miniapp users have unlimited questions, and notification tokens
+// are exclusively from Farcaster users, so reset notifications are no longer relevant.
 export async function scheduleRateLimitResetNotifications(): Promise<void> {
-  try {
-    // Get all users who have notification tokens
-    const usersWithTokens = await sql`
-      SELECT DISTINCT fid FROM notification_tokens WHERE enabled = true
-    `;
-    
-    console.log(`Scheduling reset notifications for ${usersWithTokens.length} users`);
-    
-    // Send reset notifications to all users
-    // Note: In production, you'd want to determine user tiers properly
-    for (const user of usersWithTokens) {
-      try {
-        await sendRateLimitResetNotification(user.fid, 'authenticated');
-      } catch (error) {
-        console.error(`Failed to send reset notification to FID ${user.fid}:`, error);
-      }
-    }
-  } catch (error) {
-    console.error('Failed to schedule reset notifications:', error);
-  }
+  console.log('scheduleRateLimitResetNotifications: skipped — miniapp users have unlimited questions');
 }

@@ -1,5 +1,43 @@
 # OrthoIQ Changelog
 
+## [1.8.0] - 2026-03-23: Farcaster Notification Fix & Testnet Readiness
+
+### Fixed
+- **Farcaster Push Notifications Delivered** — Milestone PROMIS check-in notifications now arrive
+  in Warpcast inbox. Three spec violations were causing silent rejection:
+  1. `targetUrl` used relative paths (`/miniapp?track=...`) instead of full `https://` URLs
+     required by Farcaster's `secureUrlSchema`
+  2. Milestone notification `title` exceeded the 32-character limit
+     (`"Week 2 Check-in: How are you doing?"` → `"Week 2 PROMIS Check-in"`)
+  3. Several response review notification titles also exceeded 32 chars and were shortened
+- **Error response body logging** — `sendNotification()` now logs the Farcaster response body on
+  failure, making spec violations visible in Vercel logs instead of only status codes
+
+### Removed
+- **Daily question reset notifications** — The midnight cron job (`/api/notifications/reset-daily`)
+  was sending "Your daily question limit has reset!" to all Farcaster users, but miniapp users
+  have had unlimited questions since v1.5.0. Removed the cron schedule from `vercel.json` and
+  deprecated `scheduleRateLimitResetNotifications()`. The route remains but is a no-op.
+
+### Milestone — Testnet Ready
+Both notification paths are now confirmed working end-to-end:
+- **Web users**: Email follow-up notifications via Resend (verified since v1.5.1)
+- **Farcaster users**: Warpcast inbox push notifications (confirmed 2026-03-23 with Week 2 PROMIS check-in)
+
+The platform is ready for testnet deployment pending final validation of 4-week and 8-week
+milestone notifications and general integration testing. The journey from Claude API experiment
+to full subspecialist agent panel with prediction market token exchanges, validated PROMIS
+questionnaire follow-up, evidence-based research citations, and informational query pathway
+is complete at MVP+ stage.
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `lib/notifications.ts` | Added `APP_URL` constant, absolute `targetUrl`s, shortened titles to ≤32 chars, error body logging, deprecated reset notifications |
+| `vercel.json` | Removed `reset-daily` cron schedule |
+
+---
+
 ## [1.7.0] - 2026-03-21: Async Consultation Polling Architecture
 
 ### Changed — Comprehensive Consultation Flow (Breaking for Farcaster)
