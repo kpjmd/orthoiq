@@ -42,16 +42,6 @@ interface PROMISPublicStats {
   avgBaselinePiScore: number | null;
 }
 
-interface AgentPerformance {
-  agentId: string;
-  agentName: string;
-  accuracyRate: number;
-  tokensEarned: number;
-  totalPredictions: number;
-  last7DaysAccuracy?: number;
-  trend?: 'improving' | 'stable' | 'declining';
-}
-
 interface QueryTypeBreakdown {
   clinical: number;
   informational: number;
@@ -63,17 +53,11 @@ interface PublicStats {
   totalConsultations: number;
   averageAgents: number;
   averageConsensus: number;
-  topAgents: AgentPerformance[];
   cardDistribution: {
     standard: number;
     complete: number;
     verified: number;
     exceptional: number;
-  };
-  networkStats: {
-    totalPredictions: number;
-    averageAccuracy: number;
-    totalTokensDistributed: number;
   };
   researchStats: ResearchPublicStats | null;
   promisStats: PROMISPublicStats | null;
@@ -98,17 +82,15 @@ export default function PublicStatsPage() {
 
   const fetchStats = async () => {
     try {
-      const [overviewRes, marketRes, cardsRes, researchRes, promisRes] = await Promise.all([
+      const [overviewRes, cardsRes, researchRes, promisRes] = await Promise.all([
         fetch('/api/admin/metrics/overview'),
-        fetch('/api/admin/prediction-market/performance'),
         fetch('/api/admin/cards/distribution'),
         fetch('/api/admin/research/metrics'),
         fetch('/api/admin/promis/metrics'),
       ]);
 
-      const [overview, market, cards, research, promis] = await Promise.all([
+      const [overview, cards, research, promis] = await Promise.all([
         overviewRes.ok ? overviewRes.json() : null,
-        marketRes.ok ? marketRes.json() : null,
         cardsRes.ok ? cardsRes.json() : null,
         researchRes.ok ? researchRes.json() : null,
         promisRes.ok ? promisRes.json() : null,
@@ -118,17 +100,11 @@ export default function PublicStatsPage() {
         totalConsultations: overview?.totalConsultations || 0,
         averageAgents: overview?.averageAgentsPerConsultation || 0,
         averageConsensus: overview?.averageMDApprovalRate || 0,
-        topAgents: market?.topPerformers?.slice(0, 5) || [],
         cardDistribution: {
           standard: cards?.byTier?.standard?.count || 0,
           complete: cards?.byTier?.complete?.count || 0,
           verified: cards?.byTier?.verified?.count || 0,
           exceptional: cards?.byTier?.exceptional?.count || 0
-        },
-        networkStats: {
-          totalPredictions: market?.totalPredictions || 0,
-          averageAccuracy: market?.averageAccuracy || 0,
-          totalTokensDistributed: market?.totalTokensDistributed || 0
         },
         researchStats: research ? {
           totalSyntheses: research.totalSyntheses || 0,
@@ -191,21 +167,6 @@ export default function PublicStatsPage() {
   };
 
   const totalCards = Object.values(stats.cardDistribution).reduce((a, b) => a + b, 0);
-
-  // Consensus leaderboard computations
-  const meanAccuracy = stats.topAgents.length > 0
-    ? stats.topAgents.reduce((s, a) => s + a.accuracyRate, 0) / stats.topAgents.length
-    : 0;
-
-  const sortedAgents = [...stats.topAgents].sort(
-    (a, b) => (b.accuracyRate * Math.log1p(b.totalPredictions)) - (a.accuracyRate * Math.log1p(a.totalPredictions))
-  );
-
-  const getTrendIcon = (trend?: string) => {
-    if (trend === 'improving') return { icon: '↑', cls: 'text-green-600 bg-green-50' };
-    if (trend === 'declining') return { icon: '↓', cls: 'text-red-600 bg-red-50' };
-    return { icon: '→', cls: 'text-gray-500 bg-gray-100' };
-  };
 
   // Research stats: prefer live agent stats when local DB is empty
   const rs = stats.researchStats;
@@ -320,75 +281,6 @@ export default function PublicStatsPage() {
             </div>
           </div>
         )}
-
-        {/* Agent Consensus Leaderboard */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Agent Consensus Leaderboard</h2>
-            <p className="text-sm text-gray-500 mt-1">Ranked by accuracy weighted by prediction volume. Agents closest to network consensus earn higher alignment scores.</p>
-          </div>
-          {sortedAgents.length === 0 ? (
-            <p className="text-gray-500 text-center">No agent data available</p>
-          ) : (
-            <div className="space-y-4">
-              {sortedAgents.map((agent, index) => {
-                const consensusScore = meanAccuracy > 0 ? agent.accuracyRate / meanAccuracy : 1;
-                const isTopAgent = index === 0;
-                const isBottomAgent = index === sortedAgents.length - 1 && sortedAgents.length > 1;
-                const trend = getTrendIcon(agent.trend);
-                return (
-                  <div key={agent.agentId} className={`flex items-center space-x-4 border-b pb-4 ${isTopAgent ? 'border-blue-100' : ''}`}>
-                    <div className="text-2xl font-bold text-gray-400 w-8">#{index + 1}</div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-gray-900">{agent.agentName}</span>
-                        {isTopAgent && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-semibold">Most Aligned</span>
-                        )}
-                        {isBottomAgent && (
-                          <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-semibold">Independent Voice</span>
-                        )}
-                        {agent.trend && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-semibold ${trend.cls}`}>
-                            {trend.icon} {agent.trend}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-gray-600">
-                        <span className="whitespace-nowrap">{Math.round(agent.accuracyRate * 100)}% accuracy</span>
-                        <span className="whitespace-nowrap">•</span>
-                        <span className="whitespace-nowrap">{agent.tokensEarned} tokens</span>
-                        <span className="whitespace-nowrap">•</span>
-                        <span className="whitespace-nowrap">{agent.totalPredictions} predictions</span>
-                        <span className="whitespace-nowrap">•</span>
-                        {(() => {
-                          const deltaPp = (agent.accuracyRate - meanAccuracy) * 100;
-                          const absDelta = Math.abs(deltaPp);
-                          if (absDelta <= 1) {
-                            return <span className="font-medium text-gray-400 whitespace-nowrap">avg</span>;
-                          }
-                          return (
-                            <span className={`font-medium whitespace-nowrap ${deltaPp > 0 ? 'text-green-600' : 'text-orange-500'}`}>
-                              {deltaPp > 0 ? '+' : ''}{deltaPp.toFixed(0)}pp vs avg
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${isTopAgent ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gradient-to-r from-blue-400 to-blue-500'}`}
-                            style={{ width: `${agent.accuracyRate * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* Research Agent Panel */}
         {showResearchPanel && (
@@ -605,46 +497,6 @@ export default function PublicStatsPage() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Prediction Market Stats */}
-        <div className="bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Prediction Market Statistics</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900 mb-2">
-                {stats.networkStats.totalPredictions.toLocaleString()}
-              </div>
-              <div className="text-sm text-gray-600">Total Predictions</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900 mb-2">
-                {Math.round(stats.networkStats.averageAccuracy * 100)}%
-              </div>
-              <div className="text-sm text-gray-600">Average Accuracy</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900 mb-2">
-                {stats.networkStats.totalTokensDistributed.toLocaleString()}
-              </div>
-              <div className="text-sm text-gray-600">Total Tokens Distributed</div>
-            </div>
-          </div>
-
-          {/* Token Economics Teaser */}
-          <div className="mt-6 pt-6 border-t border-blue-200">
-            <div className="text-center">
-              <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold mb-3">
-                COMING SOON
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">On-Chain Token Economics</h3>
-              <p className="text-sm text-gray-600 max-w-md mx-auto">
-                Agent performance tokens will be tradeable on-chain. Stake on agent accuracy,
-                earn rewards for correct predictions, and participate in decentralized
-                orthopedic intelligence.
-              </p>
-            </div>
           </div>
         </div>
 

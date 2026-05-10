@@ -76,19 +76,27 @@ from `/recovery/complete`; Zod caps free-text at 2048 chars.
 
 ---
 
-## Task 3 — Prediction Market UI Cleanup 🔲 TODO
+## Task 3 — Prediction Market UI Cleanup ✅ COMPLETE
 
-**Scope:** Remove UI that rendered data from the now-deleted backend routes.
-
-**Components to remove or repurpose:**
-- `app/admin/dashboard/components/PredictionMarketAnalytics.tsx` — remove from dashboard
-- Prediction market section in `app/stats/page.tsx` (lines 611–649)
-- Agent consensus leaderboard in `app/stats/page.tsx` (lines 325–391)
-- `app/admin/agents/[agentId]/page.tsx` — page calls the stub route; remove or redirect
-- Confirm `components/FeedbackModal.tsx` does not render `cascadingResolution`,
-  `recommendMDReview`, or `totalAgentsResolved` (verified: it doesn't — safe)
-- Confirm `app/admin/md-review/ConsultationReview.tsx` handles `{recorded: true}` response
-  correctly (verified: it only checks success/error — safe)
+**What was removed (2026-05-10):**
+- [x] Deleted `app/admin/dashboard/components/PredictionMarketAnalytics.tsx`; dashboard now renders
+  `<CardDistribution />` standalone where the 2-column grid was.
+- [x] Removed Agent Consensus Leaderboard section from `app/stats/page.tsx`.
+- [x] Removed Prediction Market Statistics section (incl. "On-Chain Token Economics" teaser) from
+  `app/stats/page.tsx`.
+- [x] Deleted `app/admin/agents/[agentId]/page.tsx` and its stub route
+  `app/api/admin/agents/[agentId]/route.ts` — detail page had no live data and was already 503.
+- [x] Deleted `app/admin/agents/page.tsx` — index page depended on dead endpoint and linked only to
+  the now-deleted detail page.
+- [x] Deleted `app/api/admin/prediction-market/performance/route.ts` (static fallback proxy) — no
+  remaining callers.
+- [x] Cleaned all orphaned `AgentPerformance` type, `topAgents`/`networkStats` fields, leaderboard
+  helper vars, and the prediction-market fetch from `Promise.all` in `app/stats/page.tsx`.
+- [x] Confirmed `components/FeedbackModal.tsx` does not render `cascadingResolution`,
+  `recommendMDReview`, or `totalAgentsResolved` (verified: safe).
+- [x] Confirmed `app/admin/md-review/ConsultationReview.tsx` handles `{recorded: true}` correctly
+  (verified: safe).
+- `npx tsc --noEmit` passes with zero errors after cache clear.
 
 ---
 
@@ -135,6 +143,6 @@ All five tasks must be signed off before:
 |---|---|
 | Task 1 — Integration audit | ✅ Done |
 | Task 2 — Security review | ✅ Done |
-| Task 3 — Prediction UI cleanup | 🔲 |
+| Task 3 — Prediction UI cleanup | ✅ Done |
 | Task 4 — Performance/cost | 🔲 |
 | Task 5 — Smart contract | 🔲 |

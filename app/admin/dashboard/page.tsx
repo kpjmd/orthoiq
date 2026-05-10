@@ -1,7 +1,6 @@
 'use client';
 
 import { SystemOverview } from './components/SystemOverview';
-import { PredictionMarketAnalytics } from './components/PredictionMarketAnalytics';
 import { CardDistribution } from './components/CardDistribution';
 import { EngagementMetrics } from './components/EngagementMetrics';
 import { MDReviewQueue } from './components/MDReviewQueue';
@@ -43,11 +42,8 @@ export default function AdminDashboard() {
         {/* Query Pathway Analytics */}
         <QueryTypeAnalytics />
 
-        {/* Prediction Market & Card Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PredictionMarketAnalytics />
-          <CardDistribution />
-        </div>
+        {/* Card Distribution */}
+        <CardDistribution />
 
         {/* PROMIS Capture Rates & Chatbot Usage */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
