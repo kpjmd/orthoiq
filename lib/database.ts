@@ -1124,7 +1124,36 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_promis_responses_patient_id ON promis_responses(patient_id);
     `;
 
-    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, web rate limits, chat messages, and PROMIS responses tables)');
+    // V2 prediction market: project key agent fields from result_data JSONB into queryable columns
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS consultation_id VARCHAR(255);
+    `;
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS agent_confidence DECIMAL(5,4);
+    `;
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS urgency_level VARCHAR(20);
+    `;
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS triage_classification VARCHAR(20);
+    `;
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS triage_confidence DECIMAL(5,4);
+    `;
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS predicted_recovery_days INTEGER;
+    `;
+    await sql`
+      ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS result_schema_version INTEGER DEFAULT 0;
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_agent_tasks_consultation_id ON agent_tasks(consultation_id);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_agent_tasks_triage_classification ON agent_tasks(triage_classification);
+    `;
+
+    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, web rate limits, chat messages, PROMIS responses, and V2 prediction market projection columns)');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -3092,26 +3121,59 @@ export async function checkPrescriptionPaymentStatus(prescriptionId: string): Pr
 }
 
 // Agent system database functions
+
+const _warnedOnce = new Set<string>();
+function warnOnce(key: string, message: string) {
+  if (!_warnedOnce.has(key)) {
+    _warnedOnce.add(key);
+    console.warn(message);
+  }
+}
+
+function isColumnMissingError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('column') && msg.includes('does not exist') ||
+    msg.includes('42703') ||
+    msg.includes('42P01');
+}
+
 export async function createAgentTask(task: AgentTask): Promise<number> {
   const sql = getSql();
   
+  const consultationId = task.context.metadata?.consultationId ?? null;
+
   try {
-    const result = await sql`
+    await sql`
       INSERT INTO agent_tasks (
-        id, agent_name, status, context_question, context_fid, 
+        id, agent_name, status, context_question, context_fid,
         context_user_tier, context_question_id, context_metadata,
-        retry_count
+        consultation_id, result_schema_version, retry_count
       )
       VALUES (
-        ${task.id}, ${task.agentName}, ${task.status}, ${task.context.question}, 
+        ${task.id}, ${task.agentName}, ${task.status}, ${task.context.question},
         ${task.context.fid}, ${task.context.userTier}, ${task.context.questionId || null},
-        ${JSON.stringify(task.context.metadata || {})}, ${task.retryCount}
+        ${JSON.stringify(task.context.metadata || {})},
+        ${consultationId}, 1, ${task.retryCount}
       )
-      RETURNING id
     `;
-    
     return 1; // Success
   } catch (error) {
+    if (isColumnMissingError(error)) {
+      warnOnce('agent_tasks_create_columns', '[agent_tasks] Projection columns missing — falling back to legacy INSERT. Run schema migration to fix.');
+      await sql`
+        INSERT INTO agent_tasks (
+          id, agent_name, status, context_question, context_fid,
+          context_user_tier, context_question_id, context_metadata,
+          retry_count
+        )
+        VALUES (
+          ${task.id}, ${task.agentName}, ${task.status}, ${task.context.question},
+          ${task.context.fid}, ${task.context.userTier}, ${task.context.questionId || null},
+          ${JSON.stringify(task.context.metadata || {})}, ${task.retryCount}
+        )
+      `;
+      return 1;
+    }
     console.error('Error creating agent task:', error);
     throw error;
   }
@@ -3119,17 +3181,33 @@ export async function createAgentTask(task: AgentTask): Promise<number> {
 
 export async function updateAgentTask(task: AgentTask): Promise<void> {
   const sql = getSql();
-  
+
+  const d = task.result?.data;
+  const agentConfidence = d?.confidence ?? null;
+  const urgencyLevel = d?.urgencyLevel ?? null;
+  const triageClassification = d?.queryType ?? null;
+  const triageConfidence = d?.triageClassificationConfidence ?? null;
+  const predictedRecoveryDays = d?.predictedRecoveryDays ?? null;
+
+  const resultData = task.result?.data ? JSON.stringify(task.result.data) : null;
+  const resultEnrichments = task.result?.enrichments ? JSON.stringify(task.result.enrichments) : null;
+
   try {
     await sql`
-      UPDATE agent_tasks 
-      SET 
+      UPDATE agent_tasks
+      SET
         status = ${task.status},
         result_success = ${task.result?.success || null},
-        result_data = ${task.result?.data ? JSON.stringify(task.result.data) : null},
+        result_data = ${resultData},
         result_error = ${task.result?.error || null},
-        result_enrichments = ${task.result?.enrichments ? JSON.stringify(task.result.enrichments) : null},
+        result_enrichments = ${resultEnrichments},
         result_cost = ${task.result?.cost || 0.0},
+        agent_confidence = ${agentConfidence},
+        urgency_level = ${urgencyLevel},
+        triage_classification = ${triageClassification},
+        triage_confidence = ${triageConfidence},
+        predicted_recovery_days = ${predictedRecoveryDays},
+        result_schema_version = 1,
         retry_count = ${task.retryCount},
         started_at = ${task.startedAt?.toISOString() || null},
         completed_at = ${task.completedAt?.toISOString() || null},
@@ -3137,8 +3215,27 @@ export async function updateAgentTask(task: AgentTask): Promise<void> {
       WHERE id = ${task.id}
     `;
   } catch (error) {
-    console.error('Error updating agent task:', error);
-    throw error;
+    if (isColumnMissingError(error)) {
+      warnOnce('agent_tasks_update_columns', '[agent_tasks] Projection columns missing — falling back to legacy UPDATE. Run schema migration to fix.');
+      await sql`
+        UPDATE agent_tasks
+        SET
+          status = ${task.status},
+          result_success = ${task.result?.success || null},
+          result_data = ${resultData},
+          result_error = ${task.result?.error || null},
+          result_enrichments = ${resultEnrichments},
+          result_cost = ${task.result?.cost || 0.0},
+          retry_count = ${task.retryCount},
+          started_at = ${task.startedAt?.toISOString() || null},
+          completed_at = ${task.completedAt?.toISOString() || null},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${task.id}
+      `;
+    } else {
+      console.error('Error updating agent task:', error);
+      throw error;
+    }
   }
 }
 
