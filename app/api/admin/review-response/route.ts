@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { reviewResponse } from '@/lib/database';
 import { sendResponseReviewNotification } from '@/lib/notifications';
 import { neon } from '@neondatabase/serverless';
+import { requireAdmin } from '@/lib/adminAuth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const { 
       responseId, 

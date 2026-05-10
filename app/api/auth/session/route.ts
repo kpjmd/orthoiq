@@ -1,16 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSession, validateSessionFromHeader } from '@/lib/session';
+import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/session';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // First try to get session from cookie (for magic link flow)
-    let sessionData = await getSession();
-
-    // Fall back to Authorization header (for localStorage-based auth)
-    if (!sessionData) {
-      const authHeader = request.headers.get('Authorization');
-      sessionData = await validateSessionFromHeader(authHeader);
-    }
+    const sessionData = await getSession();
 
     if (!sessionData) {
       return NextResponse.json(
@@ -32,9 +25,7 @@ export async function GET(request: NextRequest) {
         id: sessionData.session.id,
         expiresAt: sessionData.session.expires_at,
         lastActive: sessionData.session.last_active
-      },
-      // Return session token so frontend can store it in localStorage
-      sessionToken: sessionData.session.session_token
+      }
     });
 
   } catch (error) {

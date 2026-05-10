@@ -24,8 +24,6 @@ export default function AdminPasswordAuth({ onAuthSuccess }: AdminPasswordAuthPr
       });
 
       if (response.ok) {
-        // Store admin session
-        localStorage.setItem('admin_authenticated', 'true');
         onAuthSuccess();
       } else {
         setError('Invalid password');

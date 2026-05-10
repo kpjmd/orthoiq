@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMDReviewQueue } from '@/lib/database';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     // TODO: Add admin authentication check here
     // For now, we'll allow access but this should be restricted

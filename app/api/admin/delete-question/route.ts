@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteQuestion } from '@/lib/database';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function DELETE(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const { questionId } = await request.json();
     

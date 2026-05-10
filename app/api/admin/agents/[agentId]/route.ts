@@ -1,59 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
 
-const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
-
+// The per-agent prediction stats endpoint was removed in the Phase 3 backend audit.
+// This route returns a static "unavailable" response; the UI will be removed in Task 3.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ agentId: string }> }
 ) {
-  try {
-    const { agentId } = await params;
+  const authErr = await requireAdmin(); if (authErr) return authErr;
+  const { agentId } = await params;
 
-    if (!agentId) {
-      return NextResponse.json(
-        { error: 'agentId is required' },
-        { status: 400 }
-      );
-    }
-
-    // Proxy to orthoiq-agents backend
-    const response = await fetch(`${AGENTS_ENDPOINT}/predictions/agent/${agentId}`, {
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.warn(`orthoiq-agents returned ${response.status}: ${errorText}`);
-
-      // Return fallback data if backend is unavailable
-      return NextResponse.json(
-        {
-          agentId,
-          agentName: agentId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          backendAvailable: false,
-          message: 'Agent statistics unavailable. orthoiq-agents backend may be offline.'
-        },
-        { status: 503 }
-      );
-    }
-
-    const data = await response.json();
-
-    return NextResponse.json({
-      ...data,
-      backendAvailable: true
-    });
-
-  } catch (error) {
-    console.error('Error fetching agent details:', error);
-
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch agent details',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        backendAvailable: false
-      },
-      { status: 500 }
-    );
+  if (!agentId) {
+    return NextResponse.json({ error: 'agentId is required' }, { status: 400 });
   }
+
+  return NextResponse.json(
+    {
+      agentId,
+      agentName: agentId.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+      backendAvailable: false,
+      message: 'Per-agent prediction statistics have been removed. UI cleanup pending in Task 3.'
+    },
+    { status: 503 }
+  );
 }

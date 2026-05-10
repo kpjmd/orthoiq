@@ -235,13 +235,12 @@ async function tryOrthoIQAgents(
     };
 
     // Make consultation request
-    const consultationResponse = await fetch(`${AGENTS_ENDPOINT}/consultation`, {
+    const { agentsFetch } = await import('./agentsClient');
+    const consultationResponse = await agentsFetch('/consultation', {
+      caller: 'web',
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify(consultationRequest),
-      signal: AbortSignal.timeout(AGENTS_TIMEOUT)
+      signal: AbortSignal.timeout(AGENTS_TIMEOUT),
     });
     
     if (!consultationResponse.ok) {
@@ -763,11 +762,11 @@ function formatResponseContent(content: any): string {
  * Returns: { status: 'processing' | 'completed' | 'error' | 'not_found', ... }
  */
 export async function fetchConsultationStatus(consultationId: string): Promise<any> {
-  const agentsUrl = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+  const { agentsFetch } = await import('./agentsClient');
 
-  const res = await fetch(`${agentsUrl}/consultation/${consultationId}/status`, {
+  const res = await agentsFetch(`/consultation/${consultationId}/status`, {
+    caller: 'web',
     method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(10000),
   });
 

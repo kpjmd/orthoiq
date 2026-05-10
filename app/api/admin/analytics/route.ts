@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAnalytics } from '@/lib/database';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     // Check for admin API key from environment
     const adminApiKey = process.env.ADMIN_API_KEY;

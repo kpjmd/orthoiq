@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEnhancedAnalytics } from '@/lib/database';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function GET(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const analytics = await getEnhancedAnalytics();
 

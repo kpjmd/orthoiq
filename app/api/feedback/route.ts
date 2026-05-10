@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiLogger } from '@/lib/monitoring';
 import { storeConsultationFeedback, getConsultation, getSql } from '@/lib/database';
+import { agentsFetch } from '@/lib/agentsClient';
+import { getSession } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -26,6 +28,21 @@ export async function POST(request: NextRequest) {
         { error: 'Consultation not found' },
         { status: 404 }
       );
+    }
+
+    // Ownership check: verify the caller owns this consultation
+    const session = await getSession();
+    if (consultation.web_user_id) {
+      // Web consultation: must have a valid session matching the owner
+      if (!session || session.user.id !== consultation.web_user_id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      }
+    } else if (consultation.fid) {
+      // Farcaster consultation: patientId must match the consultation's FID
+      const claimedFid = feedbackData.patientId?.toString();
+      if (!claimedFid || claimedFid !== consultation.fid.toString()) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      }
     }
 
     console.log(`[${requestId}] Feedback received for consultation ${feedbackData.consultationId}`);
@@ -87,90 +104,41 @@ export async function POST(request: NextRequest) {
       // Continue even if local storage fails
     }
 
-    // Forward to OrthoIQ-Agents feedback endpoint
-    const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
-
-    let tokenRewards: Array<{agent: string; reward: number; accuracy: number}> = [];
-
+    // Trigger prediction resolution (best-effort — does not block the response)
     try {
-      const agentsResponse = await fetch(`${AGENTS_ENDPOINT}/feedback`, {
+      const resolutionResponse = await agentsFetch('/predictions/resolve/user-modal', {
+        caller: 'web',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transformedFeedback),
+        body: JSON.stringify({
+          consultationId: feedbackData.consultationId,
+          userFeedback: {
+            satisfied: feedbackData.feedback?.outcomeSuccess ?? true,
+            painLevel: 5,
+            confidence: feedbackData.feedback?.userSatisfaction ?? 3,
+            timestamp: new Date().toISOString()
+          }
+        }),
         signal: AbortSignal.timeout(10000)
       });
 
-      if (agentsResponse.ok) {
-        const agentsResult = await agentsResponse.json();
-        tokenRewards = agentsResult.tokenRewards || [];
-        console.log(`[${requestId}] Feedback forwarded to OrthoIQ-Agents successfully. Token rewards:`, tokenRewards);
-
-        // Update our local record with token rewards
-        if (tokenRewards.length > 0) {
-          try {
-            await storeConsultationFeedback({
-              consultationId: feedbackData.consultationId,
-              patientId: feedbackData.patientId,
-              tokenRewards
-            });
-          } catch (updateError) {
-            console.error(`[${requestId}] Failed to update token rewards:`, updateError);
-          }
-        }
-
-        // Call prediction resolution endpoint to trigger token distribution
-        try {
-          const resolutionResponse = await fetch(`${AGENTS_ENDPOINT}/predictions/resolve/user-modal`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              consultationId: feedbackData.consultationId,
-              userFeedback: {
-                satisfied: feedbackData.feedback?.outcomeSuccess ?? true,
-                painLevel: 5, // Default mid-range if not provided
-                confidence: feedbackData.feedback?.userSatisfaction ?? 3,
-                timestamp: new Date().toISOString()
-              }
-            }),
-            signal: AbortSignal.timeout(10000)
-          });
-
-          if (resolutionResponse.ok) {
-            const resolutionResult = await resolutionResponse.json();
-            console.log(`[${requestId}] User-modal predictions resolved:`, resolutionResult);
-          } else {
-            const errorText = await resolutionResponse.text();
-            console.warn(`[${requestId}] User-modal prediction resolution failed: ${resolutionResponse.status}`, errorText);
-          }
-        } catch (resolutionError) {
-          console.warn(`[${requestId}] User-modal prediction resolution failed:`, resolutionError);
-        }
-
-        apiLogger.info('Feedback submission completed', { requestId, tokenRewards });
-
-        return NextResponse.json({
-          success: true,
-          message: 'Feedback processed successfully',
-          feedbackId: agentsResult.feedbackId,
-          tokenRewards: tokenRewards,
-          timestamp: new Date().toISOString()
-        });
+      if (resolutionResponse.ok) {
+        const resolutionResult = await resolutionResponse.json();
+        console.log(`[${requestId}] User-modal predictions resolved:`, resolutionResult);
       } else {
-        console.warn(`[${requestId}] Failed to forward feedback to OrthoIQ-Agents: ${agentsResponse.status}`);
-        const errorText = await agentsResponse.text();
-        console.warn(`[${requestId}] Error details:`, errorText);
+        const errorText = await resolutionResponse.text();
+        console.warn(`[${requestId}] User-modal prediction resolution failed: ${resolutionResponse.status}`, errorText);
       }
-    } catch (agentsError) {
-      console.warn(`[${requestId}] OrthoIQ-Agents feedback forwarding failed:`, agentsError);
-      // Continue even if forwarding fails - we've stored locally
+    } catch (resolutionError) {
+      console.warn(`[${requestId}] User-modal prediction resolution failed:`, resolutionError);
     }
 
-    apiLogger.info('Feedback submission completed (local only)', { requestId });
+    apiLogger.info('Feedback submission completed', { requestId });
 
     return NextResponse.json({
       success: true,
-      message: 'Feedback received and stored locally',
-      tokenRewards: []
+      message: 'Feedback processed successfully',
+      tokenRewards: [],
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {

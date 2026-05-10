@@ -1,5 +1,42 @@
 # OrthoIQ Changelog
 
+## [1.9.0] - 2026-05-10: Pre-Testnet Integration Audit (Task 1)
+
+### Changed — Backend auth wiring (Phase 1 backend audit)
+- **`lib/agentsClient.ts`** (new) — centralised `agentsFetch()` helper that injects `X-API-Key`
+  on every server-to-server call to `orthoiq-agents`. Three keys: `ORTHOIQ_AGENTS_WEB_KEY`,
+  `ORTHOIQ_AGENTS_FARCASTER_KEY`, `ORTHOIQ_AGENTS_ADMIN_KEY`, matching the backend's three-key
+  auth model introduced in Phase 1 of the agents audit.
+- All 10 fetch call sites migrated to `agentsFetch`: `lib/claude.ts` (consultation + status
+  polling), `app/api/research/trigger`, `app/api/research/[consultationId]`,
+  `app/api/feedback/route.ts`, `app/api/predictions/resolve/follow-up`,
+  `app/api/admin/md-review` (admin key), `app/api/admin/research/metrics`,
+  `app/api/admin/metrics/overview`.
+
+### Removed — Dead agent backend calls
+- `POST /feedback` call from `app/api/feedback/route.ts` — endpoint never existed on the
+  backend; local DB write is the source of truth. The `predictions/resolve/user-modal` call
+  that was nested inside it now fires directly with proper auth.
+- `POST /feedback/milestone` call from `app/api/feedback/milestone/route.ts` — same: 404'd
+  silently. Local DB storage is unchanged.
+
+### Fixed — Deleted prediction-market routes
+- `app/api/admin/prediction-market/performance/route.ts` — no longer calls the deleted
+  `GET /predictions/market/statistics` endpoint; returns static empty payload immediately.
+- `app/api/admin/agents/[agentId]/route.ts` — no longer calls the deleted
+  `GET /predictions/agent/:id` endpoint; returns static 503 with message.
+
+### Fixed — Free-text 2048-char cap
+- `components/WebOrthoInterface.tsx` — main question textarea now has `maxLength={2048}` and
+  a live character counter that turns amber at 1900 characters.
+- `app/miniapp/page.tsx` — same cap and counter applied to the miniapp question textarea.
+
+### Added
+- `.env.local.template` — documented the three new `ORTHOIQ_AGENTS_*_KEY` server-side env vars.
+- `TESTNET_AUDIT.md` — tracks all five pre-testnet audit tasks and their completion status.
+
+---
+
 ## [1.8.0] - 2026-03-23: Farcaster Notification Fix & Testnet Readiness
 
 ### Fixed

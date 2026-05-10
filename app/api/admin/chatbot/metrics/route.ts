@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAdmin } from '@/lib/adminAuth';
 
 function getSql() {
   const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
@@ -10,6 +11,7 @@ function getSql() {
 }
 
 export async function GET(_request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const sql = getSql();
 

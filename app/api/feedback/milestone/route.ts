@@ -33,15 +33,6 @@ export async function POST(request: NextRequest) {
     // Generate milestone ID
     const milestoneId = `milestone_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    // Transform milestone data for OrthoIQ-Agents schema
-    const transformedMilestone = {
-      consultationId: milestoneData.consultationId,
-      patientId: milestoneData.patientId,
-      milestoneDay: milestoneData.milestoneDay,
-      progressData: milestoneData.progressData || {},
-      patientReportedOutcome: milestoneData.patientReportedOutcome || {}
-    };
-
     // Store in local database first
     try {
       await storeMilestoneFeedback({
@@ -65,79 +56,11 @@ export async function POST(request: NextRequest) {
       // Continue even if local storage fails
     }
 
-    // Forward to OrthoIQ-Agents milestone endpoint
-    const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+    apiLogger.info('Milestone feedback completed', { requestId, milestoneId });
 
-    try {
-      const agentsResponse = await fetch(`${AGENTS_ENDPOINT}/feedback/milestone`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transformedMilestone),
-        signal: AbortSignal.timeout(10000)
-      });
-
-      if (agentsResponse.ok) {
-        const agentsResult = await agentsResponse.json();
-        console.log(`[${requestId}] Milestone feedback forwarded to OrthoIQ-Agents successfully`);
-
-        // Update local record with agent response data
-        try {
-          await storeMilestoneFeedback({
-            milestoneId: agentsResult.milestoneId || milestoneId,
-            consultationId: milestoneData.consultationId,
-            patientId: milestoneData.patientId,
-            milestoneDay: milestoneData.milestoneDay,
-            painLevel: milestoneData.progressData?.painLevel,
-            functionalScore: milestoneData.progressData?.functionalScore,
-            adherence: milestoneData.progressData?.adherence,
-            completedInterventions: milestoneData.progressData?.completedInterventions,
-            newSymptoms: milestoneData.progressData?.newSymptoms,
-            concernFlags: milestoneData.progressData?.concernFlags,
-            overallProgress: milestoneData.patientReportedOutcome?.overallProgress,
-            satisfactionSoFar: milestoneData.patientReportedOutcome?.satisfactionSoFar,
-            difficultiesEncountered: milestoneData.patientReportedOutcome?.difficultiesEncountered,
-            milestoneAchieved: agentsResult.milestoneAchieved,
-            progressStatus: agentsResult.progressStatus,
-            tokenReward: agentsResult.tokenReward?.amount || 0,
-            reassessmentTriggered: agentsResult.reassessmentTriggered,
-            adjustedRecommendations: agentsResult.adjustedRecommendations,
-            nextMilestoneDay: agentsResult.nextMilestone?.day,
-            encouragement: agentsResult.encouragement
-          });
-        } catch (updateError) {
-          console.error(`[${requestId}] Failed to update milestone with agent response:`, updateError);
-        }
-
-        apiLogger.info('Milestone feedback completed', { requestId, milestoneId: agentsResult.milestoneId });
-
-        return NextResponse.json({
-          success: true,
-          milestoneId: agentsResult.milestoneId || milestoneId,
-          milestoneAchieved: agentsResult.milestoneAchieved,
-          progressStatus: agentsResult.progressStatus,
-          tokenReward: agentsResult.tokenReward,
-          reassessmentTriggered: agentsResult.reassessmentTriggered,
-          adjustedRecommendations: agentsResult.adjustedRecommendations,
-          nextMilestone: agentsResult.nextMilestone,
-          encouragement: agentsResult.encouragement
-        });
-      } else {
-        console.warn(`[${requestId}] Failed to forward milestone to OrthoIQ-Agents: ${agentsResponse.status}`);
-        const errorText = await agentsResponse.text();
-        console.warn(`[${requestId}] Error details:`, errorText);
-      }
-    } catch (agentsError) {
-      console.warn(`[${requestId}] OrthoIQ-Agents milestone forwarding failed:`, agentsError);
-      // Continue even if forwarding fails - we've stored locally
-    }
-
-    apiLogger.info('Milestone feedback completed (local only)', { requestId, milestoneId });
-
-    // Return success with local data only
     return NextResponse.json({
       success: true,
       milestoneId,
-      message: 'Milestone feedback received and stored locally',
       progressStatus: 'pending_analysis'
     });
 

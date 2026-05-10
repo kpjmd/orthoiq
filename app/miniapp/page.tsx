@@ -1172,8 +1172,14 @@ function MiniAppContent() {
               placeholder="e.g., What should I do for knee pain after running?"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={3}
+              maxLength={2048}
               disabled={isLoading}
             />
+            <div className="flex justify-end mt-1">
+              <span className={`text-xs ${question.length > 1900 ? 'text-amber-600' : 'text-gray-400'}`}>
+                {question.length}/2048
+              </span>
+            </div>
           </div>
 
           <button

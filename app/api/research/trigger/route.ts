@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const ORTHOIQ_AGENTS_URL = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+import { agentsFetch } from '@/lib/agentsClient';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +16,9 @@ export async function POST(request: NextRequest) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const agentsRes = await fetch(`${ORTHOIQ_AGENTS_URL}/research/trigger`, {
+    const agentsRes = await agentsFetch('/research/trigger', {
+      caller: 'web',
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ consultationId, caseData, consultationResult, userTier }),
       signal: controller.signal,
     });

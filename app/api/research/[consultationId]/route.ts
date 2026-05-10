@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const ORTHOIQ_AGENTS_URL = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+import { agentsFetch } from '@/lib/agentsClient';
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +18,8 @@ export async function GET(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const agentsRes = await fetch(`${ORTHOIQ_AGENTS_URL}/research/${consultationId}`, {
+    const agentsRes = await agentsFetch(`/research/${consultationId}`, {
+      caller: 'web',
       method: 'GET',
       signal: controller.signal,
     });

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logInteraction } from '@/lib/database';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function POST(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     // Sample test data for admin dashboard testing
     const testQuestions = [

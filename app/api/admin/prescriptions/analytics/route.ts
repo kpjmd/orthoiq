@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getPrescriptionAnalytics } from '@/lib/database';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function GET() {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const analytics = await getPrescriptionAnalytics();
     

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTrainingData, logTrainingExport } from '@/lib/database';
 import fs from 'fs';
 import path from 'path';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function POST(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   console.log('Training data export request received');
   
   try {
@@ -234,6 +236,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format') || 'jsonl';

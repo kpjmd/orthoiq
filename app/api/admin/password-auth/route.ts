@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { createAdminToken, getAdminCookieConfig } from '@/lib/adminAuth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +34,11 @@ export async function POST(request: NextRequest) {
     
     if (isValidPassword) {
       console.log('Password auth: Authentication successful');
-      return NextResponse.json({ success: true });
+      const token = createAdminToken();
+      const cookieConfig = getAdminCookieConfig(token);
+      const response = NextResponse.json({ success: true });
+      response.cookies.set(cookieConfig.name, cookieConfig.value, cookieConfig.options);
+      return response;
     } else {
       console.log('Password auth: Invalid password provided');
       // Add delay to prevent brute force attacks

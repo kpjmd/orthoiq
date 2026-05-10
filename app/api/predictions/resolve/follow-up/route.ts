@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storeMilestoneFeedback, getConsultation } from '@/lib/database';
+import { agentsFetch } from '@/lib/agentsClient';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -57,12 +58,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to OrthoIQ-Agents predictions resolve endpoint
-    const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
-
     try {
-      const agentsResponse = await fetch(`${AGENTS_ENDPOINT}/predictions/resolve/follow-up`, {
+      const agentsResponse = await agentsFetch('/predictions/resolve/follow-up', {
+        caller: 'web',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           consultationId,
           followUpData: {

@@ -887,8 +887,14 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               placeholder="Describe your orthopedic concern. Include: age, pain level (1-10), activity level, and when symptoms started. Example: '45yo runner with knee pain (7/10) for 2 weeks after marathon training'"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={3}
+              maxLength={2048}
               disabled={isLoading || getRemainingQuestions() === 0}
             />
+            <div className="flex justify-end mt-1">
+              <span className={`text-xs ${question.length > 1900 ? 'text-amber-600' : 'text-gray-400'}`}>
+                {question.length}/2048
+              </span>
+            </div>
           </div>
 
           <button

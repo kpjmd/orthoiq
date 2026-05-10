@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-
-const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+import { agentsFetch } from '@/lib/agentsClient';
+import { requireAdmin } from '@/lib/adminAuth';
 
 function getSql() {
   const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
@@ -12,6 +12,7 @@ function getSql() {
 }
 
 export async function POST(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   const requestId = Math.random().toString(36).substring(7);
 
   try {
@@ -94,9 +95,9 @@ export async function POST(request: NextRequest) {
     let backendSuccess = false;
 
     try {
-      const backendResponse = await fetch(`${AGENTS_ENDPOINT}/predictions/resolve/md-review`, {
+      const backendResponse = await agentsFetch('/predictions/resolve/md-review', {
+        caller: 'admin',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           consultationId,
           mdReviewData: {
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to fetch a single consultation for review
 export async function GET(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const { searchParams } = new URL(request.url);
     const consultationId = searchParams.get('consultationId');

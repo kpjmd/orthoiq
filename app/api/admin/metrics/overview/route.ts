@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-
-const AGENTS_ENDPOINT = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000';
+import { agentsFetch } from '@/lib/agentsClient';
+import { requireAdmin } from '@/lib/adminAuth';
 
 function getSql() {
   const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
@@ -12,6 +12,7 @@ function getSql() {
 }
 
 export async function GET(request: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   try {
     const sql = getSql();
 
@@ -83,8 +84,9 @@ export async function GET(request: NextRequest) {
     };
 
     try {
-      const tokenResponse = await fetch(`${AGENTS_ENDPOINT}/tokens/statistics`, {
-        signal: AbortSignal.timeout(5000)
+      const tokenResponse = await agentsFetch('/tokens/statistics', {
+        caller: 'admin',
+        signal: AbortSignal.timeout(5000),
       });
 
       if (tokenResponse.ok) {

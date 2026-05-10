@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
+import { requireAdmin } from '@/lib/adminAuth';
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdmin(); if (authErr) return authErr;
   const adminKey = req.headers.get('x-admin-key');
   if (!process.env.ADMIN_API_KEY || adminKey !== process.env.ADMIN_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
