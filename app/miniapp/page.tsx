@@ -514,7 +514,7 @@ function MiniAppContent() {
       loadRateLimitStatus(fid, getUserTier());
       loadUserPreferences(fid);
     }
-  }, [isAuthenticated, authUser, context, getUserTier, isSDKLoaded]);
+  }, [isAuthenticated, authUser, context?.user?.fid, isSDKLoaded]);
 
   // Handle notification deep-link: ?track=<consultationId>&milestone=<day>
   useEffect(() => {
@@ -705,6 +705,8 @@ function MiniAppContent() {
 
   // Stage 2: Comprehensive upgrade
   const handleComprehensiveUpgrade = async () => {
+    if (consultationStage === 'comprehensive_loading' ||
+        consultationStage === 'comprehensive_complete') return;
     // Re-validate FID
     const fid = context?.user?.fid;
     if (!fid) {

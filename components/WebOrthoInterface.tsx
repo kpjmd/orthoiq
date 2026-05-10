@@ -513,6 +513,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   };
 
   const handleComprehensiveUpgrade = async () => {
+    if (consultationStage === 'comprehensive_loading' ||
+        consultationStage === 'comprehensive_complete') return;
     setConsultationStage('comprehensive_loading');
     setError('');
 

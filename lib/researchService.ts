@@ -72,7 +72,7 @@ export async function pollResearch(
   consultationId: string,
   options: PollResearchOptions = {}
 ): Promise<ResearchResult | null> {
-  const { intervalMs = 3000, timeoutMs = 60000 } = options;
+  const { intervalMs = 5000, timeoutMs = 60000 } = options;
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
