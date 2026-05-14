@@ -16,7 +16,7 @@ export default function PostFeedbackConfirmation({ onStartCheckIn }: PostFeedbac
       <div className="text-4xl mb-2">🧠</div>
       <h4 className="text-lg font-bold text-green-900 mb-2">Thanks — we got your feedback</h4>
       <p className="text-sm text-green-700 mb-4">
-        We'll check in with you in 2 weeks to see how you're doing.
+        We&apos;ll check in with you in 2 weeks to see how you&apos;re doing.
       </p>
       {onStartCheckIn && (
         <button

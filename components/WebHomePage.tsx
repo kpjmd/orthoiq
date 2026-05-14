@@ -140,7 +140,7 @@ export default function WebHomePage() {
           </h3>
           <p className="text-gray-600">
             After each consultation, complete a brief PROMIS questionnaire to establish a recovery baseline.
-            We'll check in at 2, 4, and 8 weeks so you can track your progress over time.
+            We&apos;ll check in at 2, 4, and 8 weeks so you can track your progress over time.
           </p>
         </div>
         <div className="bg-white rounded-lg p-6 shadow-lg">
