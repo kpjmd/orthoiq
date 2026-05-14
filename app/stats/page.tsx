@@ -76,22 +76,15 @@ export default function PublicStatsPage() {
 
   const fetchStats = async () => {
     try {
-      const [overviewRes, researchRes, promisRes] = await Promise.all([
-        fetch('/api/admin/metrics/overview'),
-        fetch('/api/admin/research/metrics'),
-        fetch('/api/admin/promis/metrics'),
-      ]);
-
-      const [overview, research, promis] = await Promise.all([
-        overviewRes.ok ? overviewRes.json() : null,
-        researchRes.ok ? researchRes.json() : null,
-        promisRes.ok ? promisRes.json() : null,
-      ]);
+      const res = await fetch('/api/public/stats');
+      const data = res.ok ? await res.json() : null;
+      const research = data?.researchStats;
+      const promis = data?.promisStats;
 
       setStats({
-        totalConsultations: overview?.totalConsultations || 0,
-        averageAgents: overview?.averageAgentsPerConsultation || 0,
-        averageConsensus: overview?.averageMDApprovalRate || 0,
+        totalConsultations: data?.totalConsultations || 0,
+        averageAgents: data?.averageAgentsPerConsultation || 0,
+        averageConsensus: data?.averageMDApprovalRate || 0,
         researchStats: research ? {
           totalSyntheses: research.totalSyntheses || 0,
           totalStudiesAnalyzed: research.totalStudiesAnalyzed || 0,
@@ -101,7 +94,7 @@ export default function PublicStatsPage() {
           rarityDistribution: research.rarityDistribution || [],
           agentLiveStats: research.agentLiveStats || null,
         } : null,
-        queryTypeBreakdown: overview?.queryTypeBreakdown || null,
+        queryTypeBreakdown: data?.queryTypeBreakdown || null,
         promisStats: promis ? {
           totalConsultations: promis.totalConsultations || 0,
           baselineCaptureCount: promis.baselineCaptureCount || 0,

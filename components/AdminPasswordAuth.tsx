@@ -77,7 +77,7 @@ export default function AdminPasswordAuth({ onAuthSuccess }: AdminPasswordAuthPr
         </form>
         
         <div className="mt-4 text-xs text-gray-500 text-center">
-          This is a temporary backup method. Primary authentication is via Farcaster.
+          Admin session lasts 24 hours.
         </div>
       </div>
     </div>
