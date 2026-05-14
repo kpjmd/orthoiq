@@ -179,10 +179,6 @@ export function generateLinkedInPost(
       <text x="100" y="300" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#374151">
         AI Analysis Complete
       </text>
-      <text x="100" y="330" font-family="Arial, sans-serif" font-size="16" fill="#6b7280">
-        Confidence: ${Math.round(prescriptionData.confidence * 100)}%
-      </text>
-      
       <!-- Right Column -->
       <rect x="650" y="200" width="450" height="250" fill="${metadata.theme.primaryColor}10" rx="10" />
       <text x="875" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="${metadata.theme.primaryColor}">
@@ -238,14 +234,6 @@ export function generateTwitterCard(
       </text>
       
       <!-- Stats -->
-      <rect x="100" y="370" width="200" height="80" fill="${metadata.theme.primaryColor}15" rx="10" />
-      <text x="200" y="400" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="${metadata.theme.primaryColor}">
-        ${Math.round(prescriptionData.confidence * 100)}%
-      </text>
-      <text x="200" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#6b7280">
-        AI Confidence
-      </text>
-      
       <rect x="350" y="370" width="200" height="80" fill="${metadata.theme.accentColor}15" rx="10" />
       <text x="450" y="400" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="${metadata.theme.accentColor}">
         ${metadata.rarity.replace('-', ' ').toUpperCase()}
@@ -361,7 +349,7 @@ export function generateNFTMetadata(
   // Generate NFT-compatible metadata following ERC-721 standard
   return {
     name: `OrthoIQ Prescription #${metadata.id}`,
-    description: `${mdReviewed ? 'MD-Reviewed ' : ''}AI-generated orthopedic prescription: "${prescriptionData.userQuestion.substring(0, 150)}..." Generated with ${Math.round(prescriptionData.confidence * 100)}% AI confidence${mdReviewed ? ` and reviewed by ${mdReviewerName || 'Dr. KPJMD'}` : ''}.`,
+    description: `${mdReviewed ? 'MD-Reviewed ' : ''}AI-generated orthopedic prescription: "${prescriptionData.userQuestion.substring(0, 150)}..."${mdReviewed ? ` Reviewed by ${mdReviewerName || 'Dr. KPJMD'}.` : ''}`,
     image: `https://orthoiq.com/api/prescription-image/${metadata.id}`,
     external_url: `https://orthoiq.com/prescription/${metadata.id}`,
     animation_url: metadata.rarity === 'ultra-rare' ? `https://orthoiq.com/api/prescription-animation/${metadata.id}` : undefined,
@@ -373,11 +361,6 @@ export function generateNFTMetadata(
       {
         trait_type: "Rarity Percentage",
         value: rarityPercentages[metadata.rarity as keyof typeof rarityPercentages],
-        max_value: 100
-      },
-      {
-        trait_type: "AI Confidence",
-        value: Math.round(prescriptionData.confidence * 100),
         max_value: 100
       },
       {

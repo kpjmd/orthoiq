@@ -206,11 +206,6 @@ export default async function SharePage({ params, searchParams }: SharePageProps
                 <span className="text-2xl mr-2">🔬</span>
                 OrthoIQ Response:
               </h2>
-              {confidence && (
-                <div className="text-sm text-gray-600">
-                  Confidence: {confidence}%
-                </div>
-              )}
             </div>
             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
           </div>

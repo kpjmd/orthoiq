@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
           </div>
         </foreignObject>
         
-        <text x="150" y="650" font-family="Arial, sans-serif" font-size="16" fill="#6b7280">🔬 AI Confidence: ${confidence}%</text>
         <text x="950" y="650" font-family="Arial, sans-serif" font-size="16" fill="#6b7280">by Dr. KPJMD</text>
       </svg>
     `;

@@ -76,9 +76,6 @@ export default function TriageResponseCard({
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${urgency.bg} ${urgency.text}${urgency.pulse ? ' animate-pulse' : ''}`}>
             {urgency.icon} {urgency.label}
           </span>
-          {confidence !== undefined && (
-            <span className="text-xs text-gray-400">{Math.round(confidence * 100)}% confidence</span>
-          )}
         </div>
       </div>
 

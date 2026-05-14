@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ResearchState, AgentEnrichment, AgentSummaryData, StructuredBriefData } from '@/lib/types';
 import { specialistIcons } from './SpecialistBadge';
-import ConfidenceIndicator, { getConfidenceLevel } from './ConfidenceIndicator';
+import { getConfidenceLevel } from './ConfidenceIndicator';
 import AgentSummaryRow from './AgentSummaryRow';
 import ResearchStatusRow from './ResearchStatusRow';
 
@@ -131,7 +131,6 @@ export default function StructuredBrief({
       {/* Brief Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Structured Brief</h3>
-        <ConfidenceIndicator score={briefData.overallConfidence} variant="badge" />
       </div>
 
       {/* Key Finding + Immediate Action */}

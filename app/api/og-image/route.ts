@@ -117,10 +117,6 @@ export async function GET(request: NextRequest) {
         <text x="120" y="480" fill="white" font-size="24" font-weight="600" font-family="system-ui, sans-serif">AI Response:</text>
         ${generateWrappedText(response, 120, 520, 920, 18, 'white', 3)}
         
-        <!-- Confidence Badge -->
-        <rect x="120" y="670" width="200" height="40" rx="20" fill="white" opacity="0.2" />
-        <text x="220" y="695" text-anchor="middle" fill="white" font-size="18" font-weight="600" font-family="system-ui, sans-serif">Confidence: ${confidence}%</text>
-        
         <!-- Call to Action -->
         <rect x="850" y="660" width="270" height="60" rx="30" fill="white" opacity="0.9" />
         <text x="985" y="700" text-anchor="middle" fill="#1e3a8a" font-size="22" font-weight="700" font-family="system-ui, sans-serif">Ask Your Question</text>

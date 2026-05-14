@@ -129,34 +129,6 @@ export default function CoordinationMetadata({
         </motion.div>
       </div>
       
-      {/* Confidence Score */}
-      {confidence !== undefined && (
-        <motion.div 
-          variants={itemVariants}
-          className="mt-4 pt-4 border-t border-gray-200"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-500">Overall Confidence</span>
-            <span className="text-sm font-semibold text-gray-900">
-              {Math.round(confidence * 100)}%
-            </span>
-          </div>
-          <div className="w-full bg-white rounded-full h-2 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${confidence * 100}%` }}
-              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-              className={`h-full ${
-                confidence >= 0.8 
-                  ? 'bg-gradient-to-r from-green-400 to-green-500' 
-                  : confidence >= 0.6 
-                  ? 'bg-gradient-to-r from-yellow-400 to-yellow-500'
-                  : 'bg-gradient-to-r from-red-400 to-red-500'
-              }`}
-            />
-          </div>
-        </motion.div>
-      )}
       
       {/* Token Distribution Summary */}
       {tokenRewards.length > 0 && (

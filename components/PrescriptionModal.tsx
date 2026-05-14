@@ -187,7 +187,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
       
-      const shareText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')} • ${Math.round(prescriptionData.confidence * 100)}% confidence`;
+      const shareText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}`;
       
       const webShareData = {
         title: 'OrthoIQ Medical Prescription',

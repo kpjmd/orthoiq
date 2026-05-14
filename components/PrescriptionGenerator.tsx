@@ -412,12 +412,6 @@ export default function PrescriptionGenerator({
             strokeWidth="1"
             rx="5"
           />
-          <text x={size - 110} y="495" textAnchor="middle" className="prescription-small">
-            AI CONFIDENCE
-          </text>
-          <text x={size - 110} y="515" textAnchor="middle" className="prescription-header">
-            {Math.round(data.confidence * 100)}%
-          </text>
           {data.enhancedData?.agentConsensus && (
             <text x={size - 110} y="535" textAnchor="middle" className="prescription-small" fill={theme.primaryColor}>
               Agent Consensus: {Math.round(data.enhancedData.agentConsensus * 100)}%

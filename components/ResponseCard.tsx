@@ -572,14 +572,6 @@ export default function ResponseCard({
           <div className="flex items-center space-x-2">
             {getStatusBadge()}
             
-            {confidence !== undefined && (
-              <button
-                onClick={() => setShowConfidence(!showConfidence)}
-                className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                ⓘ Confidence
-              </button>
-            )}
           </div>
         </div>
         
@@ -592,17 +584,6 @@ export default function ResponseCard({
         
       </motion.div>
       
-      {/* Confidence Display */}
-      {showConfidence && confidence !== undefined && (
-        <div className="px-4 py-2 bg-blue-50 border-b">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">AI Confidence Level:</span>
-            <span className={`font-medium ${getConfidenceColor(confidence)}`}>
-              {Math.round(confidence * 100)}%
-            </span>
-          </div>
-        </div>
-      )}
       
       {/* Response Content */}
       <motion.div
@@ -898,19 +879,6 @@ export default function ResponseCard({
                         <h5 className="font-semibold text-gray-900">
                           {enrichment.title}
                         </h5>
-                        {enrichment.metadata?.confidence && (
-                          <div className="mt-1 flex items-center space-x-2">
-                            <div className="flex-1 max-w-[100px] h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-medical-primary to-medical-accent rounded-full"
-                                style={{ width: `${enrichment.metadata.confidence * 100}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-gray-700">
-                              {Math.round(enrichment.metadata.confidence * 100)}% confidence
-                            </span>
-                          </div>
-                        )}
                       </div>
                       <div className="flex-shrink-0">
                         <svg

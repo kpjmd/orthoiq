@@ -1,7 +1,6 @@
 'use client';
 
 import { specialistIcons, specialistColors } from './SpecialistBadge';
-import ConfidenceIndicator from './ConfidenceIndicator';
 
 interface AgentSummaryRowProps {
   specialist: string;
@@ -16,7 +15,6 @@ export default function AgentSummaryRow({
   specialist,
   specialistType,
   summary,
-  confidence,
   index,
   onViewFull,
 }: AgentSummaryRowProps) {
@@ -33,7 +31,6 @@ export default function AgentSummaryRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2 mb-0.5">
           <span className={`text-sm font-semibold ${colors.text}`}>{specialist}</span>
-          <ConfidenceIndicator score={confidence} variant="inline" />
         </div>
         <p className="text-xs text-gray-600 leading-relaxed">{truncated}</p>
       </div>

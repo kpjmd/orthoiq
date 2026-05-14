@@ -152,24 +152,6 @@ export default function SpecialistBadge({
             {specialty}
           </p>
           
-          {/* Confidence Indicator */}
-          {confidence !== undefined && status === 'completed' && (
-            <div className="mt-2">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className={`${colors.text} opacity-60`}>Confidence</span>
-                <span className={`font-medium ${colors.text}`}>{Math.round(confidence * 100)}%</span>
-              </div>
-              <div className="w-full bg-white bg-opacity-50 rounded-full h-1.5 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${confidence * 100}%` }}
-                  transition={{ duration: 0.8, delay: animationDelay + 0.3 }}
-                  className={`h-full ${colors.status} rounded-full`}
-                />
-              </div>
-            </div>
-          )}
-          
           {/* Status Text */}
           <div className={`mt-2 text-xs ${colors.text} opacity-60`}>
             {status === 'pending' && 'Waiting...'}
