@@ -104,8 +104,8 @@ export default function WebHomePage() {
             🤖 Self-Learning AI Specialists
           </h3>
           <p className="text-gray-700 mb-3">
-            Our panel of 5 AI specialists continuously improves through a prediction market system.
-            Each specialist stakes tokens on their recommendations, earning rewards for accurate predictions.
+            Our panel of 5 AI specialists collaborates on every consultation, each contributing its domain expertise
+            and earning tokens for its contribution to your case.
           </p>
           <div className="flex flex-wrap gap-2">
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">Pain Whisperer</span>
@@ -117,16 +117,16 @@ export default function WebHomePage() {
         </div>
         <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg p-6 shadow-lg border border-amber-200">
           <h3 className="text-xl font-semibold mb-3 text-amber-900">
-            🪙 Token-Driven Accuracy
+            🪙 Agent Token Rewards
           </h3>
           <p className="text-gray-700 mb-3">
-            Unlike typical AI, our specialists put &quot;skin in the game.&quot; They stake tokens on each prediction,
-            which are redistributed based on accuracy - creating genuine incentives for quality.
+            Each specialist earns tokens for contributing to your consultation.
+            Your feedback and outcome data feed back into the system to continuously improve recommendation quality.
           </p>
           <div className="bg-white/50 rounded-lg p-3">
             <p className="text-sm text-amber-800">
-              <strong>Your feedback matters:</strong> When you report outcomes, specialists are rewarded or penalized,
-              driving continuous improvement.
+              <strong>Your feedback matters:</strong> When you report outcomes, it helps our AI specialists
+              learn and improve for every future patient.
             </p>
           </div>
         </div>
@@ -136,11 +136,11 @@ export default function WebHomePage() {
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-lg p-6 shadow-lg">
           <h3 className="text-xl font-semibold mb-3 text-gray-800">
-            📊 Intelligence Cards
+            📈 Outcome Tracking
           </h3>
           <p className="text-gray-600">
-            After each consultation, receive a shareable Intelligence Card showing specialist consensus,
-            token stakes, and predictions - a unique record of your AI consultation.
+            After each consultation, complete a brief PROMIS questionnaire to establish a recovery baseline.
+            We'll check in at 2, 4, and 8 weeks so you can track your progress over time.
           </p>
         </div>
         <div className="bg-white rounded-lg p-6 shadow-lg">

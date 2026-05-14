@@ -78,7 +78,6 @@ export async function GET(request: NextRequest) {
     let agentStats = {
       totalTokensIssued: 0,
       tokensInCirculation: 0,
-      averageStakePerConsultation: 0,
       totalAgentInvocations: 0,
       agentStatsAvailable: false
     };
@@ -94,7 +93,6 @@ export async function GET(request: NextRequest) {
         agentStats = {
           totalTokensIssued: tokenData.totalTokensIssued || tokenData.totalTokens || 0,
           tokensInCirculation: tokenData.tokensInCirculation || tokenData.totalTokens || 0,
-          averageStakePerConsultation: tokenData.averageStakePerConsultation || 0,
           totalAgentInvocations: tokenData.totalInvocations || 0,
           agentStatsAvailable: true
         };
@@ -161,7 +159,6 @@ export async function GET(request: NextRequest) {
       // Token Economics
       totalTokensIssued: agentStats.totalTokensIssued,
       tokensInCirculation: agentStats.tokensInCirculation,
-      averageStakePerConsultation: agentStats.averageStakePerConsultation,
 
       // Chart Data
       consultationTrend: consultationTrend.map(row => ({

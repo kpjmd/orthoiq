@@ -53,12 +53,6 @@ interface PublicStats {
   totalConsultations: number;
   averageAgents: number;
   averageConsensus: number;
-  cardDistribution: {
-    standard: number;
-    complete: number;
-    verified: number;
-    exceptional: number;
-  };
   researchStats: ResearchPublicStats | null;
   promisStats: PROMISPublicStats | null;
   queryTypeBreakdown: QueryTypeBreakdown | null;
@@ -82,16 +76,14 @@ export default function PublicStatsPage() {
 
   const fetchStats = async () => {
     try {
-      const [overviewRes, cardsRes, researchRes, promisRes] = await Promise.all([
+      const [overviewRes, researchRes, promisRes] = await Promise.all([
         fetch('/api/admin/metrics/overview'),
-        fetch('/api/admin/cards/distribution'),
         fetch('/api/admin/research/metrics'),
         fetch('/api/admin/promis/metrics'),
       ]);
 
-      const [overview, cards, research, promis] = await Promise.all([
+      const [overview, research, promis] = await Promise.all([
         overviewRes.ok ? overviewRes.json() : null,
-        cardsRes.ok ? cardsRes.json() : null,
         researchRes.ok ? researchRes.json() : null,
         promisRes.ok ? promisRes.json() : null,
       ]);
@@ -100,12 +92,6 @@ export default function PublicStatsPage() {
         totalConsultations: overview?.totalConsultations || 0,
         averageAgents: overview?.averageAgentsPerConsultation || 0,
         averageConsensus: overview?.averageMDApprovalRate || 0,
-        cardDistribution: {
-          standard: cards?.byTier?.standard?.count || 0,
-          complete: cards?.byTier?.complete?.count || 0,
-          verified: cards?.byTier?.verified?.count || 0,
-          exceptional: cards?.byTier?.exceptional?.count || 0
-        },
         researchStats: research ? {
           totalSyntheses: research.totalSyntheses || 0,
           totalStudiesAnalyzed: research.totalStudiesAnalyzed || 0,
@@ -158,15 +144,6 @@ export default function PublicStatsPage() {
       </div>
     );
   }
-
-  const tierColors = {
-    standard: 'bg-gray-400',
-    complete: 'bg-blue-500',
-    verified: 'bg-purple-500',
-    exceptional: 'bg-yellow-500'
-  };
-
-  const totalCards = Object.values(stats.cardDistribution).reduce((a, b) => a + b, 0);
 
   // Research stats: prefer live agent stats when local DB is empty
   const rs = stats.researchStats;
@@ -268,7 +245,7 @@ export default function PublicStatsPage() {
                   <span className="text-sm font-semibold text-gray-700">Clinical</span>
                 </div>
                 <div className="text-3xl font-bold text-blue-600">{stats.queryTypeBreakdown.clinical}</div>
-                <p className="text-xs text-gray-500 mt-1">Multi-specialist consensus with prediction market</p>
+                <p className="text-xs text-gray-500 mt-1">Multi-specialist consensus analysis</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
@@ -461,53 +438,14 @@ export default function PublicStatsPage() {
           </div>
         )}
 
-        {/* Intelligence Card Distribution */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Intelligence Card Distribution</h2>
-          <div className="mb-6">
-            <div className="flex h-10 rounded-lg overflow-hidden">
-              {Object.entries(stats.cardDistribution).map(([tier, count]) => {
-                const percentage = totalCards > 0 ? (count / totalCards) * 100 : 0;
-                if (percentage === 0) return null;
-                return (
-                  <div
-                    key={tier}
-                    className={`${tierColors[tier as keyof typeof tierColors]} flex items-center justify-center text-white text-sm font-medium`}
-                    style={{ width: `${percentage}%` }}
-                    title={`${tier}: ${count} (${percentage.toFixed(1)}%)`}
-                  >
-                    {percentage >= 15 && `${Math.round(percentage)}%`}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(stats.cardDistribution).map(([tier, count]) => (
-              <div key={tier} className="text-center">
-                <div className={`w-12 h-12 rounded-full ${tierColors[tier as keyof typeof tierColors]} mx-auto mb-2 flex items-center justify-center text-white font-bold`}>
-                  {count}
-                </div>
-                <div className="text-sm font-medium text-gray-900 capitalize">
-                  {tier}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {totalCards > 0 ? `${Math.round((count / totalCards) * 100)}%` : '0%'}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* About Section */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">About OrthoIQ</h2>
           <p className="text-gray-700 mb-4">
-            OrthoIQ uses a multi-agent AI system where specialized agents collaborate to provide comprehensive orthopedic guidance. Each agent makes predictions about recovery outcomes, and these predictions are tracked through a transparent token economy system.
+            OrthoIQ uses a multi-agent AI system where specialized agents collaborate to provide comprehensive orthopedic guidance. Each specialist contributes its expertise; their responses are synthesized into a single recommendation, with confidence and consensus tracked across consultations.
           </p>
           <p className="text-gray-700">
-            Agents earn tokens when their predictions are accurate, creating a competitive environment that drives continuous improvement in prediction quality and patient outcomes.
+            User feedback, PROMIS milestone responses, and physician reviews feed back into the system to drive continuous improvement.
           </p>
         </div>
 

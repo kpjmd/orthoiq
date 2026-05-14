@@ -1431,6 +1431,7 @@ function MiniAppContent() {
               researchState={researchPolling.researchState}
               initialFeedbackSubmitted={comprehensiveFeedbackSubmitted}
               onFeedbackSubmitted={() => setComprehensiveFeedbackSubmitted(true)}
+              onStartCheckIn={!showPromisQuestionnaire && !promisCompleted ? () => setShowPromisQuestionnaire(true) : undefined}
             />
 
             {/* PROMIS completion summary — after ResponseCard, near feedback section */}

@@ -1202,6 +1202,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               rawConsultationData={comprehensiveResult.rawConsultationData}
               researchState={effectiveResearchState}
               onFeedbackSubmitted={setFeedbackSubmitted}
+              onStartCheckIn={!showPromisQuestionnaire && !promisCompleted ? () => setShowPromisQuestionnaire(true) : undefined}
             />
 
             {/* PROMIS — shown after results so they don't compete for attention */}

@@ -356,7 +356,7 @@ export async function sendRateLimitWarningEmail(
 
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
               <p style="margin: 0; font-size: 14px;">
-                <strong>Want unlimited access?</strong> Try OrthoIQ on Farcaster for unlimited consultations and exclusive features like the full Intelligence Card.
+                <strong>Want unlimited access?</strong> Try OrthoIQ on Farcaster for unlimited consultations and exclusive features like recovery tracking with PROMIS milestones.
               </p>
             </div>
 
@@ -376,7 +376,7 @@ Hi there,
 
 You've used all ${limit} of your daily consultations on OrthoIQ. Your questions will reset at midnight UTC.
 
-Want unlimited access? Try OrthoIQ on Farcaster for unlimited consultations and exclusive features like the full Intelligence Card.
+Want unlimited access? Try OrthoIQ on Farcaster for unlimited consultations and exclusive features like recovery tracking with PROMIS milestones.
 
 Thank you for using OrthoIQ. We're here to support your recovery journey.
 

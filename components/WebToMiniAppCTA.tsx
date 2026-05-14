@@ -90,7 +90,7 @@ export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, total
               <li className="flex items-start">
                 <span className="text-green-600 mr-2 mt-0.5">✅</span>
                 <span className="text-sm text-gray-800">
-                  <strong>Intelligence Card</strong> with shareable insights
+                  <strong>Recovery tracking</strong> with 2/4/8-week PROMIS check-ins
                 </span>
               </li>
             </ul>

@@ -1,22 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import MDReviewUpgrade from './MDReviewUpgrade';
-import IntelligenceCardModal from './IntelligenceCardModal';
 import SpecialistBadge from './SpecialistBadge';
 import ConsultationProgressBar from './ConsultationProgressBar';
 import CoordinationMetadata from './CoordinationMetadata';
 import FeedbackModal from './FeedbackModal';
 import TokenRewards from './TokenRewards';
-import IntelligenceCardCTA from './IntelligenceCardCTA';
-import WebIntelligenceCard from './WebIntelligenceCard';
+import PostFeedbackConfirmation from './PostFeedbackConfirmation';
 import ClientOnly from './ClientOnly';
 import { PrescriptionData, PrescriptionMetadata, AgentEnrichment, ResearchState } from '@/lib/types';
 import { exportPrescription } from '@/lib/exportUtils';
-import { mapConsultationToCardData } from '@/lib/intelligenceCardUtils';
 import StructuredBrief from './StructuredBrief';
 import ResearchDetailPanel from './ResearchDetailPanel';
 
@@ -83,6 +80,8 @@ interface ResponseCardProps {
   onFeedbackSubmitted?: (submitted: boolean) => void;
   // Lift feedbackSubmitted state to prevent reset on unmount/remount
   initialFeedbackSubmitted?: boolean;
+  // Trigger parent's PROMIS baseline launcher after feedback
+  onStartCheckIn?: () => void;
 }
 
 export default function ResponseCard({
@@ -115,6 +114,7 @@ export default function ResponseCard({
   researchState,
   onFeedbackSubmitted,
   initialFeedbackSubmitted,
+  onStartCheckIn,
 }: ResponseCardProps) {
   // Debug logging for rawConsultationData
   console.log('[ResponseCard] rawConsultationData received:', rawConsultationData);
@@ -138,13 +138,9 @@ export default function ResponseCard({
   const [tokenRewards, setTokenRewards] = useState<Array<{agent: string; reward: number; accuracy: number}>>([]);
   const [expandedSpecialists, setExpandedSpecialists] = useState<Set<number>>(new Set());
 
-  // Intelligence Card modal state
-  const [showIntelligenceCardModal, setShowIntelligenceCardModal] = useState(false);
-
   // Platform detection for tiered card rendering
   const [isMiniApp, setIsMiniApp] = useState(false);
   const [isWebAuthenticated, setIsWebAuthenticated] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Detect platform (miniapp vs web)
   useEffect(() => {
@@ -192,46 +188,6 @@ export default function ResponseCard({
     checkWebAuth();
   }, [isMiniApp, fid]);
 
-  // Generate Intelligence Card data for web users
-  const cardData = useMemo(() => {
-    if (rawConsultationData && feedbackSubmitted) {
-      console.log('[ResponseCard] Generating card data from:', rawConsultationData);
-
-      // Validate data structure before mapping
-      const hasValidData = (
-        (Array.isArray(rawConsultationData.responses) && rawConsultationData.responses.length > 0) ||
-        (Array.isArray(rawConsultationData.participatingSpecialists) && rawConsultationData.participatingSpecialists.length > 0)
-      );
-
-      if (!hasValidData) {
-        console.warn('[ResponseCard] rawConsultationData exists but lacks valid responses or specialists', {
-          hasResponses: !!rawConsultationData.responses,
-          responsesLength: rawConsultationData.responses?.length,
-          hasParticipatingSpecialists: !!rawConsultationData.participatingSpecialists,
-          participatingSpecialistsLength: rawConsultationData.participatingSpecialists?.length
-        });
-      }
-
-      const data = mapConsultationToCardData(rawConsultationData);
-      // Inject research agent into card data if research completed
-      if (data && researchState?.status === 'complete') {
-        data.agentStakes.push({
-          specialist: 'research',
-          agentName: 'Research',
-          tokenStake: 2.0,
-          participated: true,
-          color: '#06b6d4',
-          confidence: 0.8,
-        });
-        data.totalStake = Math.round((data.totalStake + 2.0) * 10) / 10;
-        data.participatingCount = data.agentStakes.length;
-      }
-      console.log('[ResponseCard] Generated card data:', data);
-      return data;
-    }
-    console.log('[ResponseCard] No card data - rawConsultationData:', !!rawConsultationData, 'feedbackSubmitted:', feedbackSubmitted);
-    return null;
-  }, [rawConsultationData, feedbackSubmitted, researchState?.status]);
 
   // Simulate progressive loading for specialist consultation
   useEffect(() => {
@@ -721,24 +677,7 @@ export default function ResponseCard({
               </div>
             </button>
           ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 text-center"
-            >
-              <div className="text-4xl mb-2">🧠</div>
-              <h4 className="text-lg font-bold text-green-900 mb-2">Thank you for your feedback!</h4>
-              <p className="text-sm text-green-700 mb-4">
-                Your input helps train our AI specialists. View your Intelligence Card below.
-              </p>
-              <button
-                onClick={() => setShowIntelligenceCardModal(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg"
-              >
-                <span className="mr-2">📊</span>
-                View Intelligence Card
-              </button>
-            </motion.div>
+            <PostFeedbackConfirmation onStartCheckIn={onStartCheckIn} />
           )}
         </motion.div>
       )}
@@ -776,20 +715,7 @@ export default function ResponseCard({
         />
       )}
 
-      {/* Intelligence Card Modal */}
-      {fid && (
-        <IntelligenceCardModal
-          isOpen={showIntelligenceCardModal}
-          onClose={() => setShowIntelligenceCardModal(false)}
-          rawConsultationData={rawConsultationData}
-          fid={fid}
-          isMiniApp={isMiniApp}
-          researchCompleted={researchState?.status === 'complete'}
-        />
-      )}
-
-
-      {/* Intelligence Card Gating - Tiered based on platform and auth */}
+      {/* Post-feedback display — tiered by platform and auth */}
       {/* Wrapped in ClientOnly to prevent SSR hydration mismatch */}
       <ClientOnly>
         {!isFiltered && hasSpecialistConsultation && consultationStage === 'complete' && (
@@ -822,52 +748,42 @@ export default function ResponseCard({
             </motion.div>
           )}
 
-          {/* TIER 1: Unauthenticated/Guest Web Users - After feedback, show signup CTA */}
+          {/* TIER 1: Unauthenticated/Guest Web Users - After feedback, show confirmation */}
           {!isMiniApp && !isWebAuthenticated && feedbackSubmitted && (
-            <>
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 mb-4 text-center"
-              >
-                <span className="text-2xl">🙏</span>
-                <p className="text-green-800 font-medium mt-1">Thank you for your feedback!</p>
-              </motion.div>
-              <IntelligenceCardCTA onVerifyEmail={() => setShowEmailModal(true)} />
-            </>
+            <PostFeedbackConfirmation onStartCheckIn={onStartCheckIn} />
           )}
 
-          {/* TIER 2: Authenticated Web Users - Feedback gate then WebIntelligenceCard */}
+          {/* TIER 2: Authenticated Web Users - Feedback gate then confirmation */}
           {!isMiniApp && isWebAuthenticated && !feedbackSubmitted && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl p-6 text-center"
             >
-              <div className="text-5xl mb-3">🔒</div>
+              <div className="text-5xl mb-3">💬</div>
               <h3 className="text-xl font-bold text-purple-900 mb-2">
-                Unlock Your Intelligence Card
+                Help Improve Our AI Specialists
               </h3>
               <p className="text-purple-700 mb-4">
-                Submit feedback to help our AI specialists learn and unlock your personalized Intelligence Card
+                Share your experience to help our AI specialists provide better orthopedic guidance
               </p>
               <div className="bg-white/50 rounded-lg p-3 mb-4">
                 <p className="text-sm text-purple-800 font-medium">
-                  ✨ Your feedback directly improves our AI agents&apos; prediction accuracy
+                  ✨ Your feedback directly improves our AI agents&apos; recommendations
                 </p>
               </div>
               <button
                 onClick={() => setShowFeedbackModal(true)}
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105"
               >
-                Submit Feedback to Unlock
+                Share Your Feedback
               </button>
             </motion.div>
           )}
 
-          {/* TIER 2: Authenticated Web Users - Show WebIntelligenceCard after feedback */}
-          {!isMiniApp && isWebAuthenticated && feedbackSubmitted && cardData && (
-            <WebIntelligenceCard data={cardData} caseId={caseId || cardData.caseId} />
+          {/* TIER 2: Authenticated Web Users - Confirmation after feedback */}
+          {!isMiniApp && isWebAuthenticated && feedbackSubmitted && (
+            <PostFeedbackConfirmation onStartCheckIn={onStartCheckIn} />
           )}
 
           {/* TIER 3: Miniapp Users - Full feedback gate */}
@@ -877,47 +793,30 @@ export default function ResponseCard({
               animate={{ opacity: 1, scale: 1 }}
               className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl p-6 text-center"
             >
-              <div className="text-5xl mb-3">🔒</div>
+              <div className="text-5xl mb-3">💬</div>
               <h3 className="text-xl font-bold text-purple-900 mb-2">
-                Unlock Your Intelligence Card
+                Help Improve Our AI Specialists
               </h3>
               <p className="text-purple-700 mb-4">
-                Submit feedback to help our AI specialists learn and unlock your personalized Intelligence Card
+                Share your experience to help our AI specialists provide better orthopedic guidance
               </p>
               <div className="bg-white/50 rounded-lg p-3 mb-4">
                 <p className="text-sm text-purple-800 font-medium">
-                  ✨ Your feedback directly improves our AI agents&apos; prediction accuracy
+                  ✨ Your feedback directly improves our AI agents&apos; recommendations
                 </p>
               </div>
               <button
                 onClick={() => setShowFeedbackModal(true)}
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105"
               >
-                Submit Feedback to Unlock
+                Share Your Feedback
               </button>
             </motion.div>
           )}
 
-          {/* TIER 3: Miniapp Users - Full IntelligenceCard after feedback */}
+          {/* TIER 3: Miniapp Users - Confirmation after feedback */}
           {isMiniApp && feedbackSubmitted && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 text-center"
-            >
-              <div className="text-4xl mb-2">🧠</div>
-              <h4 className="text-lg font-bold text-green-900 mb-1">Intelligence Card Unlocked!</h4>
-              <p className="text-sm text-green-700 mb-4">
-                Thank you for your feedback. View your AI consultation with agent predictions and consensus data.
-              </p>
-              <button
-                onClick={() => setShowIntelligenceCardModal(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg"
-              >
-                <span className="mr-2">📊</span>
-                View Intelligence Card
-              </button>
-            </motion.div>
+            <PostFeedbackConfirmation onStartCheckIn={onStartCheckIn} />
           )}
           </div>
         )}
@@ -1097,44 +996,27 @@ export default function ResponseCard({
               animate={{ opacity: 1, scale: 1 }}
               className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl p-6 text-center"
             >
-              <div className="text-5xl mb-3">🔒</div>
+              <div className="text-5xl mb-3">💬</div>
               <h3 className="text-xl font-bold text-purple-900 mb-2">
-                Unlock Your Intelligence Card
+                Help Improve Our AI Specialists
               </h3>
               <p className="text-purple-700 mb-4">
-                Submit feedback to help our AI specialists learn and unlock your Intelligence Card
+                Share your experience to help our AI specialists provide better orthopedic guidance
               </p>
               <div className="bg-white/50 rounded-lg p-3 mb-4">
                 <p className="text-sm text-purple-800 font-medium">
-                  ✨ Your feedback directly improves our AI agents&apos; prediction accuracy
+                  ✨ Your feedback directly improves our AI agents&apos; recommendations
                 </p>
               </div>
               <button
                 onClick={() => setShowFeedbackModal(true)}
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105"
               >
-                Submit Feedback to Unlock
+                Share Your Feedback
               </button>
             </motion.div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 text-center"
-            >
-              <div className="text-4xl mb-2">🧠</div>
-              <h4 className="text-lg font-bold text-green-900 mb-1">Intelligence Card Unlocked!</h4>
-              <p className="text-sm text-green-700 mb-4">
-                Thank you for your feedback. View your AI consultation with agent predictions.
-              </p>
-              <button
-                onClick={() => setShowIntelligenceCardModal(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg"
-              >
-                <span className="mr-2">📊</span>
-                View Intelligence Card
-              </button>
-            </motion.div>
+            <PostFeedbackConfirmation onStartCheckIn={onStartCheckIn} />
           )}
           </motion.div>
         )}

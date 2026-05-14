@@ -1,7 +1,6 @@
 'use client';
 
 import { SystemOverview } from './components/SystemOverview';
-import { CardDistribution } from './components/CardDistribution';
 import { EngagementMetrics } from './components/EngagementMetrics';
 import { MDReviewQueue } from './components/MDReviewQueue';
 import { RecentActivity } from './components/RecentActivity';
@@ -20,14 +19,14 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold mb-2">OrthoIQ Admin Dashboard</h1>
-              <p className="text-lg opacity-90">Agent Performance & Intelligence Card Analytics</p>
+              <p className="text-lg opacity-90">Agent Performance Analytics</p>
             </div>
             <div className="flex space-x-3">
               <a
                 href="/admin/md-review"
                 className="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-purple-50 transition-colors text-sm"
               >
-                Intelligence Cards
+                MD Review
               </a>
             </div>
           </div>
@@ -41,9 +40,6 @@ export default function AdminDashboard() {
 
         {/* Query Pathway Analytics */}
         <QueryTypeAnalytics />
-
-        {/* Card Distribution */}
-        <CardDistribution />
 
         {/* PROMIS Capture Rates & Chatbot Usage */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

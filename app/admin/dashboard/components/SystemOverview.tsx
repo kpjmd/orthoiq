@@ -14,7 +14,6 @@ interface SystemMetrics {
   outcomeValidationRate: number;
   totalTokensIssued: number;
   tokensInCirculation: number;
-  averageStakePerConsultation: number;
   consultationTrend: Array<{ date: string; count: number }>;
   agentStatsAvailable: boolean;
 }
@@ -131,7 +130,7 @@ export function SystemOverview() {
 
         {/* Token Economics (if available) */}
         {metrics.agentStatsAvailable && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <MetricCard
               icon="🪙"
               label="Total Tokens Issued"
@@ -141,11 +140,6 @@ export function SystemOverview() {
               icon="💰"
               label="Tokens in Circulation"
               value={metrics.tokensInCirculation.toLocaleString()}
-            />
-            <MetricCard
-              icon="📊"
-              label="Avg Stake/Case"
-              value={metrics.averageStakePerConsultation.toFixed(1)}
             />
           </div>
         )}
