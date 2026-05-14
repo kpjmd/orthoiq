@@ -264,6 +264,7 @@ function MiniAppContent() {
   const [pendingComprehensiveReveal, setPendingComprehensiveReveal] = useState(false);
   const [showTriagePromis, setShowTriagePromis] = useState(false);
   const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
+  const [promisPermaDismissed, setPromisPermaDismissed] = useState(false);
 
   // Informational Query Pathway state
   const [queryType, setQueryType] = useState<'clinical' | 'informational'>('clinical');
@@ -331,6 +332,19 @@ function MiniAppContent() {
       setShowPromisButton(false);
     }
   }, [consultationStage, promisCompleted, queryType]);
+
+  const handlePromisDismiss = (consultationId: string) => {
+    setPromisPermaDismissed(true);
+    setShowPromisButton(false);
+    setShowTriagePromis(false);
+    if (!consultationId) return;
+    const fid = context?.user?.fid?.toString() || authUser?.fid?.toString() || 'anonymous';
+    fetch(`/api/consultations/${consultationId}/query-type`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fid, queryType: 'informational' }),
+    }).catch(() => {});
+  };
 
   const getUserTier = useCallback((): UserTier => {
     // Prioritize authUser from Quick Auth
@@ -1278,15 +1292,15 @@ function MiniAppContent() {
                   }}
                   onSkip={() => {
                     setShowPromisQuestionnaire(false);
-                    setShowPromisButton(true);
+                    if (!promisPermaDismissed) setShowPromisButton(true);
                   }}
                 />
               </div>
             )}
 
             {/* Pulsing "Track Your Recovery" button */}
-            {showPromisButton && !showPromisQuestionnaire && !promisCompleted && (
-              <div className="mt-4">
+            {showPromisButton && !showPromisQuestionnaire && !promisCompleted && !promisPermaDismissed && (
+              <div className="mt-4 relative">
                 <button
                   onClick={() => {
                     setShowPromisQuestionnaire(true);
@@ -1297,6 +1311,11 @@ function MiniAppContent() {
                   <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
                   <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire while you wait</p>
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePromisDismiss(comprehensiveResult?.consultationId || triageResult?.consultationId || ''); }}
+                  className="absolute top-1 right-2 text-xs text-gray-400 hover:text-gray-500 leading-none p-1"
+                  aria-label="Dismiss"
+                >✕</button>
               </div>
             )}
           </div>
@@ -1444,8 +1463,8 @@ function MiniAppContent() {
             )}
 
             {/* Second-chance PROMIS button — after ResponseCard, near feedback section */}
-            {!showPromisQuestionnaire && !promisCompleted && !pendingComprehensiveReveal && (
-              <div className="mt-3 mb-2">
+            {!showPromisQuestionnaire && !promisCompleted && !pendingComprehensiveReveal && !promisPermaDismissed && (
+              <div className="mt-3 mb-2 relative">
                 <button
                   onClick={() => setShowPromisQuestionnaire(true)}
                   className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
@@ -1453,6 +1472,11 @@ function MiniAppContent() {
                   <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
                   <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire to track your progress over time</p>
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePromisDismiss(comprehensiveResult?.consultationId || triageResult?.consultationId || ''); }}
+                  className="absolute top-1 right-2 text-xs text-gray-400 hover:text-gray-500 leading-none p-1"
+                  aria-label="Dismiss"
+                >✕</button>
               </div>
             )}
 
@@ -1545,8 +1569,8 @@ function MiniAppContent() {
               )}
 
               {/* PROMIS opt-in for triage-exit users (after feedback) — not for informational queries */}
-              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && queryType !== 'informational' && triageResult?.consultationId && (
-                <div className="mb-4">
+              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && queryType !== 'informational' && !promisPermaDismissed && triageResult?.consultationId && (
+                <div className="mb-4 relative">
                   <button
                     onClick={() => setShowTriagePromis(true)}
                     className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
@@ -1554,6 +1578,11 @@ function MiniAppContent() {
                     <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
                     <p className="text-xs text-gray-500 mt-0.5">2 minutes &bull; Helps track your progress over time</p>
                   </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handlePromisDismiss(triageResult.consultationId || ''); }}
+                    className="absolute top-1 right-2 text-xs text-gray-400 hover:text-gray-500 leading-none p-1"
+                    aria-label="Dismiss"
+                  >✕</button>
                 </div>
               )}
 

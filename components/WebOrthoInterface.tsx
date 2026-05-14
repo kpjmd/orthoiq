@@ -264,6 +264,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
   // Triage-exit PROMIS state
   const [showTriagePromis, setShowTriagePromis] = useState(false);
   const [triagePromisCompleted, setTriagePromisCompleted] = useState(false);
+  const [promisPermaDismissed, setPromisPermaDismissed] = useState(false);
 
   // Informational Query Pathway state
   const [queryType, setQueryType] = useState<'clinical' | 'informational'>('clinical');
@@ -386,6 +387,18 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       isLimitReached: prev.questionsAsked >= limit
     }));
   }, [isVerified, isWalletConnected]);
+
+  const handlePromisDismiss = (consultationId: string) => {
+    setPromisPermaDismissed(true);
+    setShowPromisButton(false);
+    setShowTriagePromis(false);
+    if (!consultationId) return;
+    fetch(`/api/consultations/${consultationId}/query-type`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fid: user?.id || 'web-guest', queryType: 'informational' }),
+    }).catch(() => {});
+  };
 
   // Show PROMIS button after 5s during comprehensive loading (not for informational queries)
   useEffect(() => {
@@ -1015,11 +1028,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             <ComprehensiveLoadingState />
 
             {/* Pulsing "Track Your Recovery" button — appears after 5s */}
-            {showPromisButton && !showPromisQuestionnaire && !promisCompleted && (
+            {showPromisButton && !showPromisQuestionnaire && !promisCompleted && !promisPermaDismissed && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4"
+                className="mt-4 relative"
               >
                 <button
                   onClick={() => {
@@ -1032,6 +1045,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                   <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
                   <p className="text-xs text-gray-500 mt-0.5">Complete a 2-minute questionnaire while you wait</p>
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePromisDismiss(comprehensiveResult?.consultationId || triageResult?.consultationId || ''); }}
+                  className="absolute top-1 right-2 text-xs text-gray-400 hover:text-gray-500 leading-none p-1"
+                  aria-label="Dismiss"
+                >✕</button>
               </motion.div>
             )}
           </div>
@@ -1062,7 +1080,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 setShowPromisQuestionnaire(false);
                 setPromisStartedDuringLoading(false);
                 setPendingComprehensiveReveal(false);
-                if (consultationStage === 'comprehensive_loading') {
+                if (consultationStage === 'comprehensive_loading' && !promisPermaDismissed) {
                   setShowPromisButton(true);
                 }
               }}
@@ -1223,11 +1241,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             )}
 
             {/* Second-chance PROMIS button — shown after results if not yet started */}
-            {!showPromisQuestionnaire && !promisCompleted && (
+            {!showPromisQuestionnaire && !promisCompleted && !promisPermaDismissed && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 mb-2"
+                className="mt-4 mb-2 relative"
               >
                 <button
                   onClick={() => setShowPromisQuestionnaire(true)}
@@ -1236,6 +1254,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                   <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
                   <p className="text-xs text-gray-500 mt-0.5">2-minute questionnaire to track your progress over time</p>
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePromisDismiss(comprehensiveResult?.consultationId || triageResult?.consultationId || ''); }}
+                  className="absolute top-1 right-2 text-xs text-gray-400 hover:text-gray-500 leading-none p-1"
+                  aria-label="Dismiss"
+                >✕</button>
               </motion.div>
             )}
 
@@ -1372,8 +1395,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
               )}
 
               {/* PROMIS opt-in for triage-exit users (after feedback) — not for informational queries */}
-              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && queryType !== 'informational' && triageResult?.consultationId && (
-                <div className="mb-4">
+              {feedbackSubmitted && !showTriagePromis && !triagePromisCompleted && queryType !== 'informational' && !promisPermaDismissed && triageResult?.consultationId && (
+                <div className="mb-4 relative">
                   <button
                     onClick={() => setShowTriagePromis(true)}
                     className="w-full py-3 px-4 bg-white border-2 border-blue-300 rounded-xl text-center transition-all hover:border-blue-400 promis-pulse"
@@ -1381,6 +1404,11 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                     <span className="text-sm font-semibold text-blue-700">Track Your Recovery</span>
                     <p className="text-xs text-gray-500 mt-0.5">2 minutes &bull; Helps track your progress over time</p>
                   </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handlePromisDismiss(triageResult.consultationId || ''); }}
+                    className="absolute top-1 right-2 text-xs text-gray-400 hover:text-gray-500 leading-none p-1"
+                    aria-label="Dismiss"
+                  >✕</button>
                 </div>
               )}
 

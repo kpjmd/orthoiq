@@ -3636,6 +3636,24 @@ export async function updateConsultationPrivacy(
   }
 }
 
+export async function updateConsultationQueryType(
+  consultationId: string,
+  queryType: string
+): Promise<void> {
+  const sql = getSql();
+  try {
+    await sql`
+      UPDATE consultations
+      SET query_type = ${queryType}
+      WHERE consultation_id = ${consultationId}
+    `;
+    console.log(`Updated consultation ${consultationId} query_type to ${queryType}`);
+  } catch (error) {
+    console.error('Error updating consultation query_type:', error);
+    throw error;
+  }
+}
+
 // User Preferences: Get user preferences by FID
 export async function getUserPreferences(fid: string): Promise<any | null> {
   const sql = getSql();
