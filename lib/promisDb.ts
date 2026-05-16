@@ -13,6 +13,7 @@ export async function storePromisResponse(data: {
   painInterferenceResponses?: Record<string, number> | null;
   painInterferenceRawScore?: number | null;
   painInterferenceTScore?: number | null;
+  webUserId?: string | null;
 }): Promise<number> {
   const sql = getSql();
 
@@ -21,13 +22,15 @@ export async function storePromisResponse(data: {
       INSERT INTO promis_responses (
         consultation_id, patient_id, timepoint,
         physical_function_responses, physical_function_raw_score, physical_function_t_score,
-        pain_interference_responses, pain_interference_raw_score, pain_interference_t_score
+        pain_interference_responses, pain_interference_raw_score, pain_interference_t_score,
+        web_user_id
       ) VALUES (
         ${data.consultationId}, ${data.patientId}, ${data.timepoint},
         ${JSON.stringify(data.physicalFunctionResponses)}, ${data.physicalFunctionRawScore}, ${data.physicalFunctionTScore},
         ${data.painInterferenceResponses ? JSON.stringify(data.painInterferenceResponses) : null},
         ${data.painInterferenceRawScore ?? null},
-        ${data.painInterferenceTScore ?? null}
+        ${data.painInterferenceTScore ?? null},
+        ${data.webUserId ?? null}
       )
       ON CONFLICT (consultation_id, timepoint) DO UPDATE SET
         physical_function_responses = EXCLUDED.physical_function_responses,
@@ -35,7 +38,8 @@ export async function storePromisResponse(data: {
         physical_function_t_score = EXCLUDED.physical_function_t_score,
         pain_interference_responses = EXCLUDED.pain_interference_responses,
         pain_interference_raw_score = EXCLUDED.pain_interference_raw_score,
-        pain_interference_t_score = EXCLUDED.pain_interference_t_score
+        pain_interference_t_score = EXCLUDED.pain_interference_t_score,
+        web_user_id = COALESCE(EXCLUDED.web_user_id, promis_responses.web_user_id)
       RETURNING id
     `;
     console.log('PROMIS response stored:', { consultationId: data.consultationId, timepoint: data.timepoint });
@@ -149,6 +153,59 @@ export async function getUserPromisHistory(fid: string): Promise<any[]> {
     return rows;
   } catch (error) {
     console.error('Error getting user PROMIS history:', error);
+    return [];
+  }
+}
+
+/**
+ * Get a web user's PROMIS history. Joins via promis_responses.web_user_id and
+ * also unions consultations the user owns by web_user_id (for cases where
+ * a follow-up wasn't tagged at write time but the consultation is theirs).
+ */
+export async function getUserPromisHistoryByWebUserId(
+  webUserId: string,
+  walletAddress?: string | null
+): Promise<any[]> {
+  const sql = getSql();
+
+  try {
+    const rows = walletAddress
+      ? await sql`
+          SELECT
+            pr.consultation_id,
+            pr.timepoint,
+            pr.physical_function_t_score,
+            pr.pain_interference_t_score,
+            pr.created_at AS response_date,
+            c.created_at AS consultation_date,
+            q.question AS consultation_question
+          FROM promis_responses pr
+          JOIN consultations c ON pr.consultation_id = c.consultation_id
+          JOIN questions q ON c.question_id = q.id
+          WHERE pr.web_user_id = ${webUserId}
+             OR c.web_user_id = ${webUserId}
+             OR (c.wallet_address IS NOT NULL AND LOWER(c.wallet_address) = LOWER(${walletAddress}))
+          ORDER BY c.created_at DESC, pr.timepoint ASC
+        `
+      : await sql`
+          SELECT
+            pr.consultation_id,
+            pr.timepoint,
+            pr.physical_function_t_score,
+            pr.pain_interference_t_score,
+            pr.created_at AS response_date,
+            c.created_at AS consultation_date,
+            q.question AS consultation_question
+          FROM promis_responses pr
+          JOIN consultations c ON pr.consultation_id = c.consultation_id
+          JOIN questions q ON c.question_id = q.id
+          WHERE pr.web_user_id = ${webUserId}
+             OR c.web_user_id = ${webUserId}
+          ORDER BY c.created_at DESC, pr.timepoint ASC
+        `;
+    return rows;
+  } catch (error) {
+    console.error('Error getting web-user PROMIS history:', error);
     return [];
   }
 }

@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
       timepoint,
       physicalFunctionResponses,
       painInterferenceResponses,
+      webUserId,
     } = body;
 
     // Validate required fields
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
       painInterferenceResponses: painInterferenceResponses || null,
       painInterferenceRawScore: piScores?.rawScore ?? null,
       painInterferenceTScore: piScores?.tScore ?? null,
+      webUserId: webUserId ?? null,
     });
 
     // Calculate delta if this is a follow-up

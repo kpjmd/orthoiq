@@ -19,7 +19,9 @@ export async function GET() {
         email: sessionData.user.email,
         emailVerified: sessionData.user.email_verified,
         dailyQuestionCount: sessionData.user.daily_question_count,
-        createdAt: sessionData.user.created_at
+        createdAt: sessionData.user.created_at,
+        walletAddress: sessionData.user.wallet_address,
+        walletVerified: !!sessionData.user.wallet_verified_at
       },
       session: {
         id: sessionData.session.id,

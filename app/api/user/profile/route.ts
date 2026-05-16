@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       profile: profile
         ? {
+            kind: 'fid' as const,
             fid: profile.fid,
             displayName: profile.display_name,
             username: profile.username,

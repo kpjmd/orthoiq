@@ -16,21 +16,26 @@ const AuthSection = dynamic(
   }
 );
 
+const ProfileHeader = dynamic(() => import('./ProfileHeader'), { ssr: false });
+
 export default function WebHomePage() {
   return (
     <div className="text-center max-w-4xl mx-auto">
       <div className="medical-gradient text-white p-8 rounded-lg mb-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-4xl font-bold">OrthoIQ</h1>
-          <a
-            href="/stats?from=web"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-          >
-            <span>📊</span>
-            <span>Platform Stats</span>
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="/stats?from=web"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+            >
+              <span>📊</span>
+              <span>Platform Stats</span>
+            </a>
+            <ProfileHeader />
+          </div>
         </div>
         <p className="text-xl mb-2">AI-Powered Orthopedic Intelligence</p>
         <p className="text-lg opacity-90 mb-4">

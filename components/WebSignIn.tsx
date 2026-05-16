@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount, useConnect } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { useWebAuth } from './WebAuthProvider';
 import OrthoIQLogo from './OrthoIQLogo';
+import { WalletSignInButton } from './WalletSignIn';
 
 export default function WebSignIn() {
   const { signInWithEmail, signInAsGuest, isLoading, magicLinkSent, user } = useWebAuth();
   const { address, isConnected: isWalletConnected } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
   const [email, setEmail] = useState('');
   const [sentEmail, setSentEmail] = useState('');
   const [error, setError] = useState('');
@@ -171,24 +171,18 @@ export default function WebSignIn() {
         </div>
       </div>
 
-      {/* Connect Wallet */}
-      {isWalletConnected ? (
-        <div className="mb-4 p-3 bg-green-50 border border-green-300 rounded-lg text-center">
-          <p className="text-green-800 text-sm font-medium">
-            Wallet connected: {address?.slice(0, 6)}…{address?.slice(-4)}
+      {/* Connect Wallet — runs SIWE so a profile session is created */}
+      <div className="mb-4">
+        <WalletSignInButton
+          className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
+          onError={(msg) => setError(msg)}
+        />
+        {isWalletConnected && address && (
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            Wallet detected: {address.slice(0, 6)}…{address.slice(-4)}
           </p>
-          <p className="text-green-700 text-xs mt-1">You&apos;ll proceed automatically with unlimited access.</p>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => connect({ connector: connectors[0] })}
-          disabled={isConnecting}
-          className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors mb-4"
-        >
-          {isConnecting ? 'Connecting…' : 'Connect Wallet (Unlimited access)'}
-        </button>
-      )}
+        )}
+      </div>
 
       {/* Second Divider */}
       <div className="relative mb-4">

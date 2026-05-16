@@ -996,6 +996,25 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_web_users_email ON web_users(email);
     `;
 
+    // Allow wallet-only web users: nullable email + new wallet_address column
+    await sql`
+      ALTER TABLE web_users ADD COLUMN IF NOT EXISTS wallet_address VARCHAR(255);
+    `;
+    await sql`
+      ALTER TABLE web_users ADD COLUMN IF NOT EXISTS wallet_verified_at TIMESTAMP WITH TIME ZONE;
+    `;
+    await sql`
+      ALTER TABLE web_users ALTER COLUMN email DROP NOT NULL;
+    `;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_web_users_wallet_lower
+        ON web_users (LOWER(wallet_address))
+        WHERE wallet_address IS NOT NULL;
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_web_users_wallet_address ON web_users(wallet_address);
+    `;
+
     // Web Sessions table for persistent 90-day sessions (milestone journey support)
     await sql`
       CREATE TABLE IF NOT EXISTS web_sessions (
@@ -1122,6 +1141,44 @@ export async function initDatabase() {
 
     await sql`
       CREATE INDEX IF NOT EXISTS idx_promis_responses_patient_id ON promis_responses(patient_id);
+    `;
+
+    // Web profiles: stable FK from promis_responses to web_users
+    await sql`
+      ALTER TABLE promis_responses ADD COLUMN IF NOT EXISTS web_user_id UUID REFERENCES web_users(id);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_promis_responses_web_user_id ON promis_responses(web_user_id);
+    `;
+    // Backfill: link existing promis_responses to the web_user_id already on their consultation
+    await sql`
+      UPDATE promis_responses pr
+      SET web_user_id = c.web_user_id
+      FROM consultations c
+      WHERE pr.consultation_id = c.consultation_id
+        AND pr.web_user_id IS NULL
+        AND c.web_user_id IS NOT NULL
+    `;
+
+    // Wallet sign-in challenges (10-min single-use nonces)
+    await sql`
+      CREATE TABLE IF NOT EXISTS wallet_challenges (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        nonce VARCHAR(64) UNIQUE NOT NULL,
+        wallet_address VARCHAR(255) NOT NULL,
+        web_user_id UUID REFERENCES web_users(id) ON DELETE CASCADE,
+        purpose VARCHAR(32) NOT NULL CHECK (purpose IN ('connect','verify','backfill')),
+        message TEXT NOT NULL,
+        issued_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        consumed_at TIMESTAMP WITH TIME ZONE
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_wallet_challenges_nonce ON wallet_challenges(nonce);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_wallet_challenges_expires ON wallet_challenges(expires_at);
     `;
 
     // V2 prediction market: project key agent fields from result_data JSONB into queryable columns
@@ -3829,7 +3886,7 @@ export async function getPlatformHandoff(handoffId: string): Promise<any | null>
 
 export interface WebUser {
   id: string;
-  email: string;
+  email: string | null;
   email_verified: boolean;
   verification_token: string | null;
   verification_expires_at: Date | null;
@@ -3837,6 +3894,8 @@ export interface WebUser {
   last_question_date: Date | null;
   created_at: Date;
   last_login: Date | null;
+  wallet_address: string | null;
+  wallet_verified_at: Date | null;
 }
 
 export interface WebSession {
@@ -4046,7 +4105,9 @@ export async function getWebSessionByToken(token: string): Promise<(WebSession &
         wu.daily_question_count as user_daily_question_count,
         wu.last_question_date as user_last_question_date,
         wu.created_at as user_created_at,
-        wu.last_login as user_last_login
+        wu.last_login as user_last_login,
+        wu.wallet_address as user_wallet_address,
+        wu.wallet_verified_at as user_wallet_verified_at
       FROM web_sessions ws
       JOIN web_users wu ON ws.web_user_id = wu.id
       WHERE ws.session_token = ${token}
@@ -4073,7 +4134,9 @@ export async function getWebSessionByToken(token: string): Promise<(WebSession &
         daily_question_count: row.user_daily_question_count,
         last_question_date: row.user_last_question_date,
         created_at: row.user_created_at,
-        last_login: row.user_last_login
+        last_login: row.user_last_login,
+        wallet_address: row.user_wallet_address,
+        wallet_verified_at: row.user_wallet_verified_at
       }
     };
   } catch (error) {

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { getPhysicalFunctionBand, getPainInterferenceBand } from '@/lib/promis';
 import { PROMISTimepoint } from '@/lib/promisTypes';
 
@@ -11,16 +10,31 @@ export interface ConsultationRecord {
   question: string;
 }
 
+export type ProfileIdentity =
+  | {
+      kind: 'fid';
+      fid: string;
+      displayName: string | null;
+      username: string | null;
+      pfpUrl: string | null;
+      walletAddress: string | null;
+      createdAt: string;
+      lastSeen: string;
+    }
+  | {
+      kind: 'webUser';
+      webUserId: string;
+      email: string | null;
+      displayName: string | null;
+      initials: string;
+      walletAddress: string | null;
+      walletVerified: boolean;
+      createdAt: string;
+      lastLogin: string | null;
+    };
+
 export interface ProfileData {
-  profile: {
-    fid: string;
-    displayName: string | null;
-    username: string | null;
-    pfpUrl: string | null;
-    walletAddress: string | null;
-    createdAt: string;
-    lastSeen: string;
-  } | null;
+  profile: ProfileIdentity | null;
   stats: { totalConsultations: number };
   consultations: ConsultationRecord[];
   promisHistory: Array<{
@@ -43,6 +57,8 @@ interface UserProfileViewProps {
   profileData: ProfileData | null;
   isLoading: boolean;
   onSelectMilestone: (consultationId: string, timepoint: PROMISTimepoint) => void;
+  /** Web-only: invoked when user clicks "Verify wallet ownership" on an unverified wallet */
+  onVerifyWallet?: () => void;
 }
 
 const TIMEPOINT_LABELS: Record<string, string> = {
@@ -65,7 +81,12 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function UserProfileView({ profileData, isLoading, onSelectMilestone }: UserProfileViewProps) {
+export default function UserProfileView({
+  profileData,
+  isLoading,
+  onSelectMilestone,
+  onVerifyWallet,
+}: UserProfileViewProps) {
   if (isLoading) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
@@ -98,7 +119,6 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
 
   const { profile, stats, consultations, promisHistory, pendingMilestones } = profileData;
 
-  // Group PROMIS history by consultation
   const promisGrouped = new Map<string, typeof promisHistory>();
   for (const entry of promisHistory) {
     const key = entry.consultationId;
@@ -114,40 +134,11 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
     <div className="p-6 max-w-2xl mx-auto space-y-5">
       {/* Identity Card */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center gap-4">
-          {profile?.pfpUrl ? (
-            <img
-              src={profile.pfpUrl}
-              alt="Profile"
-              className="w-16 h-16 rounded-full object-cover border-2 border-blue-200"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
-              {(profile?.displayName || profile?.username || '?')[0].toUpperCase()}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-gray-900 truncate">
-              {profile?.displayName || profile?.username || `FID ${profile?.fid}`}
-            </h2>
-            {profile?.username && (
-              <p className="text-sm text-gray-500">@{profile.username}</p>
-            )}
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="text-xs text-gray-400">FID {profile?.fid}</span>
-              {profile?.walletAddress && (
-                <span className="text-xs text-gray-400 font-mono">
-                  {truncateAddress(profile.walletAddress)}
-                </span>
-              )}
-            </div>
-            {profile?.createdAt && (
-              <p className="text-xs text-gray-400 mt-1">
-                Member since {formatDate(profile.createdAt)}
-              </p>
-            )}
-          </div>
-        </div>
+        {profile?.kind === 'fid' ? (
+          <FidIdentityCard profile={profile} />
+        ) : profile?.kind === 'webUser' ? (
+          <WebUserIdentityCard profile={profile} onVerifyWallet={onVerifyWallet} />
+        ) : null}
       </div>
 
       {/* Stats Row */}
@@ -225,7 +216,7 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
                   {followups.map(fu => {
                     const pfDelta = baseline ? fu.pfTScore - baseline.pfTScore : 0;
                     const piDelta = baseline && baseline.piTScore != null && fu.piTScore != null
-                      ? -(fu.piTScore - baseline.piTScore)  // reversed: positive = improvement
+                      ? -(fu.piTScore - baseline.piTScore)
                       : null;
 
                     return (
@@ -271,14 +262,101 @@ export default function UserProfileView({ profileData, isLoading, onSelectMilest
         </div>
       )}
 
-      {/* Token Placeholder */}
-      {profile?.walletAddress && (
+      {/* Wallet section (fid mode only — web mode shows wallet inline in identity card) */}
+      {profile?.kind === 'fid' && profile.walletAddress && (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">Wallet</h3>
           <p className="text-sm font-mono text-gray-600 break-all">{profile.walletAddress}</p>
           <p className="text-xs text-gray-400 mt-2">OrthoIQ Token: Coming soon (testnet)</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function FidIdentityCard({
+  profile,
+}: {
+  profile: Extract<ProfileIdentity, { kind: 'fid' }>;
+}) {
+  return (
+    <div className="flex items-center gap-4">
+      {profile.pfpUrl ? (
+        <img
+          src={profile.pfpUrl}
+          alt="Profile"
+          className="w-16 h-16 rounded-full object-cover border-2 border-blue-200"
+        />
+      ) : (
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
+          {(profile.displayName || profile.username || '?')[0].toUpperCase()}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <h2 className="text-lg font-bold text-gray-900 truncate">
+          {profile.displayName || profile.username || `FID ${profile.fid}`}
+        </h2>
+        {profile.username && (
+          <p className="text-sm text-gray-500">@{profile.username}</p>
+        )}
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <span className="text-xs text-gray-400">FID {profile.fid}</span>
+          {profile.walletAddress && (
+            <span className="text-xs text-gray-400 font-mono">
+              {truncateAddress(profile.walletAddress)}
+            </span>
+          )}
+        </div>
+        {profile.createdAt && (
+          <p className="text-xs text-gray-400 mt-1">
+            Member since {formatDate(profile.createdAt)}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WebUserIdentityCard({
+  profile,
+  onVerifyWallet,
+}: {
+  profile: Extract<ProfileIdentity, { kind: 'webUser' }>;
+  onVerifyWallet?: () => void;
+}) {
+  const primaryLine = profile.email ?? 'Wallet user';
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
+        {profile.initials}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h2 className="text-lg font-bold text-gray-900 truncate">{primaryLine}</h2>
+        {profile.walletAddress && (
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-xs text-gray-500 font-mono">
+              {truncateAddress(profile.walletAddress)}
+            </span>
+            {profile.walletVerified ? (
+              <span className="text-xs text-green-600 font-medium">✓ Verified</span>
+            ) : onVerifyWallet ? (
+              <button
+                onClick={onVerifyWallet}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Verify ownership
+              </button>
+            ) : (
+              <span className="text-xs text-amber-600">Unverified</span>
+            )}
+          </div>
+        )}
+        {profile.createdAt && (
+          <p className="text-xs text-gray-400 mt-1">
+            Member since {formatDate(profile.createdAt)}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -301,7 +379,7 @@ function DeltaArrow({ value }: { value: number }) {
   return (
     <span className={`ml-1 ${positive ? 'text-green-600' : 'text-red-500'}`}>
       {positive ? '+' : ''}{value.toFixed(1)}
-      {positive ? ' \u2191' : ' \u2193'}
+      {positive ? ' ↑' : ' ↓'}
     </span>
   );
 }

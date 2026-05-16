@@ -36,9 +36,11 @@ export async function GET(request: NextRequest) {
 
     // Send welcome email for first-time verified users
     // (The verification already happened, this is just a welcome)
-    sendWelcomeEmail(user.email).catch(err => {
-      console.error('Failed to send welcome email:', err);
-    });
+    if (user.email) {
+      sendWelcomeEmail(user.email).catch(err => {
+        console.error('Failed to send welcome email:', err);
+      });
+    }
 
     // Create response with session cookie
     const response = NextResponse.redirect(
@@ -99,9 +101,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Send welcome email
-    sendWelcomeEmail(user.email).catch(err => {
-      console.error('Failed to send welcome email:', err);
-    });
+    if (user.email) {
+      sendWelcomeEmail(user.email).catch(err => {
+        console.error('Failed to send welcome email:', err);
+      });
+    }
 
     // Create response with session cookie
     const response = NextResponse.json({

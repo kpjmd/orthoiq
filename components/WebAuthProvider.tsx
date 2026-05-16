@@ -6,9 +6,11 @@ interface WebUser {
   id: string;
   email?: string;
   name?: string;
-  authType: 'email' | 'guest' | 'verified';
+  authType: 'email' | 'guest' | 'verified' | 'wallet';
   emailVerified: boolean;
   dailyQuestionCount?: number;
+  walletAddress?: string;
+  walletVerified?: boolean;
 }
 
 interface WebAuthContextType {
@@ -22,6 +24,7 @@ interface WebAuthContextType {
   isLoading: boolean;
   magicLinkSent: boolean;
   checkSession: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const WebAuthContext = createContext<WebAuthContextType | null>(null);
@@ -50,13 +53,20 @@ export function WebAuthProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
+        const hasEmail = !!data.user.email;
         const verifiedUser: WebUser = {
           id: data.user.id,
-          email: data.user.email,
-          name: data.user.email?.split('@')[0],
-          authType: 'verified',
+          email: data.user.email ?? undefined,
+          name: hasEmail
+            ? data.user.email.split('@')[0]
+            : data.user.walletAddress
+            ? `${data.user.walletAddress.slice(0, 6)}...${data.user.walletAddress.slice(-4)}`
+            : undefined,
+          authType: hasEmail ? 'verified' : 'wallet',
           emailVerified: data.user.emailVerified,
           dailyQuestionCount: data.user.dailyQuestionCount,
+          walletAddress: data.user.walletAddress ?? undefined,
+          walletVerified: !!data.user.walletVerified,
         };
         setUser(verifiedUser);
         setMagicLinkSent(false);
@@ -168,7 +178,7 @@ export function WebAuthProvider({ children }: { children: ReactNode }) {
   const value: WebAuthContextType = {
     user,
     isAuthenticated: !!user,
-    isVerified: user?.emailVerified === true,
+    isVerified: user?.emailVerified === true || user?.walletVerified === true,
     signInWithEmail,
     signInAsGuest,
     upgradeToEmail,
@@ -176,6 +186,7 @@ export function WebAuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     magicLinkSent,
     checkSession,
+    refreshUser: checkSession,
   };
 
   return (

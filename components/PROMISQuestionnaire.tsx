@@ -16,6 +16,7 @@ interface PROMISQuestionnaireProps {
   consultationId: string;
   isPainRelated: boolean;
   patientId: string;
+  webUserId?: string;
   onComplete: (result: PROMISCompletionResult) => void;
   onSkip: () => void;
 }
@@ -27,6 +28,7 @@ export default function PROMISQuestionnaire({
   consultationId,
   isPainRelated,
   patientId,
+  webUserId,
   onComplete,
   onSkip,
 }: PROMISQuestionnaireProps) {
@@ -71,6 +73,7 @@ export default function PROMISQuestionnaire({
           timepoint,
           physicalFunctionResponses: pf,
           painInterferenceResponses: pi,
+          webUserId,
         }),
       });
 
@@ -107,7 +110,7 @@ export default function PROMISQuestionnaire({
         setCurrentIndex(PHYSICAL_FUNCTION_QUESTIONS.length - 1);
       }
     }
-  }, [consultationId, patientId, timepoint, onComplete]);
+  }, [consultationId, patientId, webUserId, timepoint, onComplete]);
 
   const handleNext = useCallback(() => {
     if (currentIndex < currentQuestions.length - 1) {
