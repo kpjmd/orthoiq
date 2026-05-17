@@ -1,5 +1,119 @@
 # OrthoIQ Changelog
 
+## [2.0.0] - 2026-05-17: Milestone Return Experience
+
+Reframes the week 2/4/8 PROMIS check-ins as a recovery resource rather than a data-collection
+touchpoint. Every channel now leads with the patient's own trajectory before asking anything of them.
+
+### Added — Body part extraction
+
+- **`lib/bodyPart.ts`** — `extractBodyPart()` uses Claude Haiku at inference time (temp 0,
+  max_tokens 50, 1.5s timeout) to classify the consultation into one of 11 enum values
+  (`knee`, `shoulder`, `hip`, `ankle`, `back`, `neck`, `wrist`, `elbow`, `foot`, `hand`, `other`).
+  Validates against enum; falls back to `'other'` on timeout or mismatch.
+  `bodyPartPhrase(bp)` returns `"your knee"` or `"your"` — never raw `body_part` strings in copy.
+- **`lib/database.ts`** — `ALTER TABLE consultations ADD COLUMN IF NOT EXISTS body_part VARCHAR(50)`.
+  `storeConsultation()` extended to persist the extracted value.
+- **`app/api/claude/route.ts`** — calls `extractBodyPart()` before `storeConsultation()`,
+  wrapped in try/catch so extraction failure never blocks a consultation.
+- **`scripts/backfill-body-parts.js`** — gated backfill script (requires
+  `BACKFILL_BODY_PARTS_ENABLED=true` and `--confirm`/`--dry-run`). Batched 50 rows, 200ms sleep
+  between API calls. Supports `--dry-run` → CSV output without DB writes.
+
+### Added — Recovery readouts (LLM-generated, grounded)
+
+- **`lib/readouts/readoutContext.ts`** — `buildReadoutContext()` assembles a frozen, deterministic
+  context object from DB + arithmetic only (no LLM): PROMIS T-scores, baseline/current/delta,
+  `keyFindings` and `suggestedFollowUp` from `agent_tasks.result_data`, pain-relevance check.
+  Excludes PI fields entirely when not pain-related (hallucination prevention).
+  Returns a SHA256 `contextHash` for change detection.
+- **`lib/readouts/composeReadout.ts`** — Claude Haiku 4.5, temp 0.1, max_tokens 600. Split
+  system/user prompt: system carries hard rules + three structural exemplars; user carries the
+  JSON context with an **echoed allow-list** (`You may cite ONLY these values: ...`) so the model
+  cannot invent numbers, timeframes, or body parts. `deterministicFallback()` returns plain
+  delta sentences when the API is unavailable.
+- **`app/api/readout/generate/route.ts`** — `POST {consultationId, timepoint}`. Decoupled from
+  PROMIS submission: PROMIS data always persists even if Anthropic is down. Idempotent via
+  `UNIQUE(consultation_id, timepoint)` (`ON CONFLICT DO NOTHING`). Always returns HTTP 200 with
+  `generation_status: 'success' | 'fallback'`.
+- **`lib/database.ts`** — `milestone_readouts` table:
+  `(consultation_id, timepoint, context_hash, prompt_version, generation_status,
+  component1_text, component3_text, honesty_check JSONB, raw_response)`.
+  `UNIQUE(consultation_id, timepoint)`. Index on `consultation_id`.
+- **`scripts/test-readout.js`** — Manual prerelease gate. Three-layer harness: hallucination
+  resistance (unauthorized numbers, future-tense verbs, emoji), adversarial fixtures (empty
+  findings, `body_part='other'`, non-pain-related), direction-agreement smoke test.
+
+### Added — Unified landing
+
+- **`lib/landing/buildLandingPayload.ts`** — Single SSR-friendly builder assembles consultation,
+  milestone statuses, all PROMIS responses, and all stored readouts for a given case. Used
+  directly by `app/track/[caseId]/page.tsx` (SSR) and returned by the new landing endpoint.
+- **`app/api/track/[caseId]/landing/route.ts`** — GET endpoint returning `LandingPayload` JSON;
+  consumed by the Farcaster miniapp client fetch.
+- **`components/RecoveryArcChart.tsx`** — Hand-rolled SVG (no chart library). Fixed x-positions
+  for baseline/2wk/4wk/8wk. Two lines: Physical Function T-score (direct) and Pain Interference
+  delta (sign-reversed so up = improvement). MCID ±5 reference lines (dashed, shown at week 4+).
+  Ghost dashed circle marks the upcoming target timepoint. Framer Motion animated circles.
+- **`components/MilestoneLandingView.tsx`** — Shared state machine
+  (`context → questionnaire → submitting → readout | already_done`) used by both the web tracking
+  page and the Farcaster miniapp. Shows: orienting line with body part + date, original question
+  as a typographic blockquote, `RecoveryArcChart`, CTA button. On form submit: optimistically
+  injects new PROMIS row into chart state, transitions to shimmer then readout. `already_done`
+  phase shows most recent readout + prior readouts in a `<details>` accordion. No celebratory
+  language at any phase; readout is shown instead of a completion screen.
+- **`app/track/[caseId]/TrackingClient.tsx`** — Rewritten to a thin wrapper around
+  `MilestoneLandingView`. Retains privacy toggle (passed as `headerSlot`) and coordination
+  summary (passed as `footerSlot`). Old status-table, "Recovery Timeline" heading, and
+  "Validation Submitted!" block removed.
+- **`app/track/[caseId]/page.tsx`** — Rewritten to call `buildLandingPayload()` directly (SSR)
+  and pass the payload to `TrackingClient`.
+- **`app/miniapp/page.tsx`** — Milestone deep-link path now fetches the landing payload and
+  mounts `MilestoneLandingView`. Direct `PROMISQuestionnaire` auto-mount and "🎉 Check-in
+  complete!" block removed.
+- **`components/PROMISQuestionnaire.tsx`** — Added `skipCompletionScreen?: boolean` prop (default
+  `false`). When `true`, `onComplete` fires immediately after submit and the parent owns the
+  post-submit UI. Baseline completion screen behavior unchanged.
+
+### Changed — Notification copy
+
+- **`lib/email.ts`** — `sendMilestoneEmail()` rewritten. Subject: `Week N: How is your knee
+  recovery?`. Body: plain text, no marketing chrome. CTA: `Start week N check-in` → links to
+  `/track/{caseId}`. Week 4+ emails reference the prior milestone delta inline.
+  Sign-off: `— OrthoIQ follow-up`. Removed: "Hi there", "validate your recovery trajectory",
+  "helps our AI specialists learn and improve", "Keep up the great work".
+- **`lib/notifications.ts`** — `sendMilestoneNotification()` rewritten. Title: `Week N check-in`
+  (≤32 chars). Body references body part without forced engagement phrasing.
+  `sendNotification()` accepts optional `NotificationContext` to thread `notification_type` and
+  `consultation_id` through to `logNotification()`.
+- **`app/api/cron/send-milestone-notifications/route.ts`** — Recipient queries now select
+  `c.body_part`; both send functions receive it. Dedup changed from
+  `title LIKE 'Week N%'` → `notification_type = 'promis_milestone_${day}'`
+  keyed on `(fid, consultation_id, notification_type)`.
+
+### Changed — Notification dedup (schema)
+
+- **`lib/database.ts`** — `notification_logs` gains `notification_type VARCHAR(50)` and
+  `consultation_id VARCHAR(255)`. All 315 existing rows backfilled to `notification_type =
+  'legacy'` so historical dedup is preserved. New index on
+  `(fid, consultation_id, notification_type, created_at)`.
+
+---
+
+### Deferred (post-testnet)
+
+The following items from the milestone workbrief are intentionally out of scope for testnet:
+
+| Item | Notes |
+|------|-------|
+| **Readout Component 2** | Pattern recognition across multiple data points ("your week-4 score is in the top quartile for knee arthroscopy at this timepoint"). Requires a meaningful cohort in `promis_responses` to be useful. |
+| **`predicted_recovery_days`** | Backend field on `consultations` — LLM estimate of recovery window at consultation time, used by Component 3 to say "you're N weeks ahead of / behind the predicted trajectory". See separate implementation prompt. |
+| **Timezone-aware send timing** | Cron currently fires at UTC 09:00 daily. Per-user timezone lookup and send-time adjustment deferred; keep daily UTC cron for now. |
+| **PDF export** | Patient-facing readout PDF (Component 1 + 3 + chart). Deferred pending stable readout format. |
+| **On-chain attestation** | Milestone completion attestation on Base. Deferred until post-testnet token model is confirmed. |
+
+---
+
 ## [1.9.0] - 2026-05-10: Pre-Testnet Integration Audit (Task 1)
 
 ### Changed — Backend auth wiring (Phase 1 backend audit)
