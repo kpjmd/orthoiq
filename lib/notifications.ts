@@ -21,8 +21,17 @@ export interface ResponseReviewNotification {
   response: string;
 }
 
+export interface NotificationContext {
+  notificationType?: string;
+  consultationId?: string;
+}
+
 // Send notification using Farcaster notification API
-export async function sendNotification(fid: string, notification: NotificationData): Promise<boolean> {
+export async function sendNotification(
+  fid: string,
+  notification: NotificationData,
+  context?: NotificationContext
+): Promise<boolean> {
   try {
     // Get the user's notification token
     const tokens = await getNotificationTokens(fid);
@@ -69,8 +78,8 @@ export async function sendNotification(fid: string, notification: NotificationDa
     }
     
     // Store notification in database for tracking
-    await logNotification(fid, notification, success);
-    
+    await logNotification(fid, notification, success, context);
+
     return success;
   } catch (error) {
     console.error('Failed to send notification:', error);
@@ -144,18 +153,25 @@ export async function sendRateLimitResetNotification(fid: string, tier: UserTier
 export async function sendMilestoneNotification(
   fid: string,
   consultationId: string,
-  milestoneDay: number
+  milestoneDay: number,
+  bodyPart?: string | null
 ): Promise<boolean> {
   const weekNumber = Math.floor(milestoneDay / 7);
+  const consultationPhrase = bodyPart && bodyPart !== 'other'
+    ? `your ${bodyPart} consultation`
+    : 'your consultation';
 
   const notification: NotificationData = {
-    title: `Week ${weekNumber} PROMIS Check-in`,
-    body: `Time for your ${weekNumber}-week PROMIS check-in. Complete a short questionnaire to track your recovery progress.`,
+    title: `Week ${weekNumber} check-in`,
+    body: `${weekNumber} weeks since ${consultationPhrase}. A short check-in shows how recovery is tracking.`,
     targetUrl: `/miniapp?track=${consultationId}&milestone=${milestoneDay}`,
     imageUrl: 'https://orthoiq.vercel.app/icon.png'
   };
 
-  return await sendNotification(fid, notification);
+  return await sendNotification(fid, notification, {
+    notificationType: `promis_milestone_${milestoneDay}`,
+    consultationId,
+  });
 }
 
 // Get notification tokens for a user
@@ -193,14 +209,26 @@ async function getDetailedReviewInfo(questionId: string): Promise<{reviewType: s
 }
 
 // Log notifications for tracking and debugging
-async function logNotification(fid: string, notification: NotificationData, delivered: boolean = false): Promise<void> {
+async function logNotification(
+  fid: string,
+  notification: NotificationData,
+  delivered: boolean = false,
+  context?: NotificationContext
+): Promise<void> {
   try {
     console.log(`[NotificationLog] FID: ${fid}, Title: ${notification.title}, Body: ${notification.body}, Delivered: ${delivered}`);
-    
-    // Store in database for tracking
+
     await sql`
-      INSERT INTO notification_logs (fid, title, body, target_url, delivered, created_at)
-      VALUES (${fid}, ${notification.title}, ${notification.body}, ${notification.targetUrl || null}, ${delivered}, NOW())
+      INSERT INTO notification_logs (
+        fid, title, body, target_url, delivered, created_at,
+        notification_type, consultation_id
+      )
+      VALUES (
+        ${fid}, ${notification.title}, ${notification.body},
+        ${notification.targetUrl || null}, ${delivered}, NOW(),
+        ${context?.notificationType ?? null},
+        ${context?.consultationId ?? null}
+      )
     `;
   } catch (error) {
     console.error('Failed to log notification:', error);

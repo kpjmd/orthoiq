@@ -16,6 +16,8 @@ import TriageResponseCard from '@/components/TriageResponseCard';
 import ComprehensiveLoadingState from '@/components/ComprehensiveLoadingState';
 import ConsultationChatbot from '@/components/ConsultationChatbot';
 import PROMISQuestionnaire from '@/components/PROMISQuestionnaire';
+import MilestoneLandingView from '@/components/MilestoneLandingView';
+import type { LandingPayload } from '@/lib/landing/buildLandingPayload';
 import UserProfileView, { ProfileData } from '@/components/UserProfileView';
 import { useResearchPolling } from '@/hooks/useResearchPolling';
 import ResearchStatusRow from '@/components/ResearchStatusRow';
@@ -275,9 +277,8 @@ function MiniAppContent() {
 
   // Follow-up PROMIS tracking mode (for Farcaster notification deep-links)
   const [trackingMode, setTrackingMode] = useState<{ consultationId: string; timepoint: PROMISTimepoint } | null>(null);
-  const [trackingComplete, setTrackingComplete] = useState(false);
   const [trackingAlreadyDone, setTrackingAlreadyDone] = useState(false);
-  const [trackingQuestion, setTrackingQuestion] = useState<string | null>(null);
+  const [trackingPayload, setTrackingPayload] = useState<LandingPayload | null>(null);
 
   // User profile state
   const [showProfile, setShowProfile] = useState(false);
@@ -545,25 +546,17 @@ function MiniAppContent() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/feedback/promis?consultationId=${encodeURIComponent(trackConsultationId)}`);
+        const res = await fetch(`/api/track/${encodeURIComponent(trackConsultationId)}/landing`);
         if (res.ok) {
-          const data = await res.json();
-          const done: string[] = (data.responses || []).map((r: any) => r.timepoint);
-          if (done.includes(timepoint)) {
+          const payload = (await res.json()) as LandingPayload;
+          setTrackingPayload(payload);
+          if (payload.promisResponses.some((r) => r.timepoint === timepoint)) {
             setTrackingAlreadyDone(true);
           }
         }
       } catch {
-        // ignore — proceed to show questionnaire
+        // ignore — proceed with whatever we have
       }
-      // Fetch original question text (best-effort)
-      try {
-        const cRes = await fetch(`/api/consultations/${encodeURIComponent(trackConsultationId)}/question`);
-        if (cRes.ok) {
-          const cData = await cRes.json();
-          setTrackingQuestion(cData.question || null);
-        }
-      } catch { /* best-effort */ }
       setTrackingMode({ consultationId: trackConsultationId, timepoint });
     })();
   }, [isSDKLoaded]);
@@ -893,60 +886,31 @@ function MiniAppContent() {
   // Follow-up PROMIS view — rendered when user taps a milestone notification deep-link
   if (trackingMode) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <OrthoIQLogo size="medium" variant="blue" className="text-white" />
-              <h1 className="text-3xl font-bold">OrthoIQ</h1>
-            </div>
-            <p className="text-lg opacity-90">Recovery Check-in</p>
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <OrthoIQLogo size="small" variant="blue" className="text-white" />
+            <span className="text-sm text-gray-300">OrthoIQ</span>
           </div>
+          <button
+            onClick={() => {
+              setTrackingMode(null);
+              setTrackingAlreadyDone(false);
+              setTrackingPayload(null);
+            }}
+            className="text-xs text-gray-400 hover:text-gray-200"
+          >
+            ← Home
+          </button>
         </div>
-        <div className="p-6 max-w-2xl mx-auto">
-          {trackingQuestion && (
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl mb-4">
-              <p className="text-xs font-medium text-gray-500 mb-1">Your Original Question</p>
-              <p className="text-sm text-gray-800">{trackingQuestion}</p>
-            </div>
-          )}
-          {trackingAlreadyDone ? (
-            <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
-              <p className="text-4xl mb-3">✅</p>
-              <p className="text-lg font-semibold text-green-800 mb-1">You&apos;re up to date!</p>
-              <p className="text-sm text-green-600 mb-4">
-                You&apos;ve already completed this check-in. Thanks for tracking your recovery.
-              </p>
-              <button
-                onClick={() => { setTrackingMode(null); setTrackingComplete(false); setTrackingAlreadyDone(false); }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Back to Home
-              </button>
-            </div>
-          ) : trackingComplete ? (
-            <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl text-center">
-              <p className="text-4xl mb-3">🎉</p>
-              <p className="text-lg font-semibold text-blue-800 mb-1">Check-in complete!</p>
-              <p className="text-sm text-blue-600 mb-4">
-                Your PROMIS questionnaire has been recorded. Thank you for tracking your recovery.
-              </p>
-              <button
-                onClick={() => { setTrackingMode(null); setTrackingComplete(false); setTrackingAlreadyDone(false); }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Back to Home
-              </button>
-            </div>
-          ) : (
-            <PROMISQuestionnaire
-              timepoint={trackingMode.timepoint}
-              consultationId={trackingMode.consultationId}
-              isPainRelated={true}
+        <div className="p-5 max-w-2xl mx-auto">
+          {trackingPayload ? (
+            <MilestoneLandingView
+              payload={trackingPayload}
               patientId={context?.user?.fid?.toString() || 'anonymous'}
-              onComplete={() => setTrackingComplete(true)}
-              onSkip={() => setTrackingMode(null)}
             />
+          ) : (
+            <div className="text-sm text-gray-400">Loading…</div>
           )}
         </div>
       </div>
@@ -975,10 +939,22 @@ function MiniAppContent() {
         <UserProfileView
           profileData={profileData}
           isLoading={profileLoading}
-          onSelectMilestone={(cId, tp) => {
-            setTrackingComplete(false);
+          onSelectMilestone={async (cId, tp) => {
             setTrackingAlreadyDone(false);
             setShowProfile(false);
+            setTrackingPayload(null);
+            try {
+              const res = await fetch(`/api/track/${encodeURIComponent(cId)}/landing`);
+              if (res.ok) {
+                const payload = (await res.json()) as LandingPayload;
+                setTrackingPayload(payload);
+                if (payload.promisResponses.some((r) => r.timepoint === tp)) {
+                  setTrackingAlreadyDone(true);
+                }
+              }
+            } catch {
+              // best-effort
+            }
             setTrackingMode({ consultationId: cId, timepoint: tp });
           }}
         />

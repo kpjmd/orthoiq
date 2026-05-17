@@ -252,6 +252,24 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_notification_logs_created_at ON notification_logs(created_at);
     `;
 
+    // Structured dedup keys (Phase 2 of milestone return experience).
+    // Replaces the brittle `title LIKE 'Week N%'` pattern with explicit
+    // (fid, consultation_id, notification_type) keying.
+    await sql`
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS notification_type VARCHAR(50);
+    `;
+    await sql`
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS consultation_id VARCHAR(255);
+    `;
+    // Backfill legacy rows so historical dedup remains intact under the new key.
+    await sql`
+      UPDATE notification_logs SET notification_type = 'legacy' WHERE notification_type IS NULL;
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_notification_logs_dedup
+      ON notification_logs(fid, consultation_id, notification_type, created_at);
+    `;
+
     // Prescriptions table for storing prescription metadata and NFT data
     await sql`
       CREATE TABLE IF NOT EXISTS prescriptions (
@@ -737,6 +755,13 @@ export async function initDatabase() {
       ALTER TABLE consultations ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;
     `;
 
+    // Body part column (Phase 1 of milestone return experience).
+    // Populated at consult time via lib/bodyPart.ts extraction. Used in
+    // notification copy, landing copy, and readout context.
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS body_part VARCHAR(50);
+    `;
+
     // OrthoIQ-Agents Integration: Consultation feedback table
     await sql`
       CREATE TABLE IF NOT EXISTS consultation_feedback (
@@ -1158,6 +1183,31 @@ export async function initDatabase() {
       WHERE pr.consultation_id = c.consultation_id
         AND pr.web_user_id IS NULL
         AND c.web_user_id IS NOT NULL
+    `;
+
+    // Milestone readouts (Phase 5 of milestone return experience).
+    // Persists the generated per-milestone narrative so revisits show the
+    // same text deterministically. UNIQUE(consultation_id, timepoint) means
+    // the readout generation endpoint is idempotent.
+    await sql`
+      CREATE TABLE IF NOT EXISTS milestone_readouts (
+        id SERIAL PRIMARY KEY,
+        consultation_id VARCHAR(255) NOT NULL,
+        timepoint VARCHAR(20) NOT NULL CHECK (timepoint IN ('2week','4week','8week')),
+        context_hash VARCHAR(64) NOT NULL,
+        prompt_version INTEGER NOT NULL DEFAULT 1,
+        generation_status VARCHAR(20) NOT NULL CHECK (generation_status IN ('success','fallback')),
+        component1_text TEXT,
+        component3_text TEXT,
+        honesty_check JSONB,
+        raw_response TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(consultation_id, timepoint)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_milestone_readouts_consultation_id
+      ON milestone_readouts(consultation_id);
     `;
 
     // Wallet sign-in challenges (10-min single-use nonces)
@@ -3479,6 +3529,7 @@ export async function storeConsultation(data: {
   queryType?: string;
   querySubtype?: string | null;
   walletAddress?: string;
+  bodyPart?: string | null;
 }): Promise<void> {
   const sql = getSql();
 
@@ -3487,7 +3538,7 @@ export async function storeConsultation(data: {
       INSERT INTO consultations (
         consultation_id, question_id, fid, web_user_id, mode, participating_specialists,
         coordination_summary, specialist_count, total_cost, execution_time,
-        query_type, query_subtype, wallet_address
+        query_type, query_subtype, wallet_address, body_part
       ) VALUES (
         ${data.consultationId},
         ${data.questionId},
@@ -3501,7 +3552,8 @@ export async function storeConsultation(data: {
         ${data.executionTime || null},
         ${data.queryType || null},
         ${data.querySubtype || null},
-        ${data.walletAddress || null}
+        ${data.walletAddress || null},
+        ${data.bodyPart || null}
       )
     `;
     console.log(`Stored consultation ${data.consultationId} for question ${data.questionId}`);

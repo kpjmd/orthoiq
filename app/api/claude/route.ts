@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { checkRateLimit, UserTier, checkIPRateLimit, checkPlatformRateLimit, Platform, ConsultationMode } from '@/lib/rateLimit';
 import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus, storeConsultation } from '@/lib/database';
+import { extractBodyPart } from '@/lib/bodyPart';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
 import { validateOrthopedicContent, validateRateLimitRequest, sanitizeInput } from '@/lib/security';
@@ -428,6 +429,20 @@ export async function POST(request: NextRequest) {
 
       // Store consultation in database
       if (questionId && specialistConsultation?.consultationId) {
+        let extractedBodyPart: string | null = null;
+        try {
+          extractedBodyPart = await extractBodyPart({
+            question: sanitizedQuestion,
+            keyFindings: Array.isArray(claudeResponse.rawConsultationData?.keyFindings)
+              ? claudeResponse.rawConsultationData.keyFindings
+                  .map((f: any) => (typeof f === 'string' ? f : f?.finding || ''))
+                  .filter(Boolean)
+              : [],
+          });
+        } catch (bpError) {
+          console.error(`[${requestId}] Body part extraction failed:`, bpError);
+        }
+
         try {
           await storeConsultation({
             consultationId: specialistConsultation.consultationId,
@@ -445,8 +460,9 @@ export async function POST(request: NextRequest) {
             queryType: claudeResponse.queryType || 'clinical',
             querySubtype: claudeResponse.querySubtype || null,
             walletAddress: walletAddress || undefined,
+            bodyPart: extractedBodyPart,
           });
-          console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database`);
+          console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database (body_part=${extractedBodyPart})`);
         } catch (storeError) {
           console.error(`[${requestId}] Failed to store consultation:`, storeError);
           // Don't fail the request if storage fails

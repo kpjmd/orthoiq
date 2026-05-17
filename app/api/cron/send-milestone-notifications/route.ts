@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     for (const milestoneDay of MILESTONE_DAYS) {
       try {
         const weekNumber = Math.floor(milestoneDay / 7);
-        const weekPattern = `%Week ${weekNumber}%`;
+        const notificationType = `promis_milestone_${milestoneDay}`;
         const timepoint = timepointMap[milestoneDay];
 
         // ===== WEB EMAIL USERS =====
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
             c.id,
             c.consultation_id,
             c.created_at,
+            c.body_part,
             wu.id as web_user_id,
             wu.email
           FROM consultations c
@@ -74,8 +75,8 @@ export async function GET(request: NextRequest) {
             AND NOT EXISTS (
               SELECT 1 FROM notification_logs nl
               WHERE nl.fid = wu.id::text
-                AND nl.title LIKE ${weekPattern}
-                AND nl.created_at > NOW() - INTERVAL '1 day'
+                AND nl.consultation_id = c.consultation_id
+                AND nl.notification_type = ${notificationType}
             )
           LIMIT 100
         `;
@@ -89,19 +90,25 @@ export async function GET(request: NextRequest) {
             await sendMilestoneEmail(
               consultation.email,
               consultation.consultation_id,
-              milestoneDay
+              milestoneDay,
+              consultation.body_part
             );
 
-            // Log the notification
+            // Log the notification with structured dedup keys
             await sql`
-              INSERT INTO notification_logs (fid, title, body, target_url, delivered, created_at)
+              INSERT INTO notification_logs (
+                fid, title, body, target_url, delivered, created_at,
+                notification_type, consultation_id
+              )
               VALUES (
                 ${consultation.web_user_id.toString()},
-                ${'Week ' + weekNumber + ' Check-in'},
+                ${'Week ' + weekNumber + ' check-in'},
                 ${'Milestone follow-up email sent'},
                 ${'/track/' + consultation.consultation_id},
                 true,
-                NOW()
+                NOW(),
+                ${notificationType},
+                ${consultation.consultation_id}
               )
             `;
 
@@ -123,7 +130,8 @@ export async function GET(request: NextRequest) {
             c.id,
             c.consultation_id,
             c.fid,
-            c.created_at
+            c.created_at,
+            c.body_part
           FROM consultations c
           WHERE c.fid IS NOT NULL
             AND c.web_user_id IS NULL
@@ -148,8 +156,8 @@ export async function GET(request: NextRequest) {
             AND NOT EXISTS (
               SELECT 1 FROM notification_logs nl
               WHERE nl.fid = c.fid
-                AND nl.title LIKE ${weekPattern}
-                AND nl.created_at > NOW() - INTERVAL '1 day'
+                AND nl.consultation_id = c.consultation_id
+                AND nl.notification_type = ${notificationType}
             )
           LIMIT 100
         `;
@@ -163,7 +171,8 @@ export async function GET(request: NextRequest) {
             const sent = await sendMilestoneNotification(
               consultation.fid,
               consultation.consultation_id,
-              milestoneDay
+              milestoneDay,
+              consultation.body_part
             );
 
             if (sent) {

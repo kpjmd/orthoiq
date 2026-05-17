@@ -19,6 +19,10 @@ interface PROMISQuestionnaireProps {
   webUserId?: string;
   onComplete: (result: PROMISCompletionResult) => void;
   onSkip: () => void;
+  // When true, the in-form completion summary (T-scores + bands) is suppressed
+  // and onComplete fires immediately on submission success. Used by
+  // MilestoneLandingView, which renders its own chart + readout in place.
+  skipCompletionScreen?: boolean;
 }
 
 type Phase = 'physicalFunction' | 'painPrompt' | 'painInterference' | 'submitting' | 'complete';
@@ -31,6 +35,7 @@ export default function PROMISQuestionnaire({
   webUserId,
   onComplete,
   onSkip,
+  skipCompletionScreen = false,
 }: PROMISQuestionnaireProps) {
   const [phase, setPhase] = useState<Phase>('physicalFunction');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -153,6 +158,12 @@ export default function PROMISQuestionnaire({
   }
 
   // ── Completion summary ──
+  // Parents using skipCompletionScreen handle the post-submit UI themselves
+  // (e.g. MilestoneLandingView shows chart + readout). Render nothing here
+  // so the form unmounts cleanly after onComplete fires.
+  if (phase === 'complete' && skipCompletionScreen) {
+    return null;
+  }
   if (phase === 'complete' && completionResult) {
     const pfBand = getPhysicalFunctionBand(completionResult.scores.physicalFunctionTScore);
     const piBand = completionResult.scores.painInterferenceTScore != null
