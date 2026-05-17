@@ -60,42 +60,23 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="OrthoIQ" />
         <link rel="apple-touch-icon" href="/icon.svg" />
         
-        {/* Mini App Detection and SDK Loading */}
+        {/* Mini App detection — sets window.__ORTHOIQ_MINI_APP__ flag read by page.tsx and PrescriptionModal */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Hybrid & SSR-friendly Mini App detection
               (function() {
-                const url = new URL(window.location.href);
-                const isMiniApp =
+                var url = new URL(window.location.href);
+                var isMiniApp =
                   url.pathname.startsWith('/miniapp') ||
                   url.searchParams.get('miniApp') === 'true';
-                
                 if (isMiniApp) {
-                  // Lazy load Mini App SDK
-                  console.log('Mini App context detected, loading SDK...');
-                  
-                  // Skip service worker registration in Mini App context
                   window.__ORTHOIQ_MINI_APP__ = true;
-                  
-                  // Dynamically import and initialize SDK
-                  import('@farcaster/miniapp-sdk').then(({ sdk }) => {
-                    console.log('Mini App SDK loaded');
-                    window.__FARCASTER_SDK__ = sdk;
-                  }).catch(err => {
-                    console.error('Failed to load Mini App SDK:', err);
-                  });
                 } else {
-                  // Regular web app - register service worker
                   if ('serviceWorker' in navigator) {
                     window.addEventListener('load', function() {
                       navigator.serviceWorker.register('/sw.js')
-                        .then(function(registration) {
-                          console.log('OrthoIQ SW registered: ', registration);
-                        })
-                        .catch(function(registrationError) {
-                          console.log('OrthoIQ SW registration failed: ', registrationError);
-                        });
+                        .then(function(r) { console.log('OrthoIQ SW registered:', r); })
+                        .catch(function(e) { console.log('OrthoIQ SW registration failed:', e); });
                     });
                   }
                 }

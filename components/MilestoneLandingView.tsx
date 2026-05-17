@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PROMISQuestionnaire from './PROMISQuestionnaire';
 import RecoveryArcChart from './RecoveryArcChart';
 import { PROMISTimepoint, PROMISCompletionResult } from '@/lib/promisTypes';
-import { bodyPartPhrase } from '@/lib/bodyPart';
+import { bodyPartPhrase } from '@/lib/bodyPartHelpers';
 import type {
   LandingPayload,
   MilestoneStatus,
