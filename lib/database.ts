@@ -762,6 +762,15 @@ export async function initDatabase() {
       ALTER TABLE consultations ADD COLUMN IF NOT EXISTS body_part VARCHAR(50);
     `;
 
+    // Predicted recovery days (independent Haiku estimate at consult time).
+    // Populated at consult time via lib/recoveryDays.ts extraction. Feeds
+    // Component 3 of the milestone readout. Independent of
+    // agent_tasks.predicted_recovery_days so coverage is uniform regardless
+    // of which specialist agents fired.
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS predicted_recovery_days INTEGER;
+    `;
+
     // OrthoIQ-Agents Integration: Consultation feedback table
     await sql`
       CREATE TABLE IF NOT EXISTS consultation_feedback (
@@ -3530,6 +3539,7 @@ export async function storeConsultation(data: {
   querySubtype?: string | null;
   walletAddress?: string;
   bodyPart?: string | null;
+  predictedRecoveryDays?: number | null;
 }): Promise<void> {
   const sql = getSql();
 
@@ -3538,7 +3548,7 @@ export async function storeConsultation(data: {
       INSERT INTO consultations (
         consultation_id, question_id, fid, web_user_id, mode, participating_specialists,
         coordination_summary, specialist_count, total_cost, execution_time,
-        query_type, query_subtype, wallet_address, body_part
+        query_type, query_subtype, wallet_address, body_part, predicted_recovery_days
       ) VALUES (
         ${data.consultationId},
         ${data.questionId},
@@ -3553,10 +3563,11 @@ export async function storeConsultation(data: {
         ${data.queryType || null},
         ${data.querySubtype || null},
         ${data.walletAddress || null},
-        ${data.bodyPart || null}
+        ${data.bodyPart || null},
+        ${data.predictedRecoveryDays ?? null}
       )
     `;
-    console.log(`Stored consultation ${data.consultationId} for question ${data.questionId}`);
+    console.log(`Stored consultation ${data.consultationId} for question ${data.questionId} (body_part=${data.bodyPart ?? 'null'}, predicted_recovery_days=${data.predictedRecoveryDays ?? 'null'})`);
   } catch (error) {
     console.error('Error storing consultation:', error);
     throw error;

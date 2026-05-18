@@ -3,6 +3,7 @@ import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { checkRateLimit, UserTier, checkIPRateLimit, checkPlatformRateLimit, Platform, ConsultationMode } from '@/lib/rateLimit';
 import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus, storeConsultation } from '@/lib/database';
 import { extractBodyPart } from '@/lib/bodyPart';
+import { extractRecoveryDays } from '@/lib/recoveryDays';
 import { ensureInitialized } from '@/lib/startup';
 import { apiLogger, getMetrics } from '@/lib/monitoring';
 import { validateOrthopedicContent, validateRateLimitRequest, sanitizeInput } from '@/lib/security';
@@ -443,6 +444,16 @@ export async function POST(request: NextRequest) {
           console.error(`[${requestId}] Body part extraction failed:`, bpError);
         }
 
+        let estimatedRecoveryDays: number | null = null;
+        try {
+          estimatedRecoveryDays = await extractRecoveryDays({
+            question: sanitizedQuestion,
+            bodyPart: extractedBodyPart,
+          });
+        } catch (rdError) {
+          console.error(`[${requestId}] Recovery days extraction failed:`, rdError);
+        }
+
         try {
           await storeConsultation({
             consultationId: specialistConsultation.consultationId,
@@ -461,8 +472,9 @@ export async function POST(request: NextRequest) {
             querySubtype: claudeResponse.querySubtype || null,
             walletAddress: walletAddress || undefined,
             bodyPart: extractedBodyPart,
+            predictedRecoveryDays: estimatedRecoveryDays,
           });
-          console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database (body_part=${extractedBodyPart})`);
+          console.log(`[${requestId}] Consultation ${specialistConsultation.consultationId} stored in database (body_part=${extractedBodyPart}, predicted_recovery_days=${estimatedRecoveryDays})`);
         } catch (storeError) {
           console.error(`[${requestId}] Failed to store consultation:`, storeError);
           // Don't fail the request if storage fails

@@ -1,5 +1,51 @@
 # OrthoIQ Changelog
 
+## [2.0.1] - 2026-05-17: Recovery days estimation
+
+Closes the `predicted_recovery_days` item that was deferred from the 2.0.0 milestone work.
+Adds an independent Claude Haiku 4.5 estimator on every consultation so Component 3 of the
+milestone readout can anchor its trajectory copy on a concrete window.
+
+### Added — Recovery days extraction
+
+- **`lib/recoveryDays.ts`** — `extractRecoveryDays({ question, bodyPart })` mirrors the
+  `lib/bodyPart.ts` pattern: Haiku 4.5, temp 0, max_tokens 50, 1500ms timeout. Output is a
+  single integer (1–730 days) or `null` for non-clinical / unestimable questions. Clamping
+  and parse failure both fall back to `null`.
+- **`lib/database.ts`** — `ALTER TABLE consultations ADD COLUMN IF NOT EXISTS
+  predicted_recovery_days INTEGER`. `storeConsultation()` extended to persist the value.
+- **`app/api/claude/route.ts`** — calls `extractRecoveryDays()` sequentially after
+  `extractBodyPart()` (so the recovery prompt can use the extracted body part as context),
+  before `storeConsultation()`. Wrapped in try/catch so extraction failure never blocks a
+  consultation. Worst-case added latency: ~1.5s.
+- **`scripts/backfill-recovery-days.js`** — gated backfill script (requires
+  `BACKFILL_RECOVERY_DAYS_ENABLED=true` and `--confirm`/`--dry-run`). Batched 50 rows, 200ms
+  sleep between API calls. Cursor-paginated on `consultations.id` so dry-run terminates
+  cleanly (NULL stays NULL in DB).
+
+### Changed — Readout pipeline
+
+- **`lib/readouts/readoutContext.ts`** — `ReadoutContext` gains `predictedRecoveryDays:
+  number | null`. Consultation SELECT extended; value included in `contextForHash` so
+  re-generation triggers when the estimate changes.
+- **`lib/readouts/composeReadout.ts`** — `buildUserPrompt()` allow-lists
+  `predicted_recovery_days` and `days_since_consult` only when the value is present (mirrors
+  the conditional pain-interference idiom). System prompt gains a new Component 3 exemplar
+  showing trajectory copy ("you are D days into a P-day predicted window"). Hard rule
+  "may cite ONLY values present in the input JSON" is unchanged — the model cannot invent a
+  window when the field is NULL. `READOUT_PROMPT_VERSION` bumped 1 → 2.
+
+### Notes
+
+- The agent-side `agent_tasks.predicted_recovery_days` field (emitted by
+  `strength-sage-agent` in orthoiq-agents) is **intentionally not consulted** by the readout.
+  Strength sage only fires on a subset of triage routes, so the agent-side value would give
+  inconsistent coverage. Running an independent Haiku call on every consultation guarantees
+  uniform coverage and a single source of truth for the readout. The agent-side column is
+  preserved for agent-level analytics.
+
+---
+
 ## [2.0.0] - 2026-05-17: Milestone Return Experience
 
 Reframes the week 2/4/8 PROMIS check-ins as a recovery resource rather than a data-collection
@@ -107,7 +153,6 @@ The following items from the milestone workbrief are intentionally out of scope 
 | Item | Notes |
 |------|-------|
 | **Readout Component 2** | Pattern recognition across multiple data points ("your week-4 score is in the top quartile for knee arthroscopy at this timepoint"). Requires a meaningful cohort in `promis_responses` to be useful. |
-| **`predicted_recovery_days`** | Backend field on `consultations` — LLM estimate of recovery window at consultation time, used by Component 3 to say "you're N weeks ahead of / behind the predicted trajectory". See separate implementation prompt. |
 | **Timezone-aware send timing** | Cron currently fires at UTC 09:00 daily. Per-user timezone lookup and send-time adjustment deferred; keep daily UTC cron for now. |
 | **PDF export** | Patient-facing readout PDF (Component 1 + 3 + chart). Deferred pending stable readout format. |
 | **On-chain attestation** | Milestone completion attestation on Base. Deferred until post-testnet token model is confirmed. |

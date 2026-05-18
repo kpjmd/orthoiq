@@ -14,6 +14,7 @@ export interface ReadoutContext {
   daysFromBaseline: number;
   weekNumber: number;
   isPainRelated: boolean;
+  predictedRecoveryDays: number | null;
 
   baseline: {
     physicalFunctionTScore: number;
@@ -84,7 +85,7 @@ export async function buildReadoutContext(
 
   // Consultation row
   const consultRows = await sql`
-    SELECT consultation_id, body_part, created_at, question_id
+    SELECT consultation_id, body_part, predicted_recovery_days, created_at, question_id
     FROM consultations WHERE consultation_id = ${consultationId} LIMIT 1
   `;
   if (consultRows.length === 0) return { error: 'Consultation not found' };
@@ -169,10 +170,16 @@ export async function buildReadoutContext(
       (1000 * 60 * 60 * 24),
   );
 
+  const predictedRecoveryDays: number | null =
+    consultation.predicted_recovery_days != null
+      ? Number(consultation.predicted_recovery_days)
+      : null;
+
   const contextForHash = {
     consultationId,
     timepoint,
     bodyPart: consultation.body_part || null,
+    predictedRecoveryDays,
     baselineScores,
     currentScores,
     delta,
@@ -188,6 +195,7 @@ export async function buildReadoutContext(
     daysFromBaseline,
     weekNumber,
     isPainRelated,
+    predictedRecoveryDays,
     baseline: baselineScores,
     current: currentScores,
     delta: {

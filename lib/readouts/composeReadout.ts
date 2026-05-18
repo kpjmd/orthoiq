@@ -5,7 +5,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
-export const READOUT_PROMPT_VERSION = 1;
+export const READOUT_PROMPT_VERSION = 2;
 const MODEL = 'claude-haiku-4-5-20251001';
 
 export interface ReadoutOutput {
@@ -28,7 +28,7 @@ const SYSTEM_PROMPT = `You are an orthopedic recovery interpreter. You write 2 s
 
 Component 1 (Delta): Describe what changed between baseline and this follow-up, grounded ONLY in PROMIS T-scores supplied in the input. State magnitude and direction honestly. If decline, say so plainly — do not soften with "but" clauses.
 
-Component 3 (Plan vs Reality): Compare the original specialist key findings and suggested follow-up against the patient's reported state. Was the trajectory consistent with what specialists flagged? Name specific findings/follow-ups that the data supports OR contradicts. If no findings exist, state that the original assessment did not include specific predictions for this timepoint.
+Component 3 (Plan vs Reality): Compare the original specialist key findings and suggested follow-up against the patient's reported state. Was the trajectory consistent with what specialists flagged? Name specific findings/follow-ups that the data supports OR contradicts. If no findings exist, state that the original assessment did not include specific predictions for this timepoint. When predicted_recovery_days and days_since_consult are both present, you may anchor the comparison to that window — e.g. "you are D days into a P-day predicted window" — but only if both numbers are echoed in the allow-list. Never invent a window; never extrapolate to weeks the user has not yet reached.
 
 HARD RULES:
 - You may cite ONLY values present in the input JSON, echoed verbatim in the user message. Do not invent numbers, timeframes, body parts, diagnoses, or specialist names.
@@ -57,7 +57,10 @@ Example output for a plateau (pf_delta: +1.2, pi_delta: +0.8):
 {"component1_delta":"Your physical function score is up 1 point from baseline, and pain interference is essentially unchanged. Both are below the threshold of clinical change.","component3_plan_vs_reality":"The original assessment anticipated faster improvement by this timepoint. The lack of movement may be worth raising with a clinician.","honesty_check":{"direction":"stable","clinically_meaningful":false,"cited_values":["pf_delta","pi_delta"]}}
 
 Example output for a regression (pf_delta: -4.0, pi_delta: -3.5):
-{"component1_delta":"Your physical function has declined 4 points from baseline, and pain interference has increased 4 points. The change in physical function is at the edge of clinical meaning; the increase in pain interference is below the threshold of clinical change.","component3_plan_vs_reality":"The original key findings did not anticipate this direction. This may be worth discussing with a clinician.","honesty_check":{"direction":"decline","clinically_meaningful":false,"cited_values":["pf_delta","pi_delta"]}}`;
+{"component1_delta":"Your physical function has declined 4 points from baseline, and pain interference has increased 4 points. The change in physical function is at the edge of clinical meaning; the increase in pain interference is below the threshold of clinical change.","component3_plan_vs_reality":"The original key findings did not anticipate this direction. This may be worth discussing with a clinician.","honesty_check":{"direction":"decline","clinically_meaningful":false,"cited_values":["pf_delta","pi_delta"]}}
+
+Example output when predicted_recovery_days is present (pf_delta: +6.0, days_since_consult: 28, predicted_recovery_days: 90):
+{"component1_delta":"Your physical function score is up 6 points from baseline, a clinically meaningful change.","component3_plan_vs_reality":"You are 28 days into a 90-day predicted recovery window, and your reported function is consistent with that timeline.","honesty_check":{"direction":"improvement","clinically_meaningful":true,"cited_values":["pf_delta","days_since_consult","predicted_recovery_days"]}}`;
 
 function buildUserPrompt(ctx: ReadoutContext): string {
   const allowed: Record<string, unknown> = {
@@ -75,6 +78,10 @@ function buildUserPrompt(ctx: ReadoutContext): string {
     allowed.followup_pi_t = ctx.current.painInterferenceTScore;
     allowed.pi_delta = ctx.delta.painInterference;
     allowed.mcid_pi = ctx.mcidThreshold;
+  }
+  if (ctx.predictedRecoveryDays != null) {
+    allowed.predicted_recovery_days = ctx.predictedRecoveryDays;
+    allowed.days_since_consult = ctx.daysFromBaseline;
   }
 
   const cited = Object.entries(allowed)
