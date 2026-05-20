@@ -962,6 +962,40 @@ export async function initDatabase() {
       WHERE requires_md_review = true;
     `;
 
+    // Comprehensive response persistence — store full multi-specialist output
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS response_text TEXT;
+    `;
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS raw_consultation_data JSONB;
+    `;
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS research_data JSONB;
+    `;
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'completed'
+        CHECK (status IN ('pending', 'completed', 'failed', 'timeout'));
+    `;
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS question_text TEXT;
+    `;
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE;
+    `;
+    await sql`
+      ALTER TABLE consultations ADD COLUMN IF NOT EXISTS error_message TEXT;
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_status ON consultations(status);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_status_pending
+        ON consultations(created_at) WHERE status = 'pending';
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_consultations_completed_at ON consultations(completed_at);
+    `;
+
     // Phase 3: Create tracking_page_views table for return visit metrics
     await sql`
       CREATE TABLE IF NOT EXISTS tracking_page_views (
@@ -3526,7 +3560,7 @@ export async function updateResearchUsage(fid: string, tier: 'bronze' | 'silver'
 // OrthoIQ-Agents Integration: Store consultation metadata
 export async function storeConsultation(data: {
   consultationId: string;
-  questionId: number;
+  questionId: number | null;
   fid: string;
   webUserId?: string;
   mode: 'fast' | 'normal';
@@ -3540,15 +3574,23 @@ export async function storeConsultation(data: {
   walletAddress?: string;
   bodyPart?: string | null;
   predictedRecoveryDays?: number | null;
+  status?: 'pending' | 'completed' | 'failed' | 'timeout';
+  questionText?: string;
+  responseText?: string | null;
+  rawConsultationData?: any | null;
+  researchData?: any | null;
 }): Promise<void> {
   const sql = getSql();
+
+  const consultationStatus = data.status ?? 'completed';
 
   try {
     await sql`
       INSERT INTO consultations (
         consultation_id, question_id, fid, web_user_id, mode, participating_specialists,
         coordination_summary, specialist_count, total_cost, execution_time,
-        query_type, query_subtype, wallet_address, body_part, predicted_recovery_days
+        query_type, query_subtype, wallet_address, body_part, predicted_recovery_days,
+        status, question_text, response_text, raw_consultation_data, research_data
       ) VALUES (
         ${data.consultationId},
         ${data.questionId},
@@ -3564,14 +3606,91 @@ export async function storeConsultation(data: {
         ${data.querySubtype || null},
         ${data.walletAddress || null},
         ${data.bodyPart || null},
-        ${data.predictedRecoveryDays ?? null}
+        ${data.predictedRecoveryDays ?? null},
+        ${consultationStatus},
+        ${data.questionText || null},
+        ${data.responseText || null},
+        ${data.rawConsultationData ? JSON.stringify(data.rawConsultationData) : null},
+        ${data.researchData ? JSON.stringify(data.researchData) : null}
       )
+      ON CONFLICT (consultation_id) DO NOTHING
     `;
-    console.log(`Stored consultation ${data.consultationId} for question ${data.questionId} (body_part=${data.bodyPart ?? 'null'}, predicted_recovery_days=${data.predictedRecoveryDays ?? 'null'})`);
+    console.log(`Stored consultation ${data.consultationId} for question ${data.questionId} (body_part=${data.bodyPart ?? 'null'}, predicted_recovery_days=${data.predictedRecoveryDays ?? 'null'}, status=${consultationStatus})`);
   } catch (error) {
     console.error('Error storing consultation:', error);
     throw error;
   }
+}
+
+export async function updateConsultationResponse(data: {
+  consultationId: string;
+  status: 'completed' | 'failed' | 'timeout';
+  responseText?: string;
+  rawConsultationData?: any;
+  researchData?: any;
+  participatingSpecialists?: string[];
+  specialistCount?: number;
+  executionTime?: number;
+  bodyPart?: string | null;
+  predictedRecoveryDays?: number | null;
+  errorMessage?: string;
+}): Promise<{ updated: boolean; exists: boolean; questionId: number | null; questionText: string | null }> {
+  const sql = getSql();
+
+  const result = await sql`
+    UPDATE consultations
+    SET status = ${data.status},
+        response_text = COALESCE(${data.responseText ?? null}, response_text),
+        raw_consultation_data = COALESCE(${data.rawConsultationData ? JSON.stringify(data.rawConsultationData) : null}, raw_consultation_data),
+        research_data = COALESCE(${data.researchData ? JSON.stringify(data.researchData) : null}, research_data),
+        participating_specialists = COALESCE(${data.participatingSpecialists ? JSON.stringify(data.participatingSpecialists) : null}, participating_specialists),
+        specialist_count = COALESCE(${data.specialistCount ?? null}, specialist_count),
+        execution_time = COALESCE(${data.executionTime ?? null}, execution_time),
+        body_part = COALESCE(${data.bodyPart ?? null}, body_part),
+        predicted_recovery_days = COALESCE(${data.predictedRecoveryDays ?? null}, predicted_recovery_days),
+        mode = CASE WHEN COALESCE(${data.specialistCount ?? null}, specialist_count) > 1 THEN 'normal' ELSE mode END,
+        error_message = ${data.errorMessage ?? null},
+        completed_at = CASE WHEN ${data.status} = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_at END
+    WHERE consultation_id = ${data.consultationId}
+      AND (status = 'pending' OR mode = 'fast')
+    RETURNING question_id, question_text
+  `;
+
+  if (result.length > 0) {
+    return {
+      updated: true,
+      exists: true,
+      questionId: result[0].question_id ?? null,
+      questionText: result[0].question_text ?? null,
+    };
+  }
+
+  // Check if row exists but was already completed (idempotent re-poll)
+  const existing = await sql`
+    SELECT question_id, question_text FROM consultations WHERE consultation_id = ${data.consultationId} LIMIT 1
+  `;
+  return {
+    updated: false,
+    exists: existing.length > 0,
+    questionId: existing[0]?.question_id ?? null,
+    questionText: existing[0]?.question_text ?? null,
+  };
+}
+
+export async function updateQuestionResponse(
+  questionId: number,
+  response: string,
+  confidence: number
+): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE questions
+    SET response = ${response},
+        confidence = ${confidence},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${questionId}
+      AND (response = '' OR response IS NULL)
+  `;
 }
 
 // OrthoIQ-Agents Integration: Store consultation feedback

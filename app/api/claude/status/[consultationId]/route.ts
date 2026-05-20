@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchConsultationStatus, transformNormalModeResponse } from '@/lib/claude';
+import { updateConsultationResponse, updateQuestionResponse, storeConsultation } from '@/lib/database';
+import { extractBodyPart } from '@/lib/bodyPart';
+import { extractRecoveryDays } from '@/lib/recoveryDays';
 
 // Helper: build specialist enrichments from rawConsultationData (mirrors route.ts logic)
 function buildEnrichments(rawConsultationData: any): any[] {
@@ -86,6 +89,15 @@ export async function GET(
     }
 
     if (data.status === 'error') {
+      try {
+        await updateConsultationResponse({
+          consultationId,
+          status: 'failed',
+          errorMessage: data.error || 'Railway returned error status',
+        });
+      } catch (persistErr) {
+        console.error(`[status/${consultationId}] Failed to mark consultation as failed:`, persistErr);
+      }
       return NextResponse.json(
         { status: 'error', error: data.error, consultationId },
         { status: 500 }
@@ -113,6 +125,99 @@ export async function GET(
         }
       : null;
 
+    // Persist the completed comprehensive response
+    let persistedQuestionId: number | null = null;
+    try {
+      const { updated, exists, questionId, questionText } = await updateConsultationResponse({
+        consultationId,
+        status: 'completed',
+        responseText: claudeResponse.response || '',
+        rawConsultationData: claudeResponse.rawConsultationData,
+        researchData: data.research || null,
+        participatingSpecialists: specialists,
+        specialistCount: specialists.length,
+        executionTime: data.responseTime || 0,
+      });
+      persistedQuestionId = questionId;
+
+      // Run body part + recovery days enrichment using the stored question text
+      if (updated && questionText) {
+        let extractedBodyPart: string | null = null;
+        try {
+          extractedBodyPart = await extractBodyPart({
+            question: questionText,
+            keyFindings: Array.isArray(claudeResponse.rawConsultationData?.keyFindings)
+              ? claudeResponse.rawConsultationData.keyFindings
+                  .map((f: any) => (typeof f === 'string' ? f : f?.finding || ''))
+                  .filter(Boolean)
+              : [],
+          });
+        } catch (bpErr) {
+          console.error(`[status/${consultationId}] Body part extraction failed:`, bpErr);
+        }
+
+        let estimatedRecoveryDays: number | null = null;
+        try {
+          estimatedRecoveryDays = await extractRecoveryDays({
+            question: questionText,
+            bodyPart: extractedBodyPart,
+          });
+        } catch (rdErr) {
+          console.error(`[status/${consultationId}] Recovery days extraction failed:`, rdErr);
+        }
+
+        // Write enrichments back to the row
+        if (extractedBodyPart || estimatedRecoveryDays) {
+          try {
+            await updateConsultationResponse({
+              consultationId,
+              status: 'completed',
+              bodyPart: extractedBodyPart,
+              predictedRecoveryDays: estimatedRecoveryDays,
+            });
+          } catch (enrichErr) {
+            console.error(`[status/${consultationId}] Failed to write enrichments:`, enrichErr);
+          }
+        }
+      }
+
+      // Update the placeholder question row with the real response text
+      if (updated && questionId && claudeResponse.response) {
+        try {
+          await updateQuestionResponse(questionId, claudeResponse.response, claudeResponse.confidence || 0);
+        } catch (qUpdateErr) {
+          console.error(`[status/${consultationId}] Failed to update question response:`, qUpdateErr);
+        }
+      }
+
+      // Fallback: pre-insert never ran (DB was down at POST time) — create the row now
+      if (!exists && claudeResponse.response) {
+        try {
+          await storeConsultation({
+            consultationId,
+            questionId: null,
+            fid: 'unknown',
+            mode: 'normal',
+            participatingSpecialists: specialists,
+            specialistCount: specialists.length,
+            executionTime: data.responseTime || 0,
+            status: 'completed',
+            responseText: claudeResponse.response,
+            rawConsultationData: claudeResponse.rawConsultationData,
+            researchData: data.research || null,
+          });
+          console.log(`[status/${consultationId}] Fallback insert: created row with unknown identity`);
+        } catch (fallbackErr) {
+          console.error(`[status/${consultationId}] Fallback insert failed:`, fallbackErr);
+        }
+      }
+
+      console.log(`[status/${consultationId}] Persisted comprehensive response (updated=${updated}, questionId=${questionId})`);
+    } catch (persistErr) {
+      console.error(`[status/${consultationId}] Failed to persist consultation:`, persistErr);
+      // Don't fail the response — user still needs to see their consult
+    }
+
     return NextResponse.json({
       status: 'completed',
       response: claudeResponse.response || '',
@@ -124,7 +229,7 @@ export async function GET(
       inquiry: claudeResponse.inquiry,
       keyPoints: claudeResponse.keyPoints,
       urgencyLevel: claudeResponse.urgencyLevel,
-      questionId: null,
+      questionId: persistedQuestionId,
       enrichments: agentEnrichments,
       agentCost: 0,
       hasResearch: agentEnrichments.some(e => e.type === 'research' || e.type === 'consultation'),

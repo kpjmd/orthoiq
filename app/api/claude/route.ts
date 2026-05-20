@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrthoResponse, filterContent } from '@/lib/claude';
 import { checkRateLimit, UserTier, checkIPRateLimit, checkPlatformRateLimit, Platform, ConsultationMode } from '@/lib/rateLimit';
-import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus, storeConsultation } from '@/lib/database';
+import { logInteraction, checkRateLimitDB, checkRateLimitDBWithTiers, getResponseStatus, storeConsultation, updateConsultationResponse, updateQuestionResponse } from '@/lib/database';
 import { extractBodyPart } from '@/lib/bodyPart';
 import { extractRecoveryDays } from '@/lib/recoveryDays';
 import { ensureInitialized } from '@/lib/startup';
@@ -210,9 +210,42 @@ export async function POST(request: NextRequest) {
       // Async polling case: Railway is processing normal-mode consultation in background
       if (claudeResponse.processingAsync && claudeResponse.consultationId) {
         console.log(`[${requestId}] Normal mode consultation async, consultationId: ${claudeResponse.consultationId}`);
+
+        // Pre-insert placeholder rows so identity is preserved when status endpoint completes
+        let pendingQuestionId: number | null = null;
+        try {
+          pendingQuestionId = await logInteraction(fid, sanitizedQuestion, '', false, 0);
+        } catch (preInsertQError) {
+          console.error(`[${requestId}] Failed to pre-insert question placeholder:`, preInsertQError);
+        }
+
+        try {
+          await storeConsultation({
+            consultationId: claudeResponse.consultationId,
+            questionId: pendingQuestionId,
+            fid,
+            webUserId: (webUser?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(webUser.id))
+              ? webUser.id
+              : undefined,
+            mode: 'normal',
+            participatingSpecialists: [],
+            specialistCount: 0,
+            queryType: userQueryType || 'clinical',
+            querySubtype: null,
+            walletAddress: walletAddress || undefined,
+            status: 'pending',
+            questionText: sanitizedQuestion,
+          });
+          console.log(`[${requestId}] Pre-inserted pending consultation ${claudeResponse.consultationId} (questionId=${pendingQuestionId})`);
+        } catch (preInsertCError) {
+          console.error(`[${requestId}] Failed to pre-insert pending consultation:`, preInsertCError);
+          // Don't fail the request — Railway is still processing regardless
+        }
+
         return NextResponse.json({
           status: 'processing',
           consultationId: claudeResponse.consultationId,
+          questionId: pendingQuestionId,
           timestamp: new Date().toISOString(),
         });
       }
