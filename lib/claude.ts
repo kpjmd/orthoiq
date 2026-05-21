@@ -359,17 +359,24 @@ function extractPatientDataFromQuestion(
   const ageMatch = question.match(/(\d+)\s*(year|yo|y\.o|yr|years old)/i);
   const age = ageMatch ? parseInt(ageMatch[1]) : undefined;
 
-  // Extract pain level
-  const painMatch = question.match(/pain.*?(\d+)\s*(?:\/10|out of 10)?|\b(mild|moderate|severe|extreme)\s*pain/i);
+  // Extract pain level — only match explicit scale references to avoid capturing
+  // unrelated numbers like "pain for 15 years", "pain since age 45", "pain 20% of time"
   let painLevel: number | undefined = undefined;
-  if (painMatch) {
-    if (painMatch[1]) {
-      painLevel = parseInt(painMatch[1]);
-    } else if (painMatch[2]) {
+  // 1. Numeric scale: "7/10", "7 out of 10", "pain level 7", "pain score 8", "rated 6"
+  const numericPainMatch = question.match(
+    /\b(\d+)\s*(?:\/\s*10|out\s+of\s+10)\b|\b(?:pain\s+level|pain\s+score|severity)\s*(?:is|of|at|:)?\s*(\d+)\b|\b(?:rated?s?|rating)\s+(?:it\s+)?(?:at\s+)?(\d+)\b/i
+  );
+  if (numericPainMatch) {
+    const raw = parseInt(numericPainMatch[1] || numericPainMatch[2] || numericPainMatch[3]);
+    painLevel = Math.min(10, Math.max(0, raw)); // hard clamp against Railway schema max:10
+  } else {
+    // 2. Word descriptors anywhere in the question
+    const wordPainMatch = question.match(/\b(mild|moderate|severe|extreme)\b/i);
+    if (wordPainMatch) {
       const painMap: { [key: string]: number } = {
         'mild': 3, 'moderate': 5, 'severe': 8, 'extreme': 9
       };
-      painLevel = painMap[painMatch[2].toLowerCase()];
+      painLevel = painMap[wordPainMatch[1].toLowerCase()];
     }
   }
 
