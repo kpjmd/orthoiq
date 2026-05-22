@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchConsultationStatus, transformNormalModeResponse, getOrthoResponse } from '@/lib/claude';
+import { fetchResearchStatus, triggerResearchAgents } from '@/lib/agentsClient';
 import {
   getContentJob,
   finalizeContentJob,
+  markContentJobConsultationComplete,
   updateConsultationResponse,
+  patchConsultationResearchData,
   storeConsultation,
   setContentJobConsultationId,
 } from '@/lib/database';
@@ -24,6 +27,12 @@ function timeoutMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 5 * 60 * 1000;
 }
 
+function researchTimeoutMs(): number {
+  const raw = process.env.ORTHOIQ_RESEARCH_TIMEOUT_MS;
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
+}
+
 function toIso(value: any): string | null {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
@@ -32,6 +41,22 @@ function toIso(value: any): string | null {
   } catch {
     return null;
   }
+}
+
+function buildResearchCaseData(question: string, rawConsultationData: any): any {
+  const cd = rawConsultationData?.caseData;
+  if (cd) {
+    return {
+      primaryComplaint: cd.primaryComplaint || question,
+      symptoms: cd.symptoms,
+      duration: cd.duration,
+      location: cd.location,
+      painLevel: cd.painLevel,
+      age: cd.age,
+      rawQuery: cd.rawQuery || question,
+    };
+  }
+  return { primaryComplaint: question, rawQuery: question };
 }
 
 export async function GET(
@@ -99,16 +124,21 @@ export async function GET(
     });
   }
 
-  // status === 'pending'
+  // status === 'pending', research_status === 'pending':
+  // Main panel is done and staged; we only need to land research.
+  if (job.research_status === 'pending') {
+    return finishResearchPhase(jobId, job, createdAt);
+  }
+
+  // status === 'pending', research_status === null:
+  // Original flow — wait for the main panel to finish.
   if (!job.consultation_id) {
     const ageMs = job.created_at ? Date.now() - new Date(job.created_at).getTime() : 0;
 
     if (ageMs < SELF_HEAL_GRACE_MS) {
-      // POST may still be finishing — don't double-submit.
       return NextResponse.json({ jobId, status: 'pending', createdAt });
     }
 
-    // Orphaned. Submit to Railway from here, attach the consultationId, and continue.
     console.warn(`[v1/consult/${jobId}] consultation_id missing after ${ageMs}ms — self-heal submit`);
 
     let recoveryResponse;
@@ -124,7 +154,6 @@ export async function GET(
     }
 
     if (!recoveryResponse?.processingAsync || !recoveryResponse.consultationId) {
-      // Sync fallback — finalize immediately with whatever we got.
       const completedAtIso = new Date().toISOString();
       const payload = {
         jobId,
@@ -148,15 +177,20 @@ export async function GET(
           executionTime: null,
           fromAgentsSystem: recoveryResponse?.fromAgentsSystem ?? false,
           degraded: true,
+          researchStatus: recoveryResponse?.researchData ? 'complete' : null,
         },
       };
-      await finalizeContentJob({ jobId, status: 'completed', resultPayload: payload }).catch(e =>
+      await finalizeContentJob({
+        jobId,
+        status: 'completed',
+        resultPayload: payload,
+        researchStatus: recoveryResponse?.researchData ? 'complete' : undefined,
+      }).catch(e =>
         console.error(`[v1/consult/${jobId}] self-heal finalize failed:`, e)
       );
       return NextResponse.json(payload);
     }
 
-    // Attach the recovered consultation_id and fall through to the Railway poll below.
     job.consultation_id = recoveryResponse.consultationId;
     try {
       await setContentJobConsultationId(jobId, recoveryResponse.consultationId);
@@ -180,8 +214,6 @@ export async function GET(
       console.error(`[v1/consult/${jobId}] self-heal pre-insert failed:`, err);
     }
 
-    // Railway has only just received the consult — it almost certainly isn't 'completed' yet.
-    // Return pending now; the next poll will hit fetchConsultationStatus.
     return NextResponse.json({ jobId, status: 'pending', createdAt, note: 'Self-heal submitted to agents' });
   }
 
@@ -195,7 +227,6 @@ export async function GET(
     return NextResponse.json({ jobId, status: 'pending', createdAt, note: 'Status check failed; will retry' });
   }
 
-  // Railway → not_found: job is lost
   if (railwayData?.status === 'not_found') {
     try {
       await finalizeContentJob({
@@ -212,7 +243,6 @@ export async function GET(
     );
   }
 
-  // Railway → error
   if (railwayData?.status === 'error') {
     const errorMessage = railwayData.error || 'Railway returned error status';
     try {
@@ -235,7 +265,6 @@ export async function GET(
     );
   }
 
-  // Railway → still processing → check timeout window
   if (railwayData?.status !== 'completed') {
     const createdMs = job.created_at ? new Date(job.created_at).getTime() : Date.now();
     if (Date.now() - createdMs > timeoutMs()) {
@@ -268,12 +297,11 @@ export async function GET(
     return NextResponse.json({ jobId, status: 'pending', createdAt });
   }
 
-  // Railway → completed
+  // Railway → completed. Assemble the consultation payload.
   const claudeResponse = transformNormalModeResponse(railwayData, undefined, job.question);
   const specialists = claudeResponse.participatingSpecialists || [];
   const enrichments = buildEnrichments(claudeResponse.rawConsultationData);
 
-  // Body part + recovery days enrichment (best-effort; never fail the response).
   let extractedBodyPart: string | null = null;
   try {
     extractedBodyPart = await extractBodyPart({
@@ -298,14 +326,15 @@ export async function GET(
     console.error(`[v1/consult/${jobId}] extractRecoveryDays failed:`, e);
   }
 
-  // Persist to consultations table (idempotent — mirrors the existing status route).
+  const inlineResearch = railwayData.research || null;
+
   try {
     const { updated, exists } = await updateConsultationResponse({
       consultationId,
       status: 'completed',
       responseText: claudeResponse.response || '',
       rawConsultationData: claudeResponse.rawConsultationData,
-      researchData: railwayData.research || null,
+      researchData: inlineResearch,
       participatingSpecialists: specialists,
       specialistCount: specialists.length,
       executionTime: railwayData.responseTime || 0,
@@ -327,7 +356,7 @@ export async function GET(
           questionText: job.question,
           responseText: claudeResponse.response,
           rawConsultationData: claudeResponse.rawConsultationData,
-          researchData: railwayData.research || null,
+          researchData: inlineResearch,
           bodyPart: extractedBodyPart,
           predictedRecoveryDays: estimatedRecoveryDays,
         });
@@ -342,7 +371,6 @@ export async function GET(
     console.error(`[v1/consult/${jobId}] Persist consultation failed:`, e);
   }
 
-  // Shape per-specialist payload for content pipeline consumption.
   const specialistPayload = enrichments.map(e => {
     const raw = (claudeResponse.rawConsultationData as any)?.responses?.find(
       (r: any) => (r.response?.specialistType || r.specialistType) === e.metadata.agentType
@@ -359,39 +387,202 @@ export async function GET(
 
   const synthesized = (claudeResponse.rawConsultationData as any)?.synthesizedRecommendations || null;
 
-  const completedIso = new Date().toISOString();
-  const payload = {
-    jobId,
-    status: 'completed' as const,
-    question: job.question,
-    createdAt,
-    completedAt: completedIso,
-    consultation: {
-      response: claudeResponse.response || '',
-      inquiry: claudeResponse.inquiry,
-      keyPoints: claudeResponse.keyPoints || [],
-      urgencyLevel: claudeResponse.urgencyLevel,
-      dataCompleteness: claudeResponse.dataCompleteness,
-      triageConfidence: claudeResponse.triageConfidence,
-      suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
-      specialists: specialistPayload,
-      treatmentPlan: synthesized,
-      researchData: railwayData.research || null,
-    },
-    meta: {
-      bodyPart: extractedBodyPart,
-      predictedRecoveryDays: estimatedRecoveryDays,
-      participatingSpecialists: specialists,
-      executionTime: railwayData.responseTime || 0,
-      consultationId,
-    },
+  const buildPayload = (researchStatus: 'complete' | 'pending', researchData: any) => {
+    const completedIso = researchStatus === 'complete' ? new Date().toISOString() : null;
+    return {
+      jobId,
+      status: researchStatus === 'complete' ? ('completed' as const) : ('pending' as const),
+      question: job.question,
+      createdAt,
+      completedAt: completedIso,
+      consultation: {
+        response: claudeResponse.response || '',
+        inquiry: claudeResponse.inquiry,
+        keyPoints: claudeResponse.keyPoints || [],
+        urgencyLevel: claudeResponse.urgencyLevel,
+        dataCompleteness: claudeResponse.dataCompleteness,
+        triageConfidence: claudeResponse.triageConfidence,
+        suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
+        specialists: specialistPayload,
+        treatmentPlan: synthesized,
+        researchData,
+      },
+      meta: {
+        bodyPart: extractedBodyPart,
+        predictedRecoveryDays: estimatedRecoveryDays,
+        participatingSpecialists: specialists,
+        executionTime: railwayData.responseTime || 0,
+        consultationId,
+        researchStatus,
+      },
+    };
   };
 
-  try {
-    await finalizeContentJob({ jobId, status: 'completed', resultPayload: payload });
-  } catch (e) {
-    console.error(`[v1/consult/${jobId}] finalize completed write failed:`, e);
+  // Inline research present — finalize immediately.
+  if (inlineResearch) {
+    const payload = buildPayload('complete', inlineResearch);
+    try {
+      await finalizeContentJob({
+        jobId,
+        status: 'completed',
+        resultPayload: payload,
+        researchStatus: 'complete',
+      });
+    } catch (e) {
+      console.error(`[v1/consult/${jobId}] finalize completed write failed:`, e);
+    }
+    return NextResponse.json(payload);
   }
 
+  // Research is missing — trigger it, stage the partial payload, return pending.
+  const stagedPayload = buildPayload('pending', null);
+  const note = 'Consultation complete, awaiting research';
+
+  const triggerResult = await triggerResearchAgents({
+    consultationId,
+    caseData: buildResearchCaseData(job.question, claudeResponse.rawConsultationData),
+    consultationResult: claudeResponse.rawConsultationData,
+  });
+  if (!triggerResult.ok) {
+    console.warn(
+      `[v1/consult/${jobId}] triggerResearchAgents returned not-ok (status=${triggerResult.status}): ${triggerResult.error || 'unknown'} — polling anyway`
+    );
+  }
+
+  try {
+    await markContentJobConsultationComplete({
+      jobId,
+      researchStatus: 'pending',
+      resultPayload: stagedPayload,
+    });
+  } catch (e) {
+    console.error(`[v1/consult/${jobId}] markContentJobConsultationComplete failed:`, e);
+  }
+
+  return NextResponse.json({ jobId, status: 'pending', createdAt, note });
+}
+
+/**
+ * Research-only polling branch. The consultation payload is already staged in
+ * job.result_payload; we just need to merge research into it (or finalize as
+ * timeout / failed if it doesn't land).
+ */
+async function finishResearchPhase(
+  jobId: string,
+  job: any,
+  createdAt: string | null
+): Promise<NextResponse> {
+  const staged = job.result_payload || {};
+  const consultationId = job.consultation_id as string;
+
+  const createdMs = job.created_at ? new Date(job.created_at).getTime() : Date.now();
+  const consultationCompletedMs = job.consultation_completed_at
+    ? new Date(job.consultation_completed_at).getTime()
+    : createdMs;
+
+  const overallExceeded = Date.now() - createdMs > timeoutMs();
+  const researchExceeded = Date.now() - consultationCompletedMs > researchTimeoutMs();
+
+  // Try to fetch research status.
+  let researchResp;
+  try {
+    researchResp = await fetchResearchStatus(consultationId);
+  } catch (err: any) {
+    console.error(`[v1/consult/${jobId}] fetchResearchStatus threw:`, err);
+    if (overallExceeded || researchExceeded) {
+      return finalizeWithoutResearch(jobId, staged, createdAt, 'timeout');
+    }
+    return NextResponse.json({
+      jobId,
+      status: 'pending',
+      createdAt,
+      note: 'Research status check failed; will retry',
+    });
+  }
+
+  if (researchResp.status === 'complete' && researchResp.research) {
+    const payload = mergeResearchIntoPayload(staged, researchResp.research, 'complete');
+    try {
+      await patchConsultationResearchData(consultationId, researchResp.research);
+    } catch (e) {
+      console.error(`[v1/consult/${jobId}] patchConsultationResearchData failed:`, e);
+    }
+    try {
+      await finalizeContentJob({
+        jobId,
+        status: 'completed',
+        resultPayload: payload,
+        researchStatus: 'complete',
+      });
+    } catch (e) {
+      console.error(`[v1/consult/${jobId}] finalize research-complete write failed:`, e);
+    }
+    return NextResponse.json(payload);
+  }
+
+  if (researchResp.status === 'failed') {
+    return finalizeWithoutResearch(jobId, staged, createdAt, 'failed');
+  }
+
+  // pending / not_found
+  if (overallExceeded || researchExceeded) {
+    return finalizeWithoutResearch(jobId, staged, createdAt, 'timeout');
+  }
+
+  return NextResponse.json({
+    jobId,
+    status: 'pending',
+    createdAt,
+    note: 'Awaiting research',
+  });
+}
+
+function mergeResearchIntoPayload(staged: any, researchData: any, researchStatus: 'complete'): any {
+  return {
+    ...staged,
+    status: 'completed',
+    completedAt: new Date().toISOString(),
+    consultation: {
+      ...(staged.consultation || {}),
+      researchData,
+    },
+    meta: {
+      ...(staged.meta || {}),
+      researchStatus,
+    },
+  };
+}
+
+async function finalizeWithoutResearch(
+  jobId: string,
+  staged: any,
+  createdAt: string | null,
+  researchStatus: 'failed' | 'timeout'
+): Promise<NextResponse> {
+  const payload = {
+    ...staged,
+    status: 'completed',
+    completedAt: new Date().toISOString(),
+    consultation: {
+      ...(staged.consultation || {}),
+      researchData: null,
+    },
+    meta: {
+      ...(staged.meta || {}),
+      researchStatus,
+    },
+  };
+  try {
+    await finalizeContentJob({
+      jobId,
+      status: 'completed',
+      resultPayload: payload,
+      researchStatus,
+    });
+  } catch (e) {
+    console.error(`[v1/consult/${jobId}] finalize research-${researchStatus} write failed:`, e);
+  }
+  // createdAt is preserved in the staged payload; reference is unused here.
+  void createdAt;
   return NextResponse.json(payload);
 }

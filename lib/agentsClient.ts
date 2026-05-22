@@ -52,3 +52,64 @@ export function agentsFetch(path: string, { caller, jwt, webUserId, ...rest }: A
 
   return fetch(`${base}${path}`, { headers, ...rest });
 }
+
+export type ResearchAgentStatus = 'pending' | 'complete' | 'failed' | 'not_found';
+
+export interface ResearchAgentResponse {
+  status: ResearchAgentStatus;
+  research?: any;
+  error?: string;
+}
+
+/**
+ * Server-side fetch of research agent status from Railway. Mirrors the
+ * /api/research/[consultationId] proxy but skips the HTTP self-hop.
+ */
+export async function fetchResearchStatus(consultationId: string): Promise<ResearchAgentResponse> {
+  const res = await agentsFetch(`/research/${consultationId}`, {
+    caller: 'web',
+    method: 'GET',
+    signal: AbortSignal.timeout(10000),
+  });
+
+  if (res.status === 404) {
+    return { status: 'not_found' };
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => 'Unknown error');
+    throw new Error(`Research status check failed: ${res.status} ${text}`);
+  }
+
+  const data = await res.json();
+  return data as ResearchAgentResponse;
+}
+
+/**
+ * Best-effort server-side trigger of the research agent. Mirrors the
+ * /api/research/trigger proxy. Never throws — returns { ok: false } on any failure.
+ */
+export async function triggerResearchAgents(params: {
+  consultationId: string;
+  caseData: any;
+  consultationResult?: any;
+  userTier?: string;
+}): Promise<{ ok: boolean; status?: number; error?: string }> {
+  try {
+    const res = await agentsFetch('/research/trigger', {
+      caller: 'web',
+      method: 'POST',
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error');
+      return { ok: false, status: res.status, error: errorText };
+    }
+
+    return { ok: true, status: res.status };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Network error' };
+  }
+}

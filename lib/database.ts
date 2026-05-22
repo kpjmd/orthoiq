@@ -1306,17 +1306,25 @@ export async function initDatabase() {
     // External content pipeline (/api/v1/consult) — job tracking table
     await sql`
       CREATE TABLE IF NOT EXISTS content_jobs (
-        job_id          UUID PRIMARY KEY,
-        consultation_id VARCHAR(255),
-        question        TEXT NOT NULL,
-        metadata        JSONB,
-        status          VARCHAR(20) NOT NULL DEFAULT 'pending'
-                        CHECK (status IN ('pending','completed','failed','timeout')),
-        result_payload  JSONB,
-        error_message   TEXT,
-        created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        completed_at    TIMESTAMP WITH TIME ZONE
+        job_id                    UUID PRIMARY KEY,
+        consultation_id           VARCHAR(255),
+        question                  TEXT NOT NULL,
+        metadata                  JSONB,
+        status                    VARCHAR(20) NOT NULL DEFAULT 'pending'
+                                  CHECK (status IN ('pending','completed','failed','timeout')),
+        result_payload            JSONB,
+        error_message             TEXT,
+        research_status           VARCHAR(20),
+        consultation_completed_at TIMESTAMP WITH TIME ZONE,
+        created_at                TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        completed_at              TIMESTAMP WITH TIME ZONE
       );
+    `;
+    await sql`
+      ALTER TABLE content_jobs ADD COLUMN IF NOT EXISTS research_status VARCHAR(20);
+    `;
+    await sql`
+      ALTER TABLE content_jobs ADD COLUMN IF NOT EXISTS consultation_completed_at TIMESTAMP WITH TIME ZONE;
     `;
     await sql`
       CREATE INDEX IF NOT EXISTS idx_content_jobs_consultation_id ON content_jobs(consultation_id);
@@ -3718,6 +3726,7 @@ export async function updateQuestionResponse(
 // External content pipeline (/api/v1/consult) — content_jobs helpers
 
 export type ContentJobStatus = 'pending' | 'completed' | 'failed' | 'timeout';
+export type ContentJobResearchStatus = 'pending' | 'complete' | 'failed' | 'timeout';
 
 export interface ContentJobRow {
   job_id: string;
@@ -3727,6 +3736,8 @@ export interface ContentJobRow {
   status: ContentJobStatus;
   result_payload: any | null;
   error_message: string | null;
+  research_status: ContentJobResearchStatus | null;
+  consultation_completed_at: string | null;
   created_at: string;
   completed_at: string | null;
 }
@@ -3764,7 +3775,8 @@ export async function getContentJob(jobId: string): Promise<ContentJobRow | null
   const sql = getSql();
   const rows = await sql`
     SELECT job_id, consultation_id, question, metadata, status,
-           result_payload, error_message, created_at, completed_at
+           result_payload, error_message, research_status, consultation_completed_at,
+           created_at, completed_at
     FROM content_jobs
     WHERE job_id = ${jobId}
     LIMIT 1
@@ -3777,6 +3789,7 @@ export async function finalizeContentJob(data: {
   status: 'completed' | 'failed' | 'timeout';
   resultPayload?: any;
   errorMessage?: string;
+  researchStatus?: ContentJobResearchStatus;
 }): Promise<void> {
   const sql = getSql();
   await sql`
@@ -3784,8 +3797,48 @@ export async function finalizeContentJob(data: {
     SET status = ${data.status},
         result_payload = COALESCE(${data.resultPayload ? JSON.stringify(data.resultPayload) : null}, result_payload),
         error_message = COALESCE(${data.errorMessage ?? null}, error_message),
+        research_status = COALESCE(${data.researchStatus ?? null}, research_status),
         completed_at = CURRENT_TIMESTAMP
     WHERE job_id = ${data.jobId}
+  `;
+}
+
+/**
+ * Stage the assembled consultation payload after the main panel finished but
+ * before research has landed. Keeps the job in 'pending' status; sets
+ * research_status and consultation_completed_at so subsequent GET polls
+ * can take the research-only path.
+ */
+export async function markContentJobConsultationComplete(data: {
+  jobId: string;
+  researchStatus: ContentJobResearchStatus;
+  resultPayload: any;
+}): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE content_jobs
+    SET research_status = ${data.researchStatus},
+        consultation_completed_at = CURRENT_TIMESTAMP,
+        result_payload = ${JSON.stringify(data.resultPayload)}
+    WHERE job_id = ${data.jobId}
+      AND status = 'pending'
+  `;
+}
+
+/**
+ * Patch the research_data column on a consultation row that may already be
+ * marked completed (updateConsultationResponse refuses to touch completed rows).
+ * Use this when research arrives after the main panel was finalized.
+ */
+export async function patchConsultationResearchData(
+  consultationId: string,
+  researchData: any
+): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE consultations
+    SET research_data = ${researchData ? JSON.stringify(researchData) : null}
+    WHERE consultation_id = ${consultationId}
   `;
 }
 

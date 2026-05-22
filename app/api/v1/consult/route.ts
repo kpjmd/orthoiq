@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
       executionTime: null,
       fromAgentsSystem: claudeResponse?.fromAgentsSystem ?? false,
       degraded: true,
+      researchStatus: claudeResponse?.researchData ? 'complete' : null,
     },
   };
 
