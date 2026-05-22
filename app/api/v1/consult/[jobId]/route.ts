@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchConsultationStatus, transformNormalModeResponse } from '@/lib/claude';
+import { fetchConsultationStatus, transformNormalModeResponse, getOrthoResponse } from '@/lib/claude';
 import {
   getContentJob,
   finalizeContentJob,
   updateConsultationResponse,
   storeConsultation,
+  setContentJobConsultationId,
 } from '@/lib/database';
 import { extractBodyPart } from '@/lib/bodyPart';
 import { extractRecoveryDays } from '@/lib/recoveryDays';
@@ -12,9 +13,10 @@ import { buildEnrichments } from '@/lib/specialists';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const CONTENT_PIPELINE_FID = 'content-pipeline';
+const SELF_HEAL_GRACE_MS = 15_000;
 
 function timeoutMs(): number {
   const raw = process.env.ORTHOIQ_CONTENT_JOB_TIMEOUT_MS;
@@ -99,8 +101,88 @@ export async function GET(
 
   // status === 'pending'
   if (!job.consultation_id) {
-    // POST hasn't yet attached a consultation_id (race or partial failure)
-    return NextResponse.json({ jobId, status: 'pending', createdAt });
+    const ageMs = job.created_at ? Date.now() - new Date(job.created_at).getTime() : 0;
+
+    if (ageMs < SELF_HEAL_GRACE_MS) {
+      // POST may still be finishing — don't double-submit.
+      return NextResponse.json({ jobId, status: 'pending', createdAt });
+    }
+
+    // Orphaned. Submit to Railway from here, attach the consultationId, and continue.
+    console.warn(`[v1/consult/${jobId}] consultation_id missing after ${ageMs}ms — self-heal submit`);
+
+    let recoveryResponse;
+    try {
+      recoveryResponse = await getOrthoResponse(job.question, `recover-${jobId.slice(0, 8)}`, {
+        mode: 'normal',
+        userId: CONTENT_PIPELINE_FID,
+        queryType: 'clinical',
+      });
+    } catch (err: any) {
+      console.error(`[v1/consult/${jobId}] self-heal getOrthoResponse threw:`, err);
+      return NextResponse.json({ jobId, status: 'pending', createdAt, note: 'Self-heal retry deferred' });
+    }
+
+    if (!recoveryResponse?.processingAsync || !recoveryResponse.consultationId) {
+      // Sync fallback — finalize immediately with whatever we got.
+      const completedAtIso = new Date().toISOString();
+      const payload = {
+        jobId,
+        status: 'completed' as const,
+        question: job.question,
+        createdAt,
+        completedAt: completedAtIso,
+        consultation: {
+          response: recoveryResponse?.response || '',
+          inquiry: recoveryResponse?.inquiry,
+          keyPoints: recoveryResponse?.keyPoints || [],
+          urgencyLevel: recoveryResponse?.urgencyLevel,
+          specialists: [],
+          treatmentPlan: null,
+          researchData: recoveryResponse?.researchData || null,
+        },
+        meta: {
+          bodyPart: null,
+          predictedRecoveryDays: null,
+          participatingSpecialists: recoveryResponse?.participatingSpecialists || [],
+          executionTime: null,
+          fromAgentsSystem: recoveryResponse?.fromAgentsSystem ?? false,
+          degraded: true,
+        },
+      };
+      await finalizeContentJob({ jobId, status: 'completed', resultPayload: payload }).catch(e =>
+        console.error(`[v1/consult/${jobId}] self-heal finalize failed:`, e)
+      );
+      return NextResponse.json(payload);
+    }
+
+    // Attach the recovered consultation_id and fall through to the Railway poll below.
+    job.consultation_id = recoveryResponse.consultationId;
+    try {
+      await setContentJobConsultationId(jobId, recoveryResponse.consultationId);
+    } catch (err) {
+      console.error(`[v1/consult/${jobId}] self-heal setContentJobConsultationId failed:`, err);
+    }
+    try {
+      await storeConsultation({
+        consultationId: recoveryResponse.consultationId,
+        questionId: null,
+        fid: CONTENT_PIPELINE_FID,
+        mode: 'normal',
+        participatingSpecialists: [],
+        specialistCount: 0,
+        queryType: 'clinical',
+        querySubtype: null,
+        status: 'pending',
+        questionText: job.question,
+      });
+    } catch (err) {
+      console.error(`[v1/consult/${jobId}] self-heal pre-insert failed:`, err);
+    }
+
+    // Railway has only just received the consult — it almost certainly isn't 'completed' yet.
+    // Return pending now; the next poll will hit fetchConsultationStatus.
+    return NextResponse.json({ jobId, status: 'pending', createdAt, note: 'Self-heal submitted to agents' });
   }
 
   const consultationId = job.consultation_id;
