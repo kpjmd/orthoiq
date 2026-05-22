@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { getOrthoResponse } from '@/lib/claude';
 import {
   createContentJob,
@@ -51,93 +51,90 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
   }
 
-  let claudeResponse;
-  try {
-    claudeResponse = await getOrthoResponse(question, requestId, {
-      mode: 'normal',
-      userId: CONTENT_PIPELINE_FID,
-    });
-  } catch (err: any) {
-    console.error(`[v1/consult] getOrthoResponse threw:`, err);
-    await finalizeContentJob({
-      jobId,
-      status: 'failed',
-      errorMessage: err?.message || 'Failed to initiate consultation',
-    }).catch(e => console.error(`[v1/consult] finalize-failed write failed:`, e));
-    return NextResponse.json({ error: 'Failed to initiate consultation' }, { status: 502 });
-  }
-
-  // Expected happy path: Railway acked async with a consultationId
-  if (claudeResponse?.processingAsync && claudeResponse.consultationId) {
-    const consultationId = claudeResponse.consultationId;
-
+  after(async () => {
+    let claudeResponse;
     try {
-      await setContentJobConsultationId(jobId, consultationId);
-    } catch (err) {
-      console.error(`[v1/consult] Failed to set consultation_id on job ${jobId}:`, err);
-    }
-
-    try {
-      await storeConsultation({
-        consultationId,
-        questionId: null,
-        fid: CONTENT_PIPELINE_FID,
+      claudeResponse = await getOrthoResponse(question, requestId, {
         mode: 'normal',
-        participatingSpecialists: [],
-        specialistCount: 0,
+        userId: CONTENT_PIPELINE_FID,
         queryType: 'clinical',
-        querySubtype: null,
-        status: 'pending',
-        questionText: question,
       });
-    } catch (err) {
-      console.error(`[v1/consult] Pre-insert consultations row failed for ${consultationId}:`, err);
-      // Non-fatal — the GET path will fall back to storeConsultation on completion
+    } catch (err: any) {
+      console.error(`[v1/consult] getOrthoResponse threw:`, err);
+      await finalizeContentJob({
+        jobId,
+        status: 'failed',
+        errorMessage: err?.message || 'Failed to initiate consultation',
+      }).catch(e => console.error(`[v1/consult] finalize-failed write failed:`, e));
+      return;
     }
 
-    return NextResponse.json({
+    // Happy path: Railway acked async with a consultationId.
+    if (claudeResponse?.processingAsync && claudeResponse.consultationId) {
+      const consultationId = claudeResponse.consultationId;
+
+      try {
+        await setContentJobConsultationId(jobId, consultationId);
+      } catch (err) {
+        console.error(`[v1/consult] Failed to set consultation_id on job ${jobId}:`, err);
+      }
+
+      try {
+        await storeConsultation({
+          consultationId,
+          questionId: null,
+          fid: CONTENT_PIPELINE_FID,
+          mode: 'normal',
+          participatingSpecialists: [],
+          specialistCount: 0,
+          queryType: 'clinical',
+          querySubtype: null,
+          status: 'pending',
+          questionText: question,
+        });
+      } catch (err) {
+        console.error(`[v1/consult] Pre-insert consultations row failed for ${consultationId}:`, err);
+        // Non-fatal — the GET path will fall back to storeConsultation on completion
+      }
+      return;
+    }
+
+    // Fallback path: Railway returned a synchronous result (or Claude fallback fired).
+    // No multi-specialist payload to assemble — store whatever we have and mark completed.
+    const fallbackPayload = {
       jobId,
-      status: 'pending',
-      consultationId,
+      status: 'completed' as const,
+      question,
       createdAt,
-    });
-  }
+      completedAt: new Date().toISOString(),
+      consultation: {
+        response: claudeResponse?.response || '',
+        inquiry: claudeResponse?.inquiry,
+        keyPoints: claudeResponse?.keyPoints || [],
+        urgencyLevel: claudeResponse?.urgencyLevel,
+        dataCompleteness: claudeResponse?.dataCompleteness,
+        triageConfidence: claudeResponse?.triageConfidence,
+        suggestedFollowUp: claudeResponse?.suggestedFollowUp || [],
+        specialists: [],
+        treatmentPlan: null,
+        researchData: claudeResponse?.researchData || null,
+      },
+      meta: {
+        bodyPart: null,
+        predictedRecoveryDays: null,
+        participatingSpecialists: claudeResponse?.participatingSpecialists || [],
+        executionTime: null,
+        fromAgentsSystem: claudeResponse?.fromAgentsSystem ?? false,
+        degraded: true,
+      },
+    };
 
-  // Fallback path: Railway returned a synchronous result (or Claude fallback fired).
-  // No multi-specialist payload to assemble — store whatever we have and mark completed.
-  const fallbackPayload = {
-    jobId,
-    status: 'completed' as const,
-    question,
-    createdAt,
-    completedAt: new Date().toISOString(),
-    consultation: {
-      response: claudeResponse?.response || '',
-      inquiry: claudeResponse?.inquiry,
-      keyPoints: claudeResponse?.keyPoints || [],
-      urgencyLevel: claudeResponse?.urgencyLevel,
-      dataCompleteness: claudeResponse?.dataCompleteness,
-      triageConfidence: claudeResponse?.triageConfidence,
-      suggestedFollowUp: claudeResponse?.suggestedFollowUp || [],
-      specialists: [],
-      treatmentPlan: null,
-      researchData: claudeResponse?.researchData || null,
-    },
-    meta: {
-      bodyPart: null,
-      predictedRecoveryDays: null,
-      participatingSpecialists: claudeResponse?.participatingSpecialists || [],
-      executionTime: null,
-      fromAgentsSystem: claudeResponse?.fromAgentsSystem ?? false,
-      degraded: true,
-    },
-  };
+    try {
+      await finalizeContentJob({ jobId, status: 'completed', resultPayload: fallbackPayload });
+    } catch (err) {
+      console.error(`[v1/consult] finalize synchronous job failed:`, err);
+    }
+  });
 
-  try {
-    await finalizeContentJob({ jobId, status: 'completed', resultPayload: fallbackPayload });
-  } catch (err) {
-    console.error(`[v1/consult] finalize synchronous job failed:`, err);
-  }
-
-  return NextResponse.json(fallbackPayload);
+  return NextResponse.json({ jobId, status: 'pending', createdAt });
 }
