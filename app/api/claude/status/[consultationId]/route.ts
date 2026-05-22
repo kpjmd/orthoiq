@@ -3,73 +3,7 @@ import { fetchConsultationStatus, transformNormalModeResponse } from '@/lib/clau
 import { updateConsultationResponse, updateQuestionResponse, storeConsultation } from '@/lib/database';
 import { extractBodyPart } from '@/lib/bodyPart';
 import { extractRecoveryDays } from '@/lib/recoveryDays';
-
-// Helper: build specialist enrichments from rawConsultationData (mirrors route.ts logic)
-function buildEnrichments(rawConsultationData: any): any[] {
-  if (!rawConsultationData?.responses) return [];
-  return rawConsultationData.responses.map((resp: any) => {
-    const specialist = resp.response || {};
-    const specialistType = specialist.specialistType || resp.specialistType || 'specialist';
-    const specialistName = specialist.specialist || resp.specialist || getSpecialistDisplayName(specialistType);
-
-    let content: string = specialist.response || specialist.assessment || '';
-    if (typeof content === 'object' && content !== null) {
-      const obj = content as any;
-      content = obj.text || obj.response || obj.assessment || JSON.stringify(content);
-    }
-    if (typeof content !== 'string') content = String(content);
-
-    content = content
-      .replace(/```json\s*\n/g, '')
-      .replace(/```\s*$/g, '')
-      .replace(/^```\s*/g, '');
-
-    const recommendations = specialist.recommendations || resp.recommendations;
-    if (recommendations && Array.isArray(recommendations) && recommendations.length > 0) {
-      content += '\n\n**Recommendations:**\n';
-      recommendations.forEach((rec: any, idx: number) => {
-        const intervention = rec.intervention || rec;
-        const timeline = rec.timeline || '';
-        content += `${idx + 1}. ${intervention}${timeline ? ` - ${timeline}` : ''}\n`;
-      });
-    }
-
-    return {
-      type: 'consultation' as const,
-      title: specialistName,
-      content,
-      metadata: {
-        specialist: specialistType,
-        agentType: specialistType,
-        confidence: specialist.confidence || resp.confidence || 0.85,
-        responseTime: specialist.responseTime || resp.responseTime,
-        agreementWithTriage: specialist.agreementWithTriage || resp.agreementWithTriage,
-      },
-    };
-  });
-}
-
-function getSpecialistDisplayName(specialist: string): string {
-  const names: Record<string, string> = {
-    triage: 'OrthoTriage Master',
-    painWhisperer: 'Pain Whisperer',
-    movementDetective: 'Movement Detective',
-    strengthSage: 'Strength Sage',
-    mindMender: 'Mind Mender',
-  };
-  return names[specialist] || specialist;
-}
-
-function getSpecialtyDescription(specialist: string): string {
-  const descriptions: Record<string, string> = {
-    triage: 'Triage and Case Coordination',
-    painWhisperer: 'Pain Management and Assessment',
-    movementDetective: 'Biomechanics and Movement Analysis',
-    strengthSage: 'Functional Restoration and Rehabilitation',
-    mindMender: 'Psychological Aspects of Recovery',
-  };
-  return descriptions[specialist] || 'Medical Specialist';
-}
+import { buildEnrichments, getSpecialistDisplayName, getSpecialtyDescription } from '@/lib/specialists';
 
 export async function GET(
   req: NextRequest,
@@ -232,7 +166,7 @@ export async function GET(
       questionId: persistedQuestionId,
       enrichments: agentEnrichments,
       agentCost: 0,
-      hasResearch: agentEnrichments.some(e => e.type === 'research' || e.type === 'consultation'),
+      hasResearch: agentEnrichments.some((e: any) => e.type === 'research' || e.type === 'consultation'),
       userTier: 'basic',
       specialistConsultation,
       agentBadges,

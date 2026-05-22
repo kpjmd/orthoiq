@@ -1303,7 +1303,29 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_agent_tasks_triage_classification ON agent_tasks(triage_classification);
     `;
 
-    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, web rate limits, chat messages, PROMIS responses, and V2 prediction market projection columns)');
+    // External content pipeline (/api/v1/consult) — job tracking table
+    await sql`
+      CREATE TABLE IF NOT EXISTS content_jobs (
+        job_id          UUID PRIMARY KEY,
+        consultation_id VARCHAR(255),
+        question        TEXT NOT NULL,
+        metadata        JSONB,
+        status          VARCHAR(20) NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','completed','failed','timeout')),
+        result_payload  JSONB,
+        error_message   TEXT,
+        created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        completed_at    TIMESTAMP WITH TIME ZONE
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_content_jobs_consultation_id ON content_jobs(consultation_id);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_content_jobs_status_created ON content_jobs(status, created_at);
+    `;
+
+    console.log('Database initialized successfully with Neon (including agent, research, consultation feedback, user preference, Phase 3 admin dashboard, web user auth, web rate limits, chat messages, PROMIS responses, V2 prediction market projection columns, and content_jobs)');
   } catch (error) {
     console.error('Error initializing database:', error);
     if (error instanceof Error) {
@@ -3690,6 +3712,80 @@ export async function updateQuestionResponse(
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${questionId}
       AND (response = '' OR response IS NULL)
+  `;
+}
+
+// External content pipeline (/api/v1/consult) — content_jobs helpers
+
+export type ContentJobStatus = 'pending' | 'completed' | 'failed' | 'timeout';
+
+export interface ContentJobRow {
+  job_id: string;
+  consultation_id: string | null;
+  question: string;
+  metadata: any | null;
+  status: ContentJobStatus;
+  result_payload: any | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export async function createContentJob(data: {
+  jobId: string;
+  question: string;
+  metadata?: any;
+}): Promise<void> {
+  const sql = getSql();
+  await sql`
+    INSERT INTO content_jobs (job_id, question, metadata, status)
+    VALUES (
+      ${data.jobId},
+      ${data.question},
+      ${data.metadata ? JSON.stringify(data.metadata) : null},
+      'pending'
+    )
+  `;
+}
+
+export async function setContentJobConsultationId(
+  jobId: string,
+  consultationId: string
+): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE content_jobs
+    SET consultation_id = ${consultationId}
+    WHERE job_id = ${jobId}
+  `;
+}
+
+export async function getContentJob(jobId: string): Promise<ContentJobRow | null> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT job_id, consultation_id, question, metadata, status,
+           result_payload, error_message, created_at, completed_at
+    FROM content_jobs
+    WHERE job_id = ${jobId}
+    LIMIT 1
+  `;
+  return (rows[0] as ContentJobRow) || null;
+}
+
+export async function finalizeContentJob(data: {
+  jobId: string;
+  status: 'completed' | 'failed' | 'timeout';
+  resultPayload?: any;
+  errorMessage?: string;
+}): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE content_jobs
+    SET status = ${data.status},
+        result_payload = COALESCE(${data.resultPayload ? JSON.stringify(data.resultPayload) : null}, result_payload),
+        error_message = COALESCE(${data.errorMessage ?? null}, error_message),
+        completed_at = CURRENT_TIMESTAMP
+    WHERE job_id = ${data.jobId}
   `;
 }
 
