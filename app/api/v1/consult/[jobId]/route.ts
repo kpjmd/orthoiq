@@ -59,6 +59,14 @@ function buildResearchCaseData(question: string, rawConsultationData: any): any 
   return { primaryComplaint: question, rawQuery: question };
 }
 
+// Returns true when `data` is the Railway research-kickoff stub rather than a
+// completed research result. Railway embeds { status: 'pending', estimatedSeconds,
+// pollEndpoint } in the consultation response while the research agent is still running.
+function isResearchStub(data: any): boolean {
+  if (!data || typeof data !== 'object') return false;
+  return data.status === 'pending' || typeof data.pollEndpoint === 'string';
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
@@ -91,6 +99,24 @@ export async function GET(
   // Terminal states — return cached payload, do NOT hit Railway.
   if (job.status === 'completed') {
     if (job.result_payload) {
+      // If a research-kickoff stub was mistakenly stored as researchData (Railway
+      // embeds a pending stub in the consultation response before research finishes),
+      // attempt one live fetch to recover the real research result.
+      const rd = job.result_payload?.consultation?.researchData;
+      if (isResearchStub(rd) && job.consultation_id) {
+        try {
+          const researchResp = await fetchResearchStatus(job.consultation_id);
+          if (researchResp.status === 'complete' && researchResp.research) {
+            const healed = mergeResearchIntoPayload(job.result_payload, researchResp.research, 'complete');
+            await finalizeContentJob({ jobId, status: 'completed', resultPayload: healed, researchStatus: 'complete' });
+            await patchConsultationResearchData(job.consultation_id, researchResp.research)
+              .catch(e => console.error(`[v1/consult/${jobId}] stub-heal patch failed:`, e));
+            return NextResponse.json(healed);
+          }
+        } catch (e) {
+          console.error(`[v1/consult/${jobId}] stub-heal research fetch failed:`, e);
+        }
+      }
       return NextResponse.json(job.result_payload);
     }
     return NextResponse.json({
@@ -326,7 +352,8 @@ export async function GET(
     console.error(`[v1/consult/${jobId}] extractRecoveryDays failed:`, e);
   }
 
-  const inlineResearch = railwayData.research || null;
+  const rawResearch = railwayData.research ?? null;
+  const inlineResearch = rawResearch && !isResearchStub(rawResearch) ? rawResearch : null;
 
   try {
     const { updated, exists } = await updateConsultationResponse({
