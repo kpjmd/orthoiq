@@ -4,6 +4,7 @@ import {
   DivergenceDialogueEntry,
   DivergencePostDialogue,
   DivergenceDeferred,
+  ContentDivergence,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -84,4 +85,42 @@ export function normalizeLiveDivergences(
 ): DivergenceRecord[] {
   if (!Array.isArray(divergences)) return [];
   return divergences.map((d) => normalizeLiveDivergence(d as LiveDivergence, consultationId));
+}
+
+// ---------------------------------------------------------------------------
+// toContentDivergence / toContentDivergences
+//
+// Project the canonical `DivergenceRecord` down to the lean `ContentDivergence`
+// shape forwarded through the external batch content payload
+// (GET /api/v1/consult/[jobId]). Keeps the contested question, its options, the
+// outcome flags, and just who-stood-where (display name + stable machine key +
+// evidence grade + confidence) — dropping reasoning prose, dialogue, deltas,
+// deferred/belowFloor, and internal IDs.
+// ---------------------------------------------------------------------------
+export function toContentDivergence(record: DivergenceRecord): ContentDivergence {
+  return {
+    decisionQuestion: record.decisionQuestion,
+    options: record.decisionOptions,
+    persisted: record.persisted,
+    resolved: record.resolved,
+    changedCount: record.changedCount,
+    sides: record.sides.map((side) => ({
+      stance: side.stance,
+      specialists: side.specialists.map((s) => ({
+        specialist: s.specialist,
+        specialistType: s.specialistType,
+        evidenceGrade: s.evidenceGrade,
+        confidence: s.confidence,
+      })),
+    })),
+  };
+}
+
+// Convenience: flatten the nested live divergence shape via the existing
+// normalizer, then project each entry. Returns [] for missing/non-array input.
+export function toContentDivergences(
+  raw: unknown,
+  consultationId: string
+): ContentDivergence[] {
+  return normalizeLiveDivergences(raw, consultationId).map(toContentDivergence);
 }

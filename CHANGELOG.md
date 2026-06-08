@@ -1,5 +1,41 @@
 # OrthoIQ Changelog
 
+## [2.1.1] - 2026-06-08: Divergences in the v1/consult content payload
+
+Extends the inter-agent divergences feature ([2.1.0]) to the **external batch content
+pipeline** (`GET /api/v1/consult/[jobId]`), the structured JSON that powers the kpjmd.com
+"Ask OrthoIQ" content library. Forwards a **lean projection** — not the verbose live/admin
+shape — so a content library can show who stood where on each contested decision without the
+reasoning prose, dialogue play-by-play, or internal IDs.
+
+### Added
+
+- **`lib/types.ts`** — `ContentDivergence` (+ `ContentDivergenceSide`,
+  `ContentDivergenceSideSpecialist`): the trimmed projection. Per contested decision it carries
+  `decisionQuestion`, `options`, the outcome flags (`persisted`, `resolved`, `changedCount`),
+  and `sides[]` with each specialist's display name, stable `specialistType` machine key,
+  `evidenceGrade`, and `confidence`. Drops reasoning prose, `dialogue[]`, `deltas`,
+  `deferred`/`belowFloor`, and internal IDs.
+- **`lib/divergence.ts`** — `toContentDivergence(record)` projects a canonical
+  `DivergenceRecord` to `ContentDivergence`; `toContentDivergences(raw, consultationId)`
+  reuses the existing `normalizeLiveDivergences()` to flatten the nested live shape, then
+  projects each entry. Returns `[]` for missing/non-array input.
+- **`app/api/v1/consult/[jobId]/route.ts`** — `buildPayload()` now emits
+  `consultation.divergences[]` (projected off
+  `synthesizedRecommendations.coordinationMetadata.divergences`). Both the inline-research and
+  the pending/partial paths route through `buildPayload()`, so both carry it, baked into the
+  persisted `result_payload` at finalize time.
+- **`app/api/v1/consult/route.ts`** (POST synchronous fallback) and the GET degraded
+  self-heal path — emit `divergences: []` for a stable contract across every `consultation`
+  object.
+
+### Notes
+
+- **New jobs only.** Already-finalized jobs are returned verbatim from `result_payload` and
+  are not backfilled. This is acceptable: the field is baked in at finalize time going forward.
+- All de-identified upstream (clinical reasoning only, no patient data). Empty array when the
+  panel did not deliberate.
+
 ## [2.1.0] - 2026-06-08: Inter-agent divergences
 
 Surfaces the platform's highest-signal artifact: the rare, gated events where the specialist
