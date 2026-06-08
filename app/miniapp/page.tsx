@@ -25,6 +25,8 @@ import ResearchDetailPanel from '@/components/ResearchDetailPanel';
 import { isPainRelatedConsultation } from '@/lib/promis';
 import { PROMISCompletionResult, PROMISTimepoint } from '@/lib/promisTypes';
 import { UserTier } from '@/lib/rateLimit';
+import { DivergenceRecord } from '@/lib/types';
+import { DivergenceNotice } from '@/components/divergence/DivergenceNotice';
 
 // Farcaster SDK Context Types
 interface FarcasterUser {
@@ -118,6 +120,8 @@ interface ResponseData {
   // Informational Query Pathway
   queryType?: 'clinical' | 'informational';
   querySubtype?: string | null;
+  // Inter-agent divergences (panel deliberation play-by-play)
+  divergences?: DivergenceRecord[];
 }
 
 type ConsultationStage =
@@ -236,6 +240,7 @@ const parseApiResponse = (data: any): ResponseData => {
     urgencyLevel: data.urgencyLevel,
     queryType: data.queryType || 'clinical',
     querySubtype: data.querySubtype || null,
+    divergences: data.divergences || [],
   };
 };
 
@@ -1379,6 +1384,8 @@ function MiniAppContent() {
                 </div>
               </div>
             )}
+
+            <DivergenceNotice divergences={comprehensiveResult.divergences} />
 
             <ResponseCard
               response={comprehensiveResult.response}

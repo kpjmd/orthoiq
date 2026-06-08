@@ -1,5 +1,80 @@
 # OrthoIQ Changelog
 
+## [2.1.0] - 2026-06-08: Inter-agent divergences
+
+Surfaces the platform's highest-signal artifact: the rare, gated events where the specialist
+panel genuinely disagrees on a contested clinical decision and then deliberates. The backend
+gate fires on only ~1 in 6 consults (true clinical equipoise), so these are featured — not
+buried — across the live consult, `/admin`, and the public `/stats` page. All de-identified
+(clinical reasoning only, no patient data). A **persisted** divergence (the split survived
+deliberation = irreducible equipoise) is treated as a premium, highlighted artifact everywhere
+it appears.
+
+### Added — Data model & normalization
+
+- **`lib/types.ts`** — new `DivergenceRecord` (and supporting `DivergenceSide`,
+  `DivergenceDialogueEntry`, `DivergencePostDialogue`, `DivergenceDeferred`, `EvidenceGrade`).
+  Intentionally distinct from the legacy `Disagreement`/`CoordinationMetadata` types, which
+  carry an older, flatter shape and are left untouched.
+- **`lib/divergence.ts`** — `normalizeLiveDivergence()` maps the nested, richer live-API shape
+  (`decisionPoint{…}`, `postDialogue{…}`, plus live-only `rationale`/`deferred`/`belowFloor`)
+  into the canonical `DivergenceRecord`. The live status payload and the durable
+  `coordination_divergences` DB table normalize into one shape so a single component renders both.
+- **`lib/database.ts`** — read-only access to the shared `coordination_divergences` table
+  (written by orthoiq-agents), mirroring the `agent_tasks` pattern (`getSql()`, tagged-template
+  params, JSONB auto-parsed, safe fallbacks). Adds `mapDivergenceRow()`,
+  `getCoordinationDivergences(consultationId)`, `getRecentDivergences(limit)`,
+  `getDivergenceStats()` (gate-open rate clinical + overall, persisted/resolved counts,
+  changed-count distribution, recurring contested decisions, per-specialist revision frequency
+  via `jsonb_array_elements`), and `getPublicDivergenceStats()`.
+
+### Added — Live in-consult rendering (web + miniapp)
+
+- **`app/api/claude/status/[consultationId]/route.ts`** — reads
+  `synthesizedRecommendations.coordinationMetadata.divergences` off the live result, runs it
+  through `normalizeLiveDivergence()`, and surfaces a top-level `divergences[]` on the response.
+- **`components/WebOrthoInterface.tsx`** / **`app/miniapp/page.tsx`** — `divergences` carried
+  into result state; a collapsed-by-default `DivergenceNotice` renders above the brief
+  ("⚖️ Your panel deliberated on N contested decision(s)"), expandable to the full play-by-play.
+
+### Added — Admin surfaces
+
+- **`app/admin/dashboard/components/InterAgentDivergences.tsx`** — featured near the top of the
+  dashboard: stat strip (gate-open rate, persisted count), persisted-vs-converged split bar,
+  deliberation-intensity distribution, most-contested decisions, and per-specialist revision
+  frequency (movable vs anchor), plus a recent-divergences feed linking to per-consult detail.
+- **`app/admin/divergences/[consultationId]/page.tsx`** (+ gated `layout.tsx`) — per-consult
+  "conference card" drill-down: the contested question + options, the two opposing sides with
+  each specialist's confidence/evidence-grade/reasoning, the deliberation round (HELD vs
+  REVISED), and an outcome banner with the deltas.
+- **API routes** — `GET /api/admin/divergences/recent`, `/[consultationId]`, `/stats`, each
+  gated with `requireAdmin()`.
+
+### Added — Public transparency (`/stats`)
+
+- **`app/api/public/stats/route.ts`** — adds a lean `divergenceStats` block (gate-open rate +
+  persisted/resolved counts) to the existing single-fetch payload; degrades gracefully if the
+  table is absent.
+- **`app/stats/page.tsx`** — a "Panel Deliberations" section framing how often the panel
+  genuinely deliberates as a validation/transparency signal. Hidden when there is no data.
+
+### Added — Shared components
+
+- **`components/divergence/`** — `DivergenceCard.tsx` (the conference card, reused by the admin
+  detail view and the live in-consult panel), `DivergenceFeedCard.tsx` (compact feed row), and
+  `DivergenceNotice.tsx` (the collapsed in-consult notice). Live-only extras render only when
+  present, so DB-sourced admin records render cleanly.
+
+### Notes
+
+- The `coordination_divergences` table is the durable source of truth for `/admin` and `/stats`;
+  the live status payload is the source for the in-consult panel (it additionally carries
+  `decisionPoint.rationale`, `deferred`, and `belowFloor`, which the table does not persist).
+- The frontend reads the table directly (matching the `agent_tasks` precedent) rather than
+  coupling to a backend HTTP endpoint.
+
+---
+
 ## [2.0.1] - 2026-05-17: Recovery days estimation
 
 Closes the `predicted_recovery_days` item that was deferred from the 2.0.0 milestone work.

@@ -175,6 +175,34 @@ export async function GET() {
       // promis_responses table may not exist yet
     }
 
+    // ── Divergence stats (public transparency) ────────────────────────────
+    let divergenceStats = null;
+    try {
+      const [coverageResult, outcomeResult] = await Promise.all([
+        sql`SELECT
+              COUNT(DISTINCT consultation_id) as consults_with_divergence,
+              COUNT(*) as total_divergences
+            FROM coordination_divergences`,
+        sql`SELECT
+              COUNT(*) FILTER (WHERE persisted) as persisted_count,
+              COUNT(*) FILTER (WHERE resolved) as resolved_count
+            FROM coordination_divergences`,
+      ]);
+      const consultsWithDivergence = Number(coverageResult[0]?.consults_with_divergence || 0);
+      const totalDivergences = Number(coverageResult[0]?.total_divergences || 0);
+      divergenceStats = {
+        totalConsultations,
+        consultsWithDivergence,
+        totalDivergences,
+        gateOpenRate: totalConsultations > 0
+          ? Math.round((consultsWithDivergence / totalConsultations) * 1000) / 10 : 0,
+        persistedCount: Number(outcomeResult[0]?.persisted_count || 0),
+        resolvedCount: Number(outcomeResult[0]?.resolved_count || 0),
+      };
+    } catch {
+      // coordination_divergences table may not exist yet — graceful degradation
+    }
+
     return NextResponse.json({
       totalConsultations,
       averageAgentsPerConsultation,
@@ -182,6 +210,7 @@ export async function GET() {
       queryTypeBreakdown,
       researchStats,
       promisStats,
+      divergenceStats,
     });
 
   } catch (error) {

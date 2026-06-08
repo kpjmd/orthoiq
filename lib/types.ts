@@ -547,6 +547,89 @@ export interface CoordinationMetadata {
   emergentFindings: EmergentFinding[];
 }
 
+// ---------------------------------------------------------------------------
+// Inter-agent divergences (gated, high-signal panel disagreements)
+//
+// NOTE: distinct from the legacy `Disagreement`/`CoordinationMetadata` above.
+// Divergences carry the richer sides/dialogue/post-dialogue deliberation shape
+// written to the `coordination_divergences` table and emitted live on
+// result.synthesizedRecommendations.coordinationMetadata.divergences.
+//
+// The live API shape is nested (decisionPoint{...}, postDialogue{...}) and
+// carries bonus fields (decisionPoint.rationale, deferred, belowFloor) that the
+// DB table does not persist. Both sources normalize into `DivergenceRecord`:
+//   - DB rows           via mapDivergenceRow()        (lib/database.ts)
+//   - live API entries  via normalizeLiveDivergence() (lib/divergence.ts)
+// ---------------------------------------------------------------------------
+
+export type EvidenceGrade = 'A' | 'B' | 'C' | 'D' | 'none';
+
+export interface DivergenceSideSpecialist {
+  specialist: string;
+  specialistType: string;
+  confidence: number; // 0–1
+  evidenceGrade: EvidenceGrade;
+  reasoning: string;
+}
+
+export interface DivergenceSide {
+  stance: string;
+  specialists: DivergenceSideSpecialist[];
+}
+
+export interface DivergenceDialogueEntry {
+  specialist: string;
+  specialistType: string;
+  originalStance: string;
+  revisedStance: string;
+  changed: boolean;
+  reasoning: string;
+  changeReason: string;
+  confidence: number; // 0–1
+}
+
+export interface DivergenceDelta {
+  specialist: string;
+  from: string;
+  to: string;
+  reason: string;
+}
+
+export interface DivergencePostDialogue {
+  resolved: boolean;
+  persisted: boolean;
+  distinctFinalStances: string[];
+  changedCount: number;
+  deltas: DivergenceDelta[];
+}
+
+export interface DivergenceDeferred {
+  specialist: string;
+  specialistType: string;
+  reasoning: string;
+}
+
+// Canonical record — both DB rows and live-API entries normalize into this.
+export interface DivergenceRecord {
+  consultationId: string;
+  decisionPointId: string;
+  decisionQuestion: string;
+  decisionOptions: string[];
+  persisted: boolean;
+  resolved: boolean;
+  changedCount: number;
+  sides: DivergenceSide[];
+  dialogue: DivergenceDialogueEntry[];
+  postDialogue: DivergencePostDialogue;
+  // present from DB only:
+  id?: number;
+  createdAt?: Date;
+  // present from the live status payload only (rendered when defined):
+  decisionRationale?: string;
+  deferred?: DivergenceDeferred[];
+  belowFloor?: number;
+}
+
 export interface NormalModeConsultation {
   responses: Array<{ response: SpecialistResponse }>;
   synthesizedRecommendations: SynthesizedRecommendations;

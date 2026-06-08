@@ -9,6 +9,7 @@ import { PROMISMetrics } from './components/PROMISMetrics';
 import { ResearchAgentMetrics } from './components/ResearchAgentMetrics';
 import { ChatbotMetrics } from './components/ChatbotMetrics';
 import { QueryTypeAnalytics } from './components/QueryTypeAnalytics';
+import { InterAgentDivergences } from './components/InterAgentDivergences';
 
 export default function AdminDashboard() {
   return (
@@ -37,6 +38,9 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* System Overview */}
         <SystemOverview />
+
+        {/* Inter-Agent Divergences — featured high-signal artifact */}
+        <InterAgentDivergences />
 
         {/* Query Pathway Analytics */}
         <QueryTypeAnalytics />
