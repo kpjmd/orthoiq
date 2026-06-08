@@ -13,6 +13,7 @@ import {
 import { extractBodyPart } from '@/lib/bodyPart';
 import { extractRecoveryDays } from '@/lib/recoveryDays';
 import { buildEnrichments } from '@/lib/specialists';
+import { toContentDivergences } from '@/lib/divergence';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -194,6 +195,7 @@ export async function GET(
           urgencyLevel: recoveryResponse?.urgencyLevel,
           specialists: [],
           treatmentPlan: null,
+          divergences: [],
           researchData: recoveryResponse?.researchData || null,
         },
         meta: {
@@ -413,6 +415,7 @@ export async function GET(
   });
 
   const synthesized = (claudeResponse.rawConsultationData as any)?.synthesizedRecommendations || null;
+  const divergences = toContentDivergences(synthesized?.coordinationMetadata?.divergences, consultationId);
 
   const buildPayload = (researchStatus: 'complete' | 'pending', researchData: any) => {
     const completedIso = researchStatus === 'complete' ? new Date().toISOString() : null;
@@ -432,6 +435,7 @@ export async function GET(
         suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
         specialists: specialistPayload,
         treatmentPlan: synthesized,
+        divergences,
         researchData,
       },
       meta: {

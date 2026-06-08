@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
       suggestedFollowUp: claudeResponse?.suggestedFollowUp || [],
       specialists: [],
       treatmentPlan: null,
+      divergences: [],
       researchData: claudeResponse?.researchData || null,
     },
     meta: {

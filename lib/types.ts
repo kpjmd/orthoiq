@@ -630,6 +630,35 @@ export interface DivergenceRecord {
   belowFloor?: number;
 }
 
+// ---------------------------------------------------------------------------
+// Lean content projection — the trimmed divergence shape forwarded through the
+// external batch content payload (GET /api/v1/consult/[jobId]). Drops reasoning
+// prose, dialogue play-by-play, deltas, deferred/belowFloor, and internal IDs;
+// keeps only what a content library needs to show who stood where on each
+// contested decision. Projected from DivergenceRecord via toContentDivergence()
+// (lib/divergence.ts).
+// ---------------------------------------------------------------------------
+export interface ContentDivergenceSideSpecialist {
+  specialist: string; // display name
+  specialistType: string; // stable machine key
+  evidenceGrade: EvidenceGrade;
+  confidence: number; // 0–1
+}
+
+export interface ContentDivergenceSide {
+  stance: string;
+  specialists: ContentDivergenceSideSpecialist[];
+}
+
+export interface ContentDivergence {
+  decisionQuestion: string;
+  options: string[];
+  persisted: boolean;
+  resolved: boolean;
+  changedCount: number;
+  sides: ContentDivergenceSide[];
+}
+
 export interface NormalModeConsultation {
   responses: Array<{ response: SpecialistResponse }>;
   synthesizedRecommendations: SynthesizedRecommendations;
