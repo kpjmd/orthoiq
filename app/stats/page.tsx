@@ -49,6 +49,15 @@ interface QueryTypeBreakdown {
   informationalPct: number;
 }
 
+interface DivergencePublicStats {
+  totalConsultations: number;
+  consultsWithDivergence: number;
+  totalDivergences: number;
+  gateOpenRate: number;
+  persistedCount: number;
+  resolvedCount: number;
+}
+
 interface PublicStats {
   totalConsultations: number;
   averageAgents: number;
@@ -56,6 +65,7 @@ interface PublicStats {
   researchStats: ResearchPublicStats | null;
   promisStats: PROMISPublicStats | null;
   queryTypeBreakdown: QueryTypeBreakdown | null;
+  divergenceStats: DivergencePublicStats | null;
 }
 
 export default function PublicStatsPage() {
@@ -95,6 +105,7 @@ export default function PublicStatsPage() {
           agentLiveStats: research.agentLiveStats || null,
         } : null,
         queryTypeBreakdown: data?.queryTypeBreakdown || null,
+        divergenceStats: data?.divergenceStats || null,
         promisStats: promis ? {
           totalConsultations: promis.totalConsultations || 0,
           baselineCaptureCount: promis.baselineCaptureCount || 0,
@@ -251,6 +262,78 @@ export default function PublicStatsPage() {
             </div>
           </div>
         )}
+
+        {/* Panel Deliberations — divergence transparency */}
+        {stats.divergenceStats && stats.divergenceStats.totalDivergences > 0 && (() => {
+          const ds = stats.divergenceStats;
+          const outcomeTotal = ds.persistedCount + ds.resolvedCount;
+          const persistedPct = outcomeTotal > 0 ? (ds.persistedCount / outcomeTotal) * 100 : 0;
+          const resolvedPct = outcomeTotal > 0 ? (ds.resolvedCount / outcomeTotal) * 100 : 0;
+          return (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Panel Deliberations</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                On contested clinical decisions, the specialist panel genuinely disagrees and deliberates. These are rare, high-signal events — a sign the system surfaces real clinical uncertainty rather than papering over it.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-amber-600 mb-2">{ds.gateOpenRate}%</div>
+                  <div className="text-sm text-gray-600">Consults with a deliberation</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {ds.consultsWithDivergence} of {ds.totalConsultations} consults
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-amber-600 mb-2">{ds.persistedCount}</div>
+                  <div className="text-sm text-gray-600">Genuine equipoise held</div>
+                  <div className="text-xs text-gray-400 mt-0.5">a real, unresolved clinical debate</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-green-600 mb-2">{ds.resolvedCount}</div>
+                  <div className="text-sm text-gray-600">Converged after deliberation</div>
+                  <div className="text-xs text-gray-400 mt-0.5">panel reached consensus</div>
+                </div>
+              </div>
+
+              {outcomeTotal > 0 && (
+                <div>
+                  <div className="text-sm font-semibold text-gray-700 mb-2">Deliberation outcomes</div>
+                  <div className="flex h-8 rounded-lg overflow-hidden">
+                    {persistedPct > 0 && (
+                      <div
+                        className="bg-amber-500 flex items-center justify-center text-white text-sm font-medium"
+                        style={{ width: `${persistedPct}%` }}
+                        title={`Equipoise held: ${ds.persistedCount} (${persistedPct.toFixed(1)}%)`}
+                      >
+                        {persistedPct >= 15 && `${persistedPct.toFixed(0)}%`}
+                      </div>
+                    )}
+                    {resolvedPct > 0 && (
+                      <div
+                        className="bg-green-500 flex items-center justify-center text-white text-sm font-medium"
+                        style={{ width: `${resolvedPct}%` }}
+                        title={`Converged: ${ds.resolvedCount} (${resolvedPct.toFixed(1)}%)`}
+                      >
+                        {resolvedPct >= 15 && `${resolvedPct.toFixed(0)}%`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <div className="w-2.5 h-2.5 rounded-sm bg-amber-500" />
+                      Equipoise held ({ds.persistedCount})
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <div className="w-2.5 h-2.5 rounded-sm bg-green-500" />
+                      Converged ({ds.resolvedCount})
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Research Agent Panel */}
         {showResearchPanel && (

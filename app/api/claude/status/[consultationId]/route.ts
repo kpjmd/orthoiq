@@ -4,6 +4,7 @@ import { updateConsultationResponse, updateQuestionResponse, storeConsultation }
 import { extractBodyPart } from '@/lib/bodyPart';
 import { extractRecoveryDays } from '@/lib/recoveryDays';
 import { buildEnrichments, getSpecialistDisplayName, getSpecialtyDescription } from '@/lib/specialists';
+import { normalizeLiveDivergences } from '@/lib/divergence';
 
 export async function GET(
   req: NextRequest,
@@ -42,6 +43,14 @@ export async function GET(
     const claudeResponse = transformNormalModeResponse(data);
     const specialists = claudeResponse.participatingSpecialists || [];
     const agentEnrichments = buildEnrichments(claudeResponse.rawConsultationData);
+
+    // Inter-agent divergences — backend always emits this array on the live result.
+    // Normalize the nested live shape into the canonical DivergenceRecord shape so
+    // the client renders it with the same component the admin views use.
+    const divergences = normalizeLiveDivergences(
+      claudeResponse.rawConsultationData?.synthesizedRecommendations?.coordinationMetadata?.divergences,
+      claudeResponse.consultationId || consultationId
+    );
 
     const agentBadges = specialists.map((s: string) => ({
       name: getSpecialistDisplayName(s),
@@ -180,6 +189,7 @@ export async function GET(
       participatingSpecialists: specialists,
       researchData: data.research || null,
       rawConsultationData: claudeResponse.rawConsultationData,
+      divergences,
       queryType: 'clinical' as const,
       querySubtype: null,
       agentNetwork: {

@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { Question, AgentTask, ResearchSynthesis, ChatMessage } from './types';
+import { Question, AgentTask, ResearchSynthesis, ChatMessage, DivergenceRecord } from './types';
 
 // Create a Neon SQL client
 export function getSql() {
@@ -4694,6 +4694,254 @@ export async function cleanupExpiredRateLimits(): Promise<number> {
   } catch (error) {
     console.error('Error cleaning up expired rate limits:', error);
     return 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Inter-agent divergences (read-only — the table is written by orthoiq-agents)
+//
+// De-identified, gated panel disagreements. One row per divergence (a consult
+// can have up to 3). JSONB columns (decision_options, sides, dialogue,
+// post_dialogue) are auto-parsed by the Neon driver — no JSON.parse needed.
+// ---------------------------------------------------------------------------
+
+function mapDivergenceRow(row: any): DivergenceRecord {
+  const post = row.post_dialogue ?? {};
+  return {
+    id: row.id,
+    consultationId: row.consultation_id,
+    decisionPointId: row.decision_point_id,
+    decisionQuestion: row.decision_question,
+    decisionOptions: row.decision_options ?? [],
+    persisted: row.persisted ?? false,
+    resolved: row.resolved ?? false,
+    changedCount: row.changed_count ?? 0,
+    sides: row.sides ?? [],
+    dialogue: row.dialogue ?? [],
+    postDialogue: {
+      resolved: post.resolved ?? row.resolved ?? false,
+      persisted: post.persisted ?? row.persisted ?? false,
+      distinctFinalStances: post.distinctFinalStances ?? [],
+      changedCount: post.changedCount ?? row.changed_count ?? 0,
+      deltas: post.deltas ?? [],
+    },
+    createdAt: row.created_at ? new Date(row.created_at) : undefined,
+  };
+}
+
+// Per-consult detail — matches the backend helper name.
+export async function getCoordinationDivergences(
+  consultationId: string
+): Promise<DivergenceRecord[]> {
+  const sql = getSql();
+  try {
+    const result = await sql`
+      SELECT id, consultation_id, decision_point_id, decision_question,
+             decision_options, persisted, resolved, changed_count,
+             sides, dialogue, post_dialogue, created_at
+      FROM coordination_divergences
+      WHERE consultation_id = ${consultationId}
+      ORDER BY created_at ASC
+    `;
+    return result.map(mapDivergenceRow);
+  } catch (error) {
+    console.error('Error getting coordination divergences:', error);
+    return [];
+  }
+}
+
+// Recent feed for the admin dashboard.
+export async function getRecentDivergences(limit: number = 20): Promise<DivergenceRecord[]> {
+  const sql = getSql();
+  try {
+    const result = await sql`
+      SELECT id, consultation_id, decision_point_id, decision_question,
+             decision_options, persisted, resolved, changed_count,
+             sides, dialogue, post_dialogue, created_at
+      FROM coordination_divergences
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return result.map(mapDivergenceRow);
+  } catch (error) {
+    console.error('Error getting recent divergences:', error);
+    return [];
+  }
+}
+
+export interface DivergenceStats {
+  totalConsults: number;
+  totalClinicalConsults: number;
+  totalDivergences: number;
+  consultsWithDivergence: number;
+  clinicalConsultsWithDivergence: number;
+  gateOpenRate: number;          // consultsWithDivergence / totalConsults
+  gateOpenRateClinical: number;  // clinicalConsultsWithDivergence / totalClinicalConsults
+  persistedCount: number;
+  resolvedCount: number;
+  persistedRate: number;         // persistedCount / totalDivergences
+  changedCountDistribution: { changedCount: number; count: number }[];
+  contestedDecisions: {
+    decisionPointId: string;
+    decisionQuestion: string;
+    count: number;
+    persistedCount: number;
+  }[];
+  specialistRevision: {
+    specialist: string;
+    specialistType: string;
+    total: number;
+    revised: number;
+    revisionRate: number;
+  }[];
+}
+
+// Full aggregate analytics for /admin.
+export async function getDivergenceStats(): Promise<DivergenceStats> {
+  const sql = getSql();
+  const empty: DivergenceStats = {
+    totalConsults: 0, totalClinicalConsults: 0, totalDivergences: 0,
+    consultsWithDivergence: 0, clinicalConsultsWithDivergence: 0,
+    gateOpenRate: 0, gateOpenRateClinical: 0,
+    persistedCount: 0, resolvedCount: 0, persistedRate: 0,
+    changedCountDistribution: [], contestedDecisions: [], specialistRevision: [],
+  };
+  try {
+    const [
+      consultCounts,
+      divergenceCoverage,
+      outcomeCounts,
+      changedDist,
+      contested,
+      specialistRows,
+    ] = await Promise.all([
+      sql`
+        SELECT
+          COUNT(*) AS total_consults,
+          COUNT(*) FILTER (WHERE query_type = 'clinical') AS total_clinical
+        FROM consultations
+      `,
+      sql`
+        SELECT
+          COUNT(DISTINCT cd.consultation_id) AS consults_with_divergence,
+          COUNT(DISTINCT cd.consultation_id) FILTER (WHERE c.query_type = 'clinical')
+            AS clinical_consults_with_divergence,
+          COUNT(*) AS total_divergences
+        FROM coordination_divergences cd
+        LEFT JOIN consultations c ON c.consultation_id = cd.consultation_id
+      `,
+      sql`
+        SELECT
+          COUNT(*) FILTER (WHERE persisted) AS persisted_count,
+          COUNT(*) FILTER (WHERE resolved) AS resolved_count
+        FROM coordination_divergences
+      `,
+      sql`
+        SELECT changed_count, COUNT(*) AS count
+        FROM coordination_divergences
+        GROUP BY changed_count
+        ORDER BY changed_count ASC
+      `,
+      sql`
+        SELECT decision_point_id, decision_question,
+               COUNT(*) AS count,
+               COUNT(*) FILTER (WHERE persisted) AS persisted_count
+        FROM coordination_divergences
+        GROUP BY decision_point_id, decision_question
+        ORDER BY count DESC
+        LIMIT 20
+      `,
+      sql`
+        SELECT
+          d->>'specialist' AS specialist,
+          MAX(d->>'specialistType') AS specialist_type,
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE (d->>'changed')::boolean = true) AS revised
+        FROM coordination_divergences cd,
+             jsonb_array_elements(cd.dialogue) AS d
+        WHERE d->>'specialist' IS NOT NULL
+        GROUP BY d->>'specialist'
+        ORDER BY total DESC
+      `,
+    ]);
+
+    const totalConsults = Number(consultCounts[0]?.total_consults || 0);
+    const totalClinicalConsults = Number(consultCounts[0]?.total_clinical || 0);
+    const consultsWithDivergence = Number(divergenceCoverage[0]?.consults_with_divergence || 0);
+    const clinicalConsultsWithDivergence = Number(
+      divergenceCoverage[0]?.clinical_consults_with_divergence || 0
+    );
+    const totalDivergences = Number(divergenceCoverage[0]?.total_divergences || 0);
+    const persistedCount = Number(outcomeCounts[0]?.persisted_count || 0);
+    const resolvedCount = Number(outcomeCounts[0]?.resolved_count || 0);
+
+    return {
+      totalConsults,
+      totalClinicalConsults,
+      totalDivergences,
+      consultsWithDivergence,
+      clinicalConsultsWithDivergence,
+      gateOpenRate: totalConsults > 0 ? consultsWithDivergence / totalConsults : 0,
+      gateOpenRateClinical:
+        totalClinicalConsults > 0 ? clinicalConsultsWithDivergence / totalClinicalConsults : 0,
+      persistedCount,
+      resolvedCount,
+      persistedRate: totalDivergences > 0 ? persistedCount / totalDivergences : 0,
+      changedCountDistribution: changedDist.map((r: any) => ({
+        changedCount: Number(r.changed_count || 0),
+        count: Number(r.count || 0),
+      })),
+      contestedDecisions: contested.map((r: any) => ({
+        decisionPointId: r.decision_point_id,
+        decisionQuestion: r.decision_question,
+        count: Number(r.count || 0),
+        persistedCount: Number(r.persisted_count || 0),
+      })),
+      specialistRevision: specialistRows.map((r: any) => {
+        const total = Number(r.total || 0);
+        const revised = Number(r.revised || 0);
+        return {
+          specialist: r.specialist,
+          specialistType: r.specialist_type || '',
+          total,
+          revised,
+          revisionRate: total > 0 ? revised / total : 0,
+        };
+      }),
+    };
+  } catch (error) {
+    console.error('Error getting divergence stats:', error);
+    return empty;
+  }
+}
+
+export interface PublicDivergenceStats {
+  totalConsults: number;
+  consultsWithDivergence: number;
+  totalDivergences: number;
+  gateOpenRate: number;
+  persistedCount: number;
+  resolvedCount: number;
+}
+
+// Lean subset for the public /stats transparency section.
+export async function getPublicDivergenceStats(): Promise<PublicDivergenceStats> {
+  try {
+    const full = await getDivergenceStats();
+    return {
+      totalConsults: full.totalConsults,
+      consultsWithDivergence: full.consultsWithDivergence,
+      totalDivergences: full.totalDivergences,
+      gateOpenRate: full.gateOpenRate,
+      persistedCount: full.persistedCount,
+      resolvedCount: full.resolvedCount,
+    };
+  } catch (error) {
+    console.error('Error getting public divergence stats:', error);
+    return {
+      totalConsults: 0, consultsWithDivergence: 0, totalDivergences: 0,
+      gateOpenRate: 0, persistedCount: 0, resolvedCount: 0,
+    };
   }
 }
 

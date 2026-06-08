@@ -22,6 +22,8 @@ import { normalizeResearchResponse } from '@/lib/researchService';
 import PROMISQuestionnaire from './PROMISQuestionnaire';
 import { isPainRelatedConsultation } from '@/lib/promis';
 import { PROMISCompletionResult } from '@/lib/promisTypes';
+import { DivergenceRecord } from '@/lib/types';
+import { DivergenceNotice } from '@/components/divergence/DivergenceNotice';
 
 type ConsultationStage =
   | 'idle'
@@ -105,6 +107,8 @@ interface ResponseData {
   // Informational Query Pathway
   queryType?: 'clinical' | 'informational';
   querySubtype?: string | null;
+  // Inter-agent divergences (panel deliberation play-by-play)
+  divergences?: DivergenceRecord[];
 }
 
 // Helper function to format structured response objects into readable text
@@ -216,6 +220,7 @@ const parseApiResponse = (data: any): ResponseData => {
     urgencyLevel: data.urgencyLevel,
     queryType: data.queryType || 'clinical',
     querySubtype: data.querySubtype || null,
+    divergences: data.divergences || [],
   };
 };
 
@@ -1174,6 +1179,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 </div>
               </div>
             )}
+
+            <DivergenceNotice divergences={comprehensiveResult.divergences} />
 
             <ResponseCard
               response={comprehensiveResult.response}
