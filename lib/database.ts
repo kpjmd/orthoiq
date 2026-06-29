@@ -4945,6 +4945,50 @@ export async function getPublicDivergenceStats(): Promise<PublicDivergenceStats>
   }
 }
 
+// ---------------------------------------------------------------------------
+// Equipoise-mapping instrument — read-only Postgres views (created backend-side).
+// The exact column sets are owned by the backend, so each fn selects the whole
+// view and returns generic rows. Views may be absent in some environments, so
+// every query fails soft to an empty result rather than throwing.
+// ---------------------------------------------------------------------------
+export interface InstrumentViewResult {
+  available: boolean; // false when the view does not exist / query failed
+  rows: Record<string, unknown>[];
+}
+
+async function queryInstrumentView(
+  run: (sql: ReturnType<typeof getSql>) => Promise<Record<string, unknown>[]>
+): Promise<InstrumentViewResult> {
+  try {
+    const sql = getSql();
+    const rows = await run(sql);
+    return { available: true, rows: rows || [] };
+  } catch (e) {
+    console.error('[instrument] view query failed:', e);
+    return { available: false, rows: [] };
+  }
+}
+
+// The moat headline — sensitivity 0.989 / specificity 0.952 / absolute-indication 1.000.
+export async function getBenchmarkAccuracy(): Promise<InstrumentViewResult> {
+  return queryInstrumentView(sql => sql`SELECT * FROM v_benchmark_accuracy`);
+}
+
+// Convergence over time, broken out by model.
+export async function getConvergenceByModel(): Promise<InstrumentViewResult> {
+  return queryInstrumentView(sql => sql`SELECT * FROM v_convergence_by_model`);
+}
+
+// Per-decision evidence / population coverage, incl. n_panels_no_accepted_evidence.
+export async function getEvidencePopulationCoverage(): Promise<InstrumentViewResult> {
+  return queryInstrumentView(sql => sql`SELECT * FROM v_evidence_population_coverage`);
+}
+
+// Detector vs MD agreement.
+export async function getDetectorMdAgreement(): Promise<InstrumentViewResult> {
+  return queryInstrumentView(sql => sql`SELECT * FROM v_detector_md_agreement`);
+}
+
 // Chat and PROMIS database functions have been extracted to dedicated modules
 // to keep this file at a manageable size for build tooling:
 //   lib/chatDb.ts   — storeChatMessage, getChatHistory, getChatMessageCount

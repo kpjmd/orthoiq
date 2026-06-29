@@ -26,7 +26,6 @@ import { isPainRelatedConsultation } from '@/lib/promis';
 import { PROMISCompletionResult, PROMISTimepoint } from '@/lib/promisTypes';
 import { UserTier } from '@/lib/rateLimit';
 import { DivergenceRecord } from '@/lib/types';
-import { DivergenceNotice } from '@/components/divergence/DivergenceNotice';
 
 // Farcaster SDK Context Types
 interface FarcasterUser {
@@ -1358,8 +1357,8 @@ function MiniAppContent() {
 
                 {comprehensiveResult.fromAgentsSystem && (
                   <div className="mt-2 flex items-center text-xs text-indigo-600">
-                    <span className="mr-1">🤖</span>
-                    Powered by OrthoIQ Multi-Specialist AI Network
+                    <span className="mr-1">⚖️</span>
+                    Calibrated equipoise mapping across the specialist panel
                   </div>
                 )}
               </div>
@@ -1384,8 +1383,6 @@ function MiniAppContent() {
                 </div>
               </div>
             )}
-
-            <DivergenceNotice divergences={comprehensiveResult.divergences} />
 
             <ResponseCard
               response={comprehensiveResult.response}

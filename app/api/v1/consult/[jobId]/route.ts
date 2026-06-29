@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchConsultationStatus, transformNormalModeResponse, getOrthoResponse } from '@/lib/claude';
-import { fetchResearchStatus, triggerResearchAgents } from '@/lib/agentsClient';
+import { fetchResearchStatus, triggerResearchAgents, fetchEquipoiseCards } from '@/lib/agentsClient';
 import {
   getContentJob,
   finalizeContentJob,
@@ -32,6 +32,27 @@ function researchTimeoutMs(): number {
   const raw = process.env.ORTHOIQ_RESEARCH_TIMEOUT_MS;
   const parsed = raw ? parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
+}
+
+// Best-effort: swap the skeleton equipoise cards in a finalized payload for the
+// persisted set (with populated evidence ledgers) once the backend has them.
+// Falls back to whatever is already on the payload if the populated set isn't
+// ready (count short) or the fetch fails. Mutates and returns the payload.
+async function withPopulatedEquipoiseCards(payload: any, consultationId: string): Promise<any> {
+  try {
+    const current = payload?.consultation?.equipoiseCards;
+    const expected = Array.isArray(current) ? current.length : 0;
+    if (expected === 0) return payload;
+    const { cards: populated, ready } = await fetchEquipoiseCards(consultationId);
+    // Only ship the persisted set once the backend says it's ready and complete;
+    // otherwise keep the skeletons rather than emit half-compiled ledgers.
+    if (ready && populated.length >= expected) {
+      payload.consultation.equipoiseCards = populated;
+    }
+  } catch (e) {
+    console.error(`[v1/consult] populate equipoise cards failed for ${consultationId}:`, e);
+  }
+  return payload;
 }
 
 function toIso(value: any): string | null {
@@ -435,6 +456,7 @@ export async function GET(
         suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
         specialists: specialistPayload,
         treatmentPlan: synthesized,
+        equipoiseCards: synthesized?.equipoiseCards || [],
         divergences,
         researchData,
       },
@@ -451,7 +473,7 @@ export async function GET(
 
   // Inline research present — finalize immediately.
   if (inlineResearch) {
-    const payload = buildPayload('complete', inlineResearch);
+    const payload = await withPopulatedEquipoiseCards(buildPayload('complete', inlineResearch), consultationId);
     try {
       await finalizeContentJob({
         jobId,
@@ -532,7 +554,10 @@ async function finishResearchPhase(
   }
 
   if (researchResp.status === 'complete' && researchResp.research) {
-    const payload = mergeResearchIntoPayload(staged, researchResp.research, 'complete');
+    const payload = await withPopulatedEquipoiseCards(
+      mergeResearchIntoPayload(staged, researchResp.research, 'complete'),
+      consultationId
+    );
     try {
       await patchConsultationResearchData(consultationId, researchResp.research);
     } catch (e) {

@@ -113,3 +113,30 @@ export async function triggerResearchAgents(params: {
     return { ok: false, error: err?.message || 'Network error' };
   }
 }
+
+/**
+ * Server-side fetch of the persisted equipoise cards (with populated evidence
+ * ledgers) from Railway. Best-effort: returns { cards: [], ready: false } on
+ * 404 / any error, so callers can fall back to the skeleton cards. `ready`
+ * mirrors the backend's readiness flag (defaults true when the field is absent).
+ */
+export async function fetchEquipoiseCards(
+  consultationId: string
+): Promise<{ cards: any[]; ready: boolean }> {
+  try {
+    const res = await agentsFetch(`/consultation/${consultationId}/equipoise-cards`, {
+      caller: 'web',
+      method: 'GET',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return { cards: [], ready: false };
+    const data = await res.json();
+    const ready = data && typeof data === 'object' && 'ready' in data ? !!data.ready : true;
+    if (Array.isArray(data)) return { cards: data, ready };
+    if (Array.isArray(data?.cards)) return { cards: data.cards, ready };
+    if (Array.isArray(data?.equipoiseCards)) return { cards: data.equipoiseCards, ready };
+    return { cards: [], ready };
+  } catch {
+    return { cards: [], ready: false };
+  }
+}

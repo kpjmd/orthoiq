@@ -23,7 +23,6 @@ import PROMISQuestionnaire from './PROMISQuestionnaire';
 import { isPainRelatedConsultation } from '@/lib/promis';
 import { PROMISCompletionResult } from '@/lib/promisTypes';
 import { DivergenceRecord } from '@/lib/types';
-import { DivergenceNotice } from '@/components/divergence/DivergenceNotice';
 
 type ConsultationStage =
   | 'idle'
@@ -1153,8 +1152,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
                 {comprehensiveResult.fromAgentsSystem && (
                   <div className="mt-2 flex items-center text-xs text-indigo-600">
-                    <span className="mr-1">🤖</span>
-                    Powered by OrthoIQ Multi-Specialist AI Network
+                    <span className="mr-1">⚖️</span>
+                    Calibrated equipoise mapping across the specialist panel
                   </div>
                 )}
               </div>
@@ -1179,8 +1178,6 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 </div>
               </div>
             )}
-
-            <DivergenceNotice divergences={comprehensiveResult.divergences} />
 
             <ResponseCard
               response={comprehensiveResult.response}
