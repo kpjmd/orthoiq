@@ -517,6 +517,127 @@ export interface SynthesizedRecommendations {
   prescriptionData: PrescriptionDataEnhanced;
   suggestedFollowUp: SuggestedFollowUp[];
   feedbackPrompts: FeedbackPrompts;
+  // Equipoise-mapping instrument: one card per decision point. Present on the
+  // live consult response; rendered as the post-consult hero. See EquipoiseCard.
+  equipoiseCards?: EquipoiseCard[];
+}
+
+// ---------------------------------------------------------------------------
+// Equipoise card (the post-consult hero) — one card_json per decision point.
+//
+// The panel diverges iff there is genuine clinical equipoise; convergence is a
+// product (a trustworthy negative). `status==='contested'` is the golden
+// debate card; `status==='consensus'` is the calm trustworthy-negative.
+//
+// This contract is new and partly derived backend-side — render defensively:
+// `whatWouldTipIt` may be absent, and `evidenceLedger` is legitimately empty on
+// a settled-operative case (no equipoise-grade evidence exists).
+// ---------------------------------------------------------------------------
+export interface EquipoiseDecision {
+  question: string;
+  optionA: string;
+  optionB: string;
+}
+
+export interface EquipoiseSplitSpecialist {
+  name: string;
+  confidence: number; // 0–1
+  evidenceGrade: EvidenceGrade;
+  reasoning: string;
+}
+
+export interface EquipoiseSplitStance {
+  stance: string;
+  specialists: EquipoiseSplitSpecialist[];
+}
+
+// Every lens that took a substantive position (incl. deliberate deferrals as
+// stance:'abstain'). Present on consensus AND contested cards. `stance` is the
+// enum here (option_a/option_b/abstain) — resolve to a label via the decision.
+export type EquipoiseStance = 'option_a' | 'option_b' | 'abstain';
+
+export interface EquipoisePanelMember {
+  name: string;
+  specialistType: string;
+  stance: EquipoiseStance;
+  confidence: number | null; // 0–1
+  evidenceGrade: string | null; // self-grade: 'A'|'B'|'C'|'D'|'none'
+  reasoning: string | null;
+}
+
+// A single specialist who moved position during dialogue.
+export interface EquipoiseRevision {
+  specialist: string;
+  from: string;
+  to: string;
+  reason: string;
+}
+
+// Who moved in dialogue. `revisions` is the per-specialist move list.
+export interface EquipoiseDeliberationDelta {
+  revisions: EquipoiseRevision[];
+  changedCount: number;
+  persisted: boolean;
+  resolved: boolean;
+}
+
+// Derived (never hallucinated). `toward` lists, per option, the factors that
+// would push the decision that way. `source` distinguishes how it was derived.
+export interface EquipoiseTipDirection {
+  option: string;
+  factors: string[];
+}
+export interface EquipoiseWhatWouldTipIt {
+  source: 'archetype_axis' | 'panel_reasoning';
+  toward?: EquipoiseTipDirection[];
+  [key: string]: unknown;
+}
+
+// Accepted citation. `supportsStance` is a stable key — 'option_a' | 'option_b'
+// | 'abstain' — resolved against the decision's optionA/optionB for display.
+// `evidenceGrade` here uses a strength vocabulary ('high'|'moderate'|'low'),
+// distinct from the A–D grades the panel specialists carry.
+export interface EquipoiseEvidenceEntry {
+  pmid: string;
+  title: string;
+  studyType: string;
+  evidenceGrade: string;
+  populationMatch: string;
+  supportsStance: string;
+  claimText: string;
+  rationale: string;
+}
+
+// Route-to-human escalation. `toHuman===true` → "Urgent surgical consult" banner.
+export interface EquipoiseRoute {
+  toHuman: boolean;
+  reason: string;
+  urgencyLevel: string;
+  label: string | null;
+}
+
+// Per-decision care pathway. Phases (phase1..phase3) are the production shape;
+// keep it open and render defensively.
+export interface EquipoiseCarePlanHome {
+  phase1?: string;
+  phase2?: string;
+  phase3?: string;
+  [key: string]: unknown;
+}
+
+export interface EquipoiseCard {
+  decision: EquipoiseDecision;
+  verdict: 'contested' | 'converged';
+  status: 'contested' | 'consensus' | 'refer';
+  contestedBy?: string[] | null;
+  // Full panel: every lens that took a position (use for "full panel discussion").
+  panel?: EquipoisePanelMember[] | null;
+  theSplit: EquipoiseSplitStance[] | null;
+  deliberationDelta?: EquipoiseDeliberationDelta | null;
+  whatWouldTipIt?: EquipoiseWhatWouldTipIt | null;
+  carePlanHome?: EquipoiseCarePlanHome | null;
+  evidenceLedger: EquipoiseEvidenceEntry[];
+  route?: EquipoiseRoute | null;
 }
 
 export interface InterAgentDialogue {

@@ -12,10 +12,12 @@ import FeedbackModal from './FeedbackModal';
 import TokenRewards from './TokenRewards';
 import PostFeedbackConfirmation from './PostFeedbackConfirmation';
 import ClientOnly from './ClientOnly';
-import { PrescriptionData, PrescriptionMetadata, AgentEnrichment, ResearchState } from '@/lib/types';
+import { PrescriptionData, PrescriptionMetadata, AgentEnrichment, ResearchState, EquipoiseCard } from '@/lib/types';
+import { useEquipoiseCards } from '@/hooks/useEquipoiseCards';
 import { exportPrescription } from '@/lib/exportUtils';
-import StructuredBrief from './StructuredBrief';
 import ResearchDetailPanel from './ResearchDetailPanel';
+import { ClinicianViewProvider } from './equipoise/clinicianView';
+import EquipoisePanel from './equipoise/EquipoisePanel';
 
 interface AgentCoordinationData {
   activeAgents?: number;
@@ -137,6 +139,10 @@ export default function ResponseCard({
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(initialFeedbackSubmitted ?? false);
   const [tokenRewards, setTokenRewards] = useState<Array<{agent: string; reward: number; accuracy: number}>>([]);
   const [expandedSpecialists, setExpandedSpecialists] = useState<Set<number>>(new Set());
+  // Full per-specialist responses are demoted behind a "see full panel
+  // discussion" expander — theSplit on each equipoise card carries the distilled
+  // per-decision reasoning.
+  const [showFullPanel, setShowFullPanel] = useState(false);
 
   // Platform detection for tiered card rendering
   const [isMiniApp, setIsMiniApp] = useState(false);
@@ -303,24 +309,18 @@ export default function ResponseCard({
     setExpandedSpecialists(new Set());
   };
 
-  const handleExpandFromBrief = (index: number) => {
-    setExpandedSpecialists(prev => new Set(prev).add(index));
-    const el = document.getElementById(`specialist-accordion-${index}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const [researchPanelVisible, setResearchPanelVisible] = useState(false);
-  const handleViewResearch = () => {
-    setResearchPanelVisible(true);
-    setTimeout(() => {
-      document.getElementById('research-detail-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  };
-
-  // Determine whether to show StructuredBrief
-  const showStructuredBrief = hasSpecialistConsultation && rawConsultationData?.responses?.length > 0;
+  // Equipoise cards — the post-consult hero. The live consult response carries
+  // skeletons (evidenceLedger: []) under synthesizedRecommendations; the poll
+  // swaps in the persisted cards with populated ledgers once compilation ends.
+  const equipoiseSkeletons: EquipoiseCard[] = Array.isArray(rawConsultationData?.synthesizedRecommendations?.equipoiseCards)
+    ? rawConsultationData.synthesizedRecommendations.equipoiseCards
+    : [];
+  const { cards: equipoiseCards, ledgersReady } = useEquipoiseCards({
+    enabled: hasSpecialistConsultation && equipoiseSkeletons.length > 0,
+    consultationId: specialistConsultation?.consultationId,
+    skeletons: equipoiseSkeletons,
+  });
+  const hasEquipoiseCards = equipoiseCards.length > 0;
 
   const defaultResearchState: ResearchState = researchState || { status: 'idle', result: null, error: null };
 
@@ -565,7 +565,7 @@ export default function ResponseCard({
           <div className="flex items-center">
             <span className="text-2xl mr-2">🔬</span>
             <h3 className="text-lg font-semibold bg-gradient-to-r from-medical-primary to-medical-accent bg-clip-text text-transparent">
-              OrthoIQ Response
+              OrthoIQ Assessment
             </h3>
           </div>
           
@@ -592,14 +592,10 @@ export default function ResponseCard({
         transition={{ delay: 0.3 }}
         className="p-6"
         style={{ overflow: 'visible', height: 'auto' }}>
-        {showStructuredBrief ? (
-          <StructuredBrief
-            rawConsultationData={rawConsultationData}
-            researchState={defaultResearchState}
-            onExpandSpecialist={handleExpandFromBrief}
-            onViewResearch={handleViewResearch}
-            enrichments={enrichments}
-          />
+        {hasEquipoiseCards ? (
+          <ClinicianViewProvider>
+            <EquipoisePanel cards={equipoiseCards} ledgersReady={ledgersReady} />
+          </ClinicianViewProvider>
         ) : (
           <div
             className="prose prose-lg max-w-none text-left prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-4 prose-ul:mb-4 prose-li:text-gray-700 prose-strong:text-gray-900 prose-strong:font-semibold [&_*]:!overflow-visible [&_*]:!line-clamp-none [&_*]:!max-h-none"
@@ -819,8 +815,9 @@ export default function ResponseCard({
       )}
       
       
-      {/* Specialist Consultation Details */}
-      {enrichments && enrichments.length > 0 && hasSpecialistConsultation && (
+      {/* Specialist Consultation Details — only for non-equipoise consults;
+          equipoise cards now carry their own per-decision panel discussion. */}
+      {enrichments && enrichments.length > 0 && hasSpecialistConsultation && !hasEquipoiseCards && (
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -828,30 +825,40 @@ export default function ResponseCard({
           className="border-t bg-gradient-to-b from-gray-50 to-white"
         >
           <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setShowFullPanel(!showFullPanel)}
+              className="flex w-full items-center justify-between text-left"
+            >
               <div className="flex items-center space-x-2">
                 <span className="text-lg">🩺</span>
-                <h4 className="font-semibold bg-gradient-to-r from-medical-primary to-medical-accent bg-clip-text text-transparent">
-                  Specialist Assessments
+                <h4 className="font-semibold text-gray-700">
+                  See full panel discussion
                 </h4>
                 <span className="px-2 py-1 bg-gradient-to-r from-premium-100 to-premium-200 text-premium-700 text-xs font-medium rounded-full">
-                  {enrichments.length} specialist{enrichments.length !== 1 ? 's' : ''} consulted
+                  {enrichments.length} specialist{enrichments.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={expandedSpecialists.size === enrichments.length ? collapseAllSpecialists : expandAllSpecialists}
-                  className="text-xs text-medical-primary hover:text-medical-accent font-medium transition-colors"
-                >
-                  {expandedSpecialists.size === enrichments.length ? '− Collapse All' : '+ Expand All'}
-                </button>
-                <div className="text-xs text-gray-600 text-right">
-                  <p>Powered by OrthoIQ-Agents AI Network</p>
-                  <p className="mt-1">Click to view detailed assessments</p>
-                </div>
-              </div>
+              <svg
+                className={`w-5 h-5 text-gray-400 transition-transform ${showFullPanel ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showFullPanel && (
+            <>
+            <div className="flex justify-end mt-3 mb-3">
+              <button
+                onClick={expandedSpecialists.size === enrichments.length ? collapseAllSpecialists : expandAllSpecialists}
+                className="text-xs text-medical-primary hover:text-medical-accent font-medium transition-colors"
+              >
+                {expandedSpecialists.size === enrichments.length ? '− Collapse All' : '+ Expand All'}
+              </button>
             </div>
-            
+
             {/* Specialist Responses */}
             <div className="space-y-3">
               {enrichments.map((enrichment, index) => {
@@ -916,10 +923,12 @@ export default function ResponseCard({
                 );
               })}
             </div>
+            </>
+            )}
           </div>
         </motion.div>
       )}
-      
+
       {/* Research Detail Panel - after specialist accordions */}
       {hasSpecialistConsultation && defaultResearchState.status === 'complete' && (
         <div id="research-detail-panel">

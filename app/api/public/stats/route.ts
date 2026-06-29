@@ -203,6 +203,30 @@ export async function GET() {
       // coordination_divergences table may not exist yet — graceful degradation
     }
 
+    // ── Instrument benchmark (the moat headline) ──────────────────────────────
+    // Validated calibration of the equipoise detector on the 122-case benchmark.
+    // Pull from v_benchmark_accuracy and normalize loosely (column names are
+    // backend-owned). Fails soft if the view is absent.
+    let benchmarkAccuracy = null;
+    try {
+      const rows = await sql`SELECT * FROM v_benchmark_accuracy`;
+      const row = rows[0] as Record<string, unknown> | undefined;
+      if (row) {
+        const findVal = (...frags: string[]): number | null => {
+          const key = Object.keys(row).find(k => frags.some(f => k.toLowerCase().includes(f)));
+          const v = key ? Number(row[key]) : NaN;
+          return Number.isFinite(v) ? v : null;
+        };
+        benchmarkAccuracy = {
+          sensitivity: findVal('sensitivit'),
+          specificity: findVal('specificit'),
+          absoluteIndication: findVal('absolute', 'indication'),
+        };
+      }
+    } catch {
+      // v_benchmark_accuracy not available — graceful degradation
+    }
+
     return NextResponse.json({
       totalConsultations,
       averageAgentsPerConsultation,
@@ -211,6 +235,7 @@ export async function GET() {
       researchStats,
       promisStats,
       divergenceStats,
+      benchmarkAccuracy,
     });
 
   } catch (error) {
