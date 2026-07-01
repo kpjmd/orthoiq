@@ -34,110 +34,101 @@ export default function AequOsLogo({
   const getGradient = () => {
     switch (variant) {
       case 'blue':
-        return 'url(#ortho-blue-gradient)';
+        return 'url(#aequos-blue-gradient)';
       case 'teal':
-        return 'url(#ortho-teal-gradient)';
+        return 'url(#aequos-teal-gradient)';
       case 'monochrome':
-        return 'url(#ortho-mono-gradient)';
+        return 'url(#aequos-mono-gradient)';
       case 'gold':
-        return 'url(#ortho-gold-gradient)';
+        return 'url(#aequos-gold-gradient)';
       default:
-        return 'url(#ortho-blue-gradient)';
+        return 'url(#aequos-blue-gradient)';
     }
   };
 
   const { width, height } = getSizeValues();
-  const holeSize = Math.min(width * 0.75, height * 0.375); // Prominent center hole
   const borderRadius = width * 0.5;
+  // Level beam + pivot circle — "equipoise as balance achieved" (Concept C, locked brand refresh)
+  const beamHeight = height * 0.075;
+  const beamY = height * 0.4625;
+  const circleR = height * 0.125;
 
   return (
     <div className={className}>
-      <svg 
-        width={circular ? height : width} 
-        height={circular ? height : height} 
+      <svg
+        width={circular ? height : width}
+        height={circular ? height : height}
         viewBox={`0 0 ${circular ? height : width} ${height}`}
         className={circular ? "rounded-full" : ""}
       >
         <defs>
-          <linearGradient id="ortho-blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id="aequos-blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#3b82f6" />
-            <stop offset="50%" stopColor="#1e40af" />
-            <stop offset="100%" stopColor="#1d4ed8" />
+            <stop offset="55%" stopColor="#1d4ed8" />
+            <stop offset="100%" stopColor="#1e3a8a" />
           </linearGradient>
-          
-          <linearGradient id="ortho-teal-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+
+          <linearGradient id="aequos-teal-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#0891b2" />
             <stop offset="50%" stopColor="#0e7490" />
             <stop offset="100%" stopColor="#164e63" />
           </linearGradient>
-          
-          <linearGradient id="ortho-mono-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+
+          <linearGradient id="aequos-mono-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#374151" />
             <stop offset="50%" stopColor="#1f2937" />
             <stop offset="100%" stopColor="#111827" />
           </linearGradient>
-          
-          <linearGradient id="ortho-gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+
+          <linearGradient id="aequos-gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#fbbf24" />
             <stop offset="50%" stopColor="#f59e0b" />
             <stop offset="100%" stopColor="#d97706" />
           </linearGradient>
-          
-          <linearGradient id="diagonal-line" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="42%" stopColor="transparent" />
-            <stop offset="50%" stopColor="white" />
-            <stop offset="58%" stopColor="transparent" />
+
+          <linearGradient id="aequos-beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#cbd5e1" />
+            <stop offset="50%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#cbd5e1" />
           </linearGradient>
-          <mask id="main-shape-mask">
-            <rect width="100%" height="100%" fill="white" />
-            <circle 
-              cx="50%" 
-              cy="50%" 
-              r={`${(holeSize / Math.max(width, height)) * 50}%`} 
-              fill="black" 
-            />
-          </mask>
         </defs>
-        
+
         {circular && (
-          <circle 
-            cx={height / 2} 
-            cy={height / 2} 
-            r={height / 2 - 2} 
-            fill={getGradient()} 
+          <circle
+            cx={height / 2}
+            cy={height / 2}
+            r={height / 2 - 2}
+            fill={getGradient()}
           />
         )}
-        
+
         {!circular && (
-          <rect 
-            x="0" 
-            y="0" 
-            width={width} 
-            height={height} 
-            rx={borderRadius} 
-            ry={borderRadius} 
-            fill={getGradient()} 
+          <rect
+            x="0"
+            y="0"
+            width={width}
+            height={height}
+            rx={borderRadius}
+            ry={borderRadius}
+            fill={getGradient()}
           />
         )}
-        
-        {/* Prominent center hole for infinity twist effect */}
-        <circle 
-          cx={circular ? height / 2 : width / 2} 
-          cy={height / 2} 
-          r={holeSize / 2} 
-          fill="white" 
+
+        {/* Level beam — the diagonal "shine" reinterpreted as a fulcrum beam achieving balance */}
+        <rect
+          x={circular ? (height - width) / 2 : 0}
+          y={beamY}
+          width={width}
+          height={beamHeight}
+          fill="url(#aequos-beam-gradient)"
         />
-        
-        {/* 45-degree diagonal line that suggests "Q" tail - masked to avoid center hole */}
-        <rect 
-          x={circular ? (height - width) / 2 : 0} 
-          y="0" 
-          width={width} 
-          height={height} 
-          rx={borderRadius} 
-          ry={borderRadius} 
-          fill="url(#diagonal-line)"
-          mask="url(#main-shape-mask)"
+
+        {/* Pivot circle resting on the beam */}
+        <circle
+          cx={circular ? height / 2 : width / 2}
+          cy={height / 2}
+          r={circleR}
+          fill="white"
         />
       </svg>
     </div>
