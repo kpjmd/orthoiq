@@ -1,4 +1,4 @@
-# OrthoIQ Evolution Roadmap
+# AequOs Evolution Roadmap
 
 Timeline of major platform milestones and architectural decisions.
 

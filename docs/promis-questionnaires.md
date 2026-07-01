@@ -1,4 +1,4 @@
-# PROMIS Questionnaires for OrthoIQ
+# PROMIS Questionnaires for AequOs
 
 ## PROMIS Physical Function Short Form 10a
 

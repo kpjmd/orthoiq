@@ -1,14 +1,14 @@
-# OrthoIQ Platform Evolution Roadmap
+# AequOs Platform Evolution Roadmap
 
 ## Executive Summary
 
-OrthoIQ is evolving from a dual-track consultation tool into a unified, longitudinal clinical AI platform. This document outlines the strategic UX and backend enhancements that will consolidate the user experience, integrate standardized patient-reported outcome measures, and position OrthoIQ as a research-grade learning health system.
+AequOs is evolving from a dual-track consultation tool into a unified, longitudinal clinical AI platform. This document outlines the strategic UX and backend enhancements that will consolidate the user experience, integrate standardized patient-reported outcome measures, and position AequOs as a research-grade learning health system.
 
 ---
 
 ## Current State
 
-### Frontend (OrthoIQ)
+### Frontend (AequOs)
 - **Fast Consultation**: Returns OrthoTriage Master response in ~17 seconds. User receives a quick triage-level answer.
 - **Comprehensive Consultation**: All 5 agents process the query in parallel. A summary response is generated from all agent outputs, and individual agent responses are viewable separately. Processing time exceeds 60 seconds.
 - **Feedback Modal**: Presented after consultation. Unlocks the Intelligence Card upon completion.
@@ -117,7 +117,7 @@ Follow-up:   [Primary recommendation for next steps]
 
 ### 3. PROMIS Integration
 
-**Rationale**: Replacing arbitrary milestone questions with the standardized PROMIS (Patient-Reported Outcomes Measurement Information System) questionnaire transforms OrthoIQ data into research-grade longitudinal outcomes data.
+**Rationale**: Replacing arbitrary milestone questions with the standardized PROMIS (Patient-Reported Outcomes Measurement Information System) questionnaire transforms AequOs data into research-grade longitudinal outcomes data.
 
 **Why PROMIS**:
 - Widely validated and accepted in orthopedic and sports medicine research.
@@ -137,7 +137,7 @@ Follow-up:   [Primary recommendation for next steps]
 1. The user is already waiting for results (productive use of dead time).
 2. The user has received initial value (triage response) and is invested.
 3. It occurs before comprehensive results, so responses are a true baseline uncontaminated by agent recommendations.
-4. It positions OrthoIQ as a longitudinal clinical companion.
+4. It positions AequOs as a longitudinal clinical companion.
 
 **Longitudinal PROMIS Schedule**:
 | Timepoint | Purpose | Prediction Market Impact |
@@ -151,7 +151,7 @@ Follow-up:   [Primary recommendation for next steps]
 - PROMIS deltas at 2/4/8 weeks provide objective outcome measures.
 - Correlation between agent recommendations and PROMIS improvement validates the predictive market token exchange as a learning mechanism.
 - Data structure supports future IRB-approved research protocols.
-- Publishable outcome: "Patients following OrthoIQ recommendations showed X-point PROMIS improvement at 8 weeks."
+- Publishable outcome: "Patients following AequOs recommendations showed X-point PROMIS improvement at 8 weeks."
 
 ### 4. Feedback Loop Architecture
 
@@ -204,7 +204,7 @@ Follow-up:   [Primary recommendation for next steps]
 **Why first**: This is backend-only work that doesn't disrupt the current frontend UX. It lays the groundwork for showing research data in the Structured Brief. The Research Agent's output will also help validate whether the Structured Brief format works well for a growing number of agents.
 
 ### Phase 2: Structured Brief (Frontend)
-**Scope**: OrthoIQ frontend
+**Scope**: AequOs frontend
 **Work**:
 - Replace the narrative comprehensive summary with the Structured Brief format.
 - Design the brief to include a slot for the Research Agent (even if initially showing "Research: Coming soon" or hidden until Phase 1 is complete).
@@ -288,7 +288,7 @@ Once both wearables data and PROMIS scores are being collected, there is an oppo
 
 ### Background
 
-During Phase 3 development and testnet preparation, a structural distinction emerged in the types of queries users submit to OrthoIQ:
+During Phase 3 development and testnet preparation, a structural distinction emerged in the types of queries users submit to AequOs:
 
 - **Outcome-based queries** — Injury reports, pain symptoms, recovery tracking. These have a natural resolution event (diagnosis, recovery milestone, clinical outcome). The current prediction market mechanic handles these well.
 - **Informational queries** — General orthopedic knowledge questions (e.g., "What is the recommended treatment for an ACL tear?", "What's the difference between ACL reconstruction techniques?"). These have no inherent outcome to settle. The platform currently has no distinct pathway for these.
@@ -349,4 +349,4 @@ The triage master already generates and stores inter-agent questions in the stru
 
 ## Summary
 
-OrthoIQ is evolving through five phases from a dual-track consultation tool into a unified clinical AI platform with standardized outcome tracking. The consolidated flow keeps users engaged, the Structured Brief scales with new agents, PROMIS integration makes data research-grade, and the predictive market token exchanges become validatable through real patient outcomes. Each phase builds on the previous, minimizing risk while steadily advancing the platform's clinical and research capabilities.
+AequOs is evolving through five phases from a dual-track consultation tool into a unified clinical AI platform with standardized outcome tracking. The consolidated flow keeps users engaged, the Structured Brief scales with new agents, PROMIS integration makes data research-grade, and the predictive market token exchanges become validatable through real patient outcomes. Each phase builds on the previous, minimizing risk while steadily advancing the platform's clinical and research capabilities.

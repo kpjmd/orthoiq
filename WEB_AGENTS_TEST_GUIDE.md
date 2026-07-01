@@ -1,4 +1,4 @@
-# OrthoIQ Web Interface - Agents Integration Test Guide
+# AequOs Web Interface - Agents Integration Test Guide
 
 ## ✅ **INTEGRATION COMPLETE** - Ready for Testing
 

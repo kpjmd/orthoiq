@@ -1,4 +1,4 @@
-# OrthoIQ - Ask the Orthopedic AI
+# AequOs - Ask the Orthopedic AI
 
 A production-ready Farcaster mini-app that provides AI-powered orthopedic and sports medicine insights through interactive frames and a native mini-app experience.
 
@@ -42,7 +42,7 @@ A production-ready Farcaster mini-app that provides AI-powered orthopedic and sp
 
 ### Project Structure
 ```
-orthoiq/
+aequos/
 ├── app/
 │   ├── api/
 │   │   ├── claude/          # Claude AI API integration

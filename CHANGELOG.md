@@ -1,4 +1,25 @@
-# OrthoIQ Changelog
+# AequOs Changelog
+
+(Renamed from OrthoIQ — see the entry below for context. Historical entries prior to
+this one refer to the app under its former name and are left as-written.)
+
+## [Unreleased] - 2026-07-01: Rebrand from OrthoIQ to AequOs
+
+Renamed the product from **OrthoIQ** to **AequOs** (aequus "equal/balanced" + os "bone").
+Two drivers: a trademark conflict with an unrelated company ("OrthoIQ Inc.") holding a
+pending trademark over overlapping services, and the platform's repositioning around a
+calibrated equipoise-mapping methodology that the new name encodes directly.
+
+Scope: user-facing copy, Next.js metadata, PWA manifest and Farcaster miniapp manifest
+content fields, internal identifiers (cookies, localStorage keys, service worker cache
+name, notification/prescriber ID prefixes), and the logo component (`OrthoIQLogo.tsx` →
+`AequOsLogo.tsx`). Renaming the auth cookies and localStorage keys means existing sessions
+and local prefs are invalidated on deploy — expected, not a bug.
+
+Explicitly out of scope for this pass: the production domain (stays on the current Vercel
+domain, no Farcaster re-signing needed), and the external Railway "orthoiq-agents" backend
+service and its `ORTHOIQ_AGENTS_*` env vars, which are a separate service's name rather
+than the product brand.
 
 ## [2.1.1] - 2026-06-08: Divergences in the v1/consult content payload
 

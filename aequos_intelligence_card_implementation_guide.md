@@ -1,4 +1,4 @@
-# OrthoIQ Intelligence Card - Implementation Guide for Claude Code
+# AequOs Intelligence Card - Implementation Guide for Claude Code
 
 ## Overview
 Transform the current prescription template into an **Intelligence Card** system that celebrates the multi-agent prediction market and creates retention through outcome validation.
@@ -358,7 +358,7 @@ async function submitOutcomeValidation(caseId: string, outcomeData: any) {
   "type": "prediction_milestone",
   "caseId": "OI-2847",
   "message": "Time to validate Pain Whisperer's prediction! Report your current pain level.",
-  "deepLink": "orthoiq://track/OI-2847",
+  "deepLink": "aequos://track/OI-2847",
   "timestamp": "2025-01-03T..."
 }
 ```
@@ -505,7 +505,7 @@ async function submitMDReview(review: MDReviewForm) {
 **NFT Metadata Schema:**
 ```json
 {
-  "name": "OrthoIQ Intelligence Card #OI-2847",
+  "name": "AequOs Intelligence Card #OI-2847",
   "description": "5-specialist consultation with 91% consensus, MD verified, Grade A evidence",
   "image": "ipfs://...",
   "attributes": [
@@ -521,7 +521,7 @@ async function submitMDReview(review: MDReviewForm) {
     "caseId": "OI-2847",
     "timestamp": "2025-12-20T...",
     "chain": "Base",
-    "trackingUrl": "https://orthoiq.app/track/OI-2847"
+    "trackingUrl": "https://orthoiq.vercel.app/track/OI-2847"
   }
 }
 ```
@@ -641,7 +641,7 @@ Update happens via webhook/polling after backend resolves predictions.
 
 ### Prompt 1: Create Data Mapper
 ```
-Create lib/intelligenceCardUtils.ts that maps rawConsultationData from the OrthoIQ-agents backend into IntelligenceCardData format. 
+Create lib/intelligenceCardUtils.ts that maps rawConsultationData from the AequOs-agents backend into IntelligenceCardData format. 
 
 Key requirements:
 - Extract agent stakes from participating specialists
@@ -710,7 +710,7 @@ Keep the feedback gate - card only unlocks after user provides feedback.
 
 ## Final Notes
 
-This system transforms OrthoIQ from "AI consultation with pretty receipt" to "prediction market with verifiable outcomes and progressive utility." The Intelligence Card becomes:
+This system transforms AequOs from "AI consultation with pretty receipt" to "prediction market with verifiable outcomes and progressive utility." The Intelligence Card becomes:
 
 1. **Proof of Quality:** Visible agent stakes and consensus show consultation quality
 2. **Status Symbol:** Achievement-based rarity creates aspirational tiers

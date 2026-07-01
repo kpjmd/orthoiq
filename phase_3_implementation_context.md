@@ -10,7 +10,7 @@ You have successfully completed:
 
 ### Dual Data Source System
 
-OrthoIQ operates with TWO data sources that must be combined:
+AequOs operates with TWO data sources that must be combined:
 
 **1. Local Database (Neon/PostgreSQL)**
 - Location: Via `lib/database.ts` connection
