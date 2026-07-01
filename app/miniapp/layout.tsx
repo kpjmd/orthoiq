@@ -21,13 +21,13 @@ export const metadata: Metadata = {
     'fc:miniapp': JSON.stringify({
       name: 'AequOs - AI Orthopedic Expert',
       icon: 'https://orthoiq.vercel.app/icon.png',
-      splashImage: 'https://orthoiq.vercel.app/splash-image.png',
+      splashImage: 'https://orthoiq.vercel.app/splash-image1.png',
       splashBackgroundColor: '#1e3a8a',
       buttonTitle: 'Ask AequOs'
     }),
     'fc:miniapp:name': 'AequOs - AI Orthopedic Expert',
     'fc:miniapp:icon': 'https://orthoiq.vercel.app/icon.png',
-    'fc:miniapp:splash_image': 'https://orthoiq.vercel.app/splash-image.png',
+    'fc:miniapp:splash_image': 'https://orthoiq.vercel.app/splash-image1.png',
     'fc:miniapp:splash_background_color': '#1e3a8a',
     'fc:miniapp:button_title': 'Ask AequOs'
   }

@@ -60,7 +60,7 @@ export async function generateMetadata() {
             "type": "launch_frame",
             "name": "AequOs",
             "url": "https://orthoiq.vercel.app/miniapp",
-            "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
+            "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
             "splashBackgroundColor": "#1e3a8a"
           }
         }
@@ -75,7 +75,7 @@ export async function generateMetadata() {
             "type": "launch_frame",
             "name": "AequOs",
             "url": "https://orthoiq.vercel.app/miniapp",
-            "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
+            "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
             "splashBackgroundColor": "#1e3a8a"
           }
         }
