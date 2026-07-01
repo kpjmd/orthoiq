@@ -17,7 +17,7 @@ const CONTENT_PIPELINE_FID = 'content-pipeline';
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get('x-api-key');
-  if (!process.env.ORTHOIQ_CONTENT_API_KEY || apiKey !== process.env.ORTHOIQ_CONTENT_API_KEY) {
+  if (!process.env.AEQUOS_CONTENT_API_KEY || apiKey !== process.env.AEQUOS_CONTENT_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

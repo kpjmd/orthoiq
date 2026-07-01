@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getShare } from '../../../lib/database';
 import PrescriptionGenerator from '../../../components/PrescriptionGenerator';
-import OrthoIQLogo from '../../../components/OrthoIQLogo';
+import AequOsLogo from '../../../components/AequOsLogo';
 
 interface SharePageProps {
   params: Promise<{ id: string }>
@@ -40,7 +40,7 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
   
   const embedImageUrl = `/api/og-image?shareId=${shareId}`;
 
-  const title = `OrthoIQ: ${question.substring(0, 60)}${question.length > 60 ? '...' : ''}`;
+  const title = `AequOs: ${question.substring(0, 60)}${question.length > 60 ? '...' : ''}`;
   const description = `AI Response: ${response.substring(0, 150)}${response.length > 150 ? '...' : ''}`;
 
   return {
@@ -54,7 +54,7 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
           url: embedImageUrl,
           width: 1200,
           height: 800,
-          alt: 'OrthoIQ Medical Prescription'
+          alt: 'AequOs Medical Prescription'
         }
       ],
       type: 'website',
@@ -71,10 +71,10 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
         imageUrl: embedImageUrl,
         aspectRatio: '3:2',
         button: {
-          title: 'Ask OrthoIQ',
+          title: 'Ask AequOs',
           action: {
             type: 'launch_frame',
-            name: 'OrthoIQ',
+            name: 'AequOs',
             url: 'https://orthoiq.vercel.app/miniapp'
           }
         }
@@ -144,8 +144,8 @@ export default async function SharePage({ params, searchParams }: SharePageProps
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
         <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <OrthoIQLogo size="medium" variant="blue" />
-            <h1 className="text-3xl font-bold">OrthoIQ</h1>
+            <AequOsLogo size="medium" variant="blue" />
+            <h1 className="text-3xl font-bold">AequOs</h1>
           </div>
           <p className="text-lg opacity-90">
             {viewMode === 'prescription' ? 'Medical Prescription' : 'AI Medical Prescription'}
@@ -204,7 +204,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center">
                 <span className="text-2xl mr-2">🔬</span>
-                OrthoIQ Response:
+                AequOs Response:
               </h2>
             </div>
             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{response}</p>
@@ -229,7 +229,7 @@ export default async function SharePage({ params, searchParams }: SharePageProps
             href="/miniapp"
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            <OrthoIQLogo size="small" variant="blue" className="mr-2" />
+            <AequOsLogo size="small" variant="blue" className="mr-2" />
             Ask Your Own Question
           </a>
         </div>

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
-const ADMIN_COOKIE_NAME = 'orthoiq_admin_session';
+const ADMIN_COOKIE_NAME = 'aequos_admin_session';
 const ADMIN_SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function getAdminSecret(): string {

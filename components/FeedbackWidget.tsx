@@ -108,7 +108,7 @@ export default function FeedbackWidget({
   return (
     <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
       <h4 className="text-sm font-medium text-blue-900 mb-3">
-        💭 Help us improve OrthoIQ
+        💭 Help us improve AequOs
       </h4>
       
       {!isSubmitted ? (

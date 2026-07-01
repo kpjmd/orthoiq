@@ -178,7 +178,7 @@ function AnalyticsDashboardContent() {
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold mb-2">📊 OrthoIQ Analytics Dashboard</h1>
+              <h1 className="text-3xl font-bold mb-2">📊 AequOs Analytics Dashboard</h1>
               <p className="text-lg opacity-90">AI Performance Metrics & Training Data Insights</p>
               <p className="text-sm mt-2 opacity-75">
                 Signed in as: {isPasswordAuthenticated ? 'Admin (Password)' : (user?.displayName || user?.username)}

@@ -599,7 +599,7 @@ export function generateIntelligenceCardNFTMetadata(
   const tierConfig = getTierConfig(cardData.tier);
 
   return {
-    name: `OrthoIQ Intelligence Card #${cardData.caseId}`,
+    name: `AequOs Intelligence Card #${cardData.caseId}`,
     description: `${cardData.participatingCount}-specialist consultation with ${cardData.consensusPercentage}% consensus${cardData.mdVerified ? ', MD verified' : ''}${cardData.evidenceGrade ? `, Grade ${cardData.evidenceGrade} evidence` : ''}`,
     image: imageUrl || '',
     attributes: [
@@ -617,10 +617,10 @@ export function generateIntelligenceCardNFTMetadata(
       caseId: cardData.caseId,
       timestamp: cardData.timestamp,
       chain: 'Base',
-      collection: 'OrthoIQ Intelligence Cards',
+      collection: 'AequOs Intelligence Cards',
       category: 'Medical AI',
       royalty: '5%',
-      trackingUrl: `https://orthoiq.app/track/${cardData.caseId}`
+      trackingUrl: `https://orthoiq.vercel.app/track/${cardData.caseId}`
     }
   };
 }

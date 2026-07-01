@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       handoff_link: handoffLink,
-      message: 'Continue your consultation in the OrthoIQ mini app for full features including milestone tracking and token rewards.'
+      message: 'Continue your consultation in the AequOs mini app for full features including milestone tracking and token rewards.'
     });
   } catch (error) {
     console.error('Error creating handoff link:', error);

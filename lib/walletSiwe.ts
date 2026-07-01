@@ -11,7 +11,7 @@ export interface SiweMessageParams {
 }
 
 const DEFAULT_STATEMENT =
-  'Sign in to OrthoIQ to link your wallet to your profile. This signature does not authorize any transaction.';
+  'Sign in to AequOs to link your wallet to your profile. This signature does not authorize any transaction.';
 
 export function buildSiweMessage(params: SiweMessageParams): string {
   const statement = params.statement ?? DEFAULT_STATEMENT;

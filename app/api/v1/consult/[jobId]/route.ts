@@ -23,13 +23,13 @@ const CONTENT_PIPELINE_FID = 'content-pipeline';
 const SELF_HEAL_GRACE_MS = 15_000;
 
 function timeoutMs(): number {
-  const raw = process.env.ORTHOIQ_CONTENT_JOB_TIMEOUT_MS;
+  const raw = process.env.AEQUOS_CONTENT_JOB_TIMEOUT_MS;
   const parsed = raw ? parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 5 * 60 * 1000;
 }
 
 function researchTimeoutMs(): number {
-  const raw = process.env.ORTHOIQ_RESEARCH_TIMEOUT_MS;
+  const raw = process.env.AEQUOS_RESEARCH_TIMEOUT_MS;
   const parsed = raw ? parseInt(raw, 10) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
 }
@@ -49,7 +49,7 @@ export async function GET(
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const apiKey = req.headers.get('x-api-key');
-  if (!process.env.ORTHOIQ_CONTENT_API_KEY || apiKey !== process.env.ORTHOIQ_CONTENT_API_KEY) {
+  if (!process.env.AEQUOS_CONTENT_API_KEY || apiKey !== process.env.AEQUOS_CONTENT_API_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

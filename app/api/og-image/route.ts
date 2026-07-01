@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         <text x="150" y="165" text-anchor="middle" fill="white" font-size="48" font-weight="bold">🦴</text>
         
         <!-- Title -->
-        <text x="250" y="130" fill="white" font-size="56" font-weight="bold" font-family="system-ui, sans-serif">OrthoIQ</text>
+        <text x="250" y="130" fill="white" font-size="56" font-weight="bold" font-family="system-ui, sans-serif">AequOs</text>
         <text x="250" y="180" fill="white" opacity="0.9" font-size="28" font-family="system-ui, sans-serif">${art ? 'AI Medical Artwork' : 'AI Orthopedic Expert'}</text>
         
         ${art ? `
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
         </defs>
         <rect width="1200" height="800" fill="url(#fallback-bg)" />
         <text x="600" y="300" text-anchor="middle" fill="white" font-size="96">🦴</text>
-        <text x="600" y="420" text-anchor="middle" fill="white" font-size="72" font-weight="bold" font-family="system-ui, sans-serif">OrthoIQ</text>
+        <text x="600" y="420" text-anchor="middle" fill="white" font-size="72" font-weight="bold" font-family="system-ui, sans-serif">AequOs</text>
         <text x="600" y="480" text-anchor="middle" fill="white" opacity="0.9" font-size="32" font-family="system-ui, sans-serif">AI Orthopedic Expert</text>
       </svg>
     `;

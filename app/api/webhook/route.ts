@@ -187,7 +187,7 @@ async function saveNotificationToken(requestId: string, fid: string, token: stri
 export async function GET() {
   return NextResponse.json({
     status: 'ok',
-    service: 'OrthoIQ Farcaster Webhook',
+    service: 'AequOs Farcaster Webhook',
     timestamp: new Date().toISOString()
   });
 }

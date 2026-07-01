@@ -12,7 +12,7 @@ export async function GET() {
     },
     miniapp: {
       version: "1",
-      name: "OrthoIQ - AI Orthopedic Assistant",
+      name: "AequOs - AI Orthopedic Assistant",
       iconUrl: `${host}/icon.png`,
       splashImageUrl: `${host}/og-image.png`,
       splashBackgroundColor: "#1e3a8a",

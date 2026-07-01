@@ -20,7 +20,7 @@ export interface WebUsageResult {
 export function generateSessionId(): string {
   // Check if session ID already exists in localStorage
   if (typeof window !== 'undefined') {
-    const existingSessionId = localStorage.getItem('orthoiq_session_id');
+    const existingSessionId = localStorage.getItem('aequos_session_id');
     if (existingSessionId) {
       return existingSessionId;
     }
@@ -33,7 +33,7 @@ export function generateSessionId(): string {
 
   // Store in localStorage
   if (typeof window !== 'undefined') {
-    localStorage.setItem('orthoiq_session_id', sessionId);
+    localStorage.setItem('aequos_session_id', sessionId);
   }
 
   return sessionId;
@@ -49,7 +49,7 @@ export function hashIP(ip: string): string {
   }
 
   // Add a salt to make rainbow table attacks harder
-  const salt = process.env.IP_HASH_SALT || 'orthoiq_default_salt_2024';
+  const salt = process.env.IP_HASH_SALT || 'aequos_default_salt_2024';
   const hash = createHash('sha256');
   hash.update(ip + salt);
   return hash.digest('hex');
@@ -99,7 +99,7 @@ export async function getWebSessionUsage(isEmailVerified: boolean = false): Prom
  */
 export function clearSessionId(): void {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('orthoiq_session_id');
+    localStorage.removeItem('aequos_session_id');
   }
 }
 
@@ -108,7 +108,7 @@ export function clearSessionId(): void {
  */
 export function getSessionId(): string | null {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('orthoiq_session_id');
+    return localStorage.getItem('aequos_session_id');
   }
   return null;
 }

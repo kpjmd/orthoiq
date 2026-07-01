@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         })
         .join('\n');
       
-      fileName = `orthoiq-training-data-${timestamp}.jsonl`;
+      fileName = `aequos-training-data-${timestamp}.jsonl`;
     
     } else if (format === 'csv') {
       // CSV format for analysis
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       });
       
       exportContent = headers.join(',') + '\n' + rows.join('\n');
-      fileName = `orthoiq-training-data-${timestamp}.csv`;
+      fileName = `aequos-training-data-${timestamp}.csv`;
     
     } else {
       // JSON format for detailed analysis
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         })
       }, null, 2);
       
-      fileName = `orthoiq-training-data-${timestamp}.json`;
+      fileName = `aequos-training-data-${timestamp}.json`;
     }
 
     // Create exports directory if it doesn't exist

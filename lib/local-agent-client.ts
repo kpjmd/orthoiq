@@ -197,12 +197,12 @@ export class LocalAgentClient extends EventEmitter {
   }
 
   /**
-   * Register a consultation agent specifically for the OrthoIQ Agents API
+   * Register a consultation agent specifically for the AequOs Agents API
    */
   async registerConsultationAgent(endpoint: string = process.env.ORTHOIQ_AGENTS_URL || 'http://localhost:3000'): Promise<void> {
     const config: LocalAgentConfig = {
-      id: 'orthoiq-consultation',
-      name: 'OrthoIQ Consultation Network',
+      id: 'aequos-consultation',
+      name: 'AequOs Consultation Network',
       type: 'http',
       endpoint,
       capabilities: ['consultation', 'medical_research', 'multi_specialist'],

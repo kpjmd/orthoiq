@@ -1,5 +1,5 @@
-// Service Worker for OrthoIQ PWA
-const CACHE_NAME = 'orthoiq-v3';
+// Service Worker for AequOs PWA
+const CACHE_NAME = 'aequos-v1';
 const STATIC_ASSETS = [
   '/',
   '/miniapp',
@@ -10,15 +10,15 @@ const STATIC_ASSETS = [
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('OrthoIQ Service Worker: Installing...');
+  console.log('AequOs Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('OrthoIQ Service Worker: Caching static assets');
+        console.log('AequOs Service Worker: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => {
-        console.log('OrthoIQ Service Worker: Installation complete');
+        console.log('AequOs Service Worker: Installation complete');
         return self.skipWaiting();
       })
   );
@@ -26,19 +26,19 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('OrthoIQ Service Worker: Activating...');
+  console.log('AequOs Service Worker: Activating...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((cacheName) => cacheName !== CACHE_NAME)
           .map((cacheName) => {
-            console.log('OrthoIQ Service Worker: Deleting old cache:', cacheName);
+            console.log('AequOs Service Worker: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           })
       );
     }).then(() => {
-      console.log('OrthoIQ Service Worker: Activation complete');
+      console.log('AequOs Service Worker: Activation complete');
       return self.clients.claim();
     })
   );
@@ -63,7 +63,7 @@ self.addEventListener('fetch', (event) => {
         // Only show offline message for true network failures
         // TypeError with 'Failed to fetch' indicates network is unavailable
         if (error.name === 'TypeError' && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
-          console.log('OrthoIQ Service Worker: True network failure detected for API request');
+          console.log('AequOs Service Worker: True network failure detected for API request');
           return new Response(JSON.stringify({
             error: 'You appear to be offline. Please check your connection and try again.',
             offline: true
@@ -76,7 +76,7 @@ self.addEventListener('fetch', (event) => {
         }
         // For other errors (timeouts, server errors), let them pass through
         // Don't mark as "offline" since network is working
-        console.log('OrthoIQ Service Worker: API error (not offline):', error.message);
+        console.log('AequOs Service Worker: API error (not offline):', error.message);
         return new Response(JSON.stringify({
           error: 'Service temporarily unavailable. Please try again.',
           offline: false
@@ -101,7 +101,7 @@ self.addEventListener('fetch', (event) => {
       event.request.destination === 'document' ||
       (event.request.method === 'GET' && event.request.headers.get('accept')?.includes('text/html'))) {
     
-    console.log('OrthoIQ Service Worker: Using network-first for HTML:', event.request.url);
+    console.log('AequOs Service Worker: Using network-first for HTML:', event.request.url);
     event.respondWith(
       fetch(event.request)
         .then((response) => {
@@ -113,19 +113,19 @@ self.addEventListener('fetch', (event) => {
                 cache.put(event.request, responseToCache);
               });
           }
-          console.log('OrthoIQ Service Worker: HTML served fresh from network:', event.request.url);
+          console.log('AequOs Service Worker: HTML served fresh from network:', event.request.url);
           return response;
         })
         .catch(() => {
           // Network failed, try cache
-          console.log('OrthoIQ Service Worker: Network failed, trying cache for:', event.request.url);
+          console.log('AequOs Service Worker: Network failed, trying cache for:', event.request.url);
           return caches.match(event.request)
             .then((cachedResponse) => {
               if (cachedResponse) {
-                console.log('OrthoIQ Service Worker: Serving HTML from cache (offline):', event.request.url);
+                console.log('AequOs Service Worker: Serving HTML from cache (offline):', event.request.url);
                 return cachedResponse;
               }
-              return new Response('Offline - OrthoIQ requires an internet connection');
+              return new Response('Offline - AequOs requires an internet connection');
             });
         })
     );
@@ -138,12 +138,12 @@ self.addEventListener('fetch', (event) => {
       .then((response) => {
         // Return cached version if available
         if (response) {
-          console.log('OrthoIQ Service Worker: Serving static asset from cache:', event.request.url);
+          console.log('AequOs Service Worker: Serving static asset from cache:', event.request.url);
           return response;
         }
         
         // Otherwise fetch from network
-        console.log('OrthoIQ Service Worker: Fetching static asset from network:', event.request.url);
+        console.log('AequOs Service Worker: Fetching static asset from network:', event.request.url);
         return fetch(event.request).then((response) => {
           // Don't cache non-successful responses or non-GET requests
           if (!response || response.status !== 200 || response.type !== 'basic' || event.request.method !== 'GET') {
@@ -163,7 +163,7 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => {
         // If both cache and network fail for static assets
-        console.log('OrthoIQ Service Worker: Failed to load static asset:', event.request.url);
+        console.log('AequOs Service Worker: Failed to load static asset:', event.request.url);
         return new Response('Asset not available', { status: 404 });
       })
   );
@@ -171,8 +171,8 @@ self.addEventListener('fetch', (event) => {
 
 // Handle background sync for offline question submission
 self.addEventListener('sync', (event) => {
-  console.log('OrthoIQ Service Worker: Background sync triggered');
-  if (event.tag === 'orthoiq-question-sync') {
+  console.log('AequOs Service Worker: Background sync triggered');
+  if (event.tag === 'aequos-question-sync') {
     event.waitUntil(syncQuestions());
   }
 });
@@ -180,31 +180,31 @@ self.addEventListener('sync', (event) => {
 async function syncQuestions() {
   // This would handle offline question submission
   // For now, just log that sync was attempted
-  console.log('OrthoIQ Service Worker: Syncing offline questions...');
+  console.log('AequOs Service Worker: Syncing offline questions...');
 }
 
 // Handle push notifications (if needed later)
 self.addEventListener('push', (event) => {
-  console.log('OrthoIQ Service Worker: Push message received');
+  console.log('AequOs Service Worker: Push message received');
   
   const options = {
-    body: 'Your OrthoIQ response is ready!',
+    body: 'Your AequOs response is ready!',
     icon: '/icon.png',
     badge: '/icon.png',
-    tag: 'orthoiq-notification',
+    tag: 'aequos-notification',
     data: {
       url: '/'
     }
   };
 
   event.waitUntil(
-    self.registration.showNotification('OrthoIQ', options)
+    self.registration.showNotification('AequOs', options)
   );
 });
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-  console.log('OrthoIQ Service Worker: Notification clicked');
+  console.log('AequOs Service Worker: Notification clicked');
   event.notification.close();
 
   event.waitUntil(

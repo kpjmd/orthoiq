@@ -1,6 +1,6 @@
 {
-  "name": "OrthoIQ - Ask the Orthopedic AI",
-  "short_name": "OrthoIQ",
+  "name": "AequOs - Ask the Orthopedic AI",
+  "short_name": "AequOs",
   "description": "AI-powered orthopedic and sports medicine assistant with MD-reviewed responses",
   "start_url": "/",
   "display": "standalone",

@@ -139,7 +139,7 @@ export default function PublicStatsPage() {
       <div className="min-h-screen bg-gray-50">
         <div className="bg-gradient-to-br from-blue-900 to-purple-600 text-white p-8">
           <div className="max-w-6xl mx-auto text-center">
-            <h1 className="text-4xl font-bold mb-4">OrthoIQ Network Statistics</h1>
+            <h1 className="text-4xl font-bold mb-4">AequOs Network Statistics</h1>
             <p className="text-xl opacity-90">Loading...</p>
           </div>
         </div>
@@ -190,7 +190,7 @@ export default function PublicStatsPage() {
             <div className="w-24"></div>
           </div>
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">OrthoIQ — A Calibrated Equipoise-Mapping Instrument</h1>
+            <h1 className="text-4xl font-bold mb-4">AequOs — A Calibrated Equipoise-Mapping Instrument</h1>
             <p className="text-xl opacity-90">
               The specialist panel diverges only when there is genuine clinical equipoise. When it converges, that
               agreement is itself the signal — a trustworthy negative.
@@ -560,9 +560,9 @@ export default function PublicStatsPage() {
 
         {/* About Section */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">About OrthoIQ</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">About AequOs</h2>
           <p className="text-gray-700 mb-4">
-            OrthoIQ uses a multi-agent AI system where specialized agents collaborate to provide comprehensive orthopedic guidance. Each specialist contributes its expertise; their responses are synthesized into a single recommendation, with confidence and consensus tracked across consultations.
+            AequOs is a validated orthopedic protocol that diverges if and only if there&apos;s genuine equipoise. Specialized AI agents independently work through each case; when they agree, you get a single confident recommendation — when they don&apos;t, that disagreement is surfaced rather than papered over, because a split decision between experts is itself clinically meaningful information.
           </p>
           <p className="text-gray-700">
             User feedback, PROMIS milestone responses, and physician reviews feed back into the system to drive continuous improvement.
@@ -574,7 +574,7 @@ export default function PublicStatsPage() {
           <p>Statistics update in real-time based on consultation data and agent performance.</p>
           <p className="mt-2">
             <Link href={backHref} className="text-blue-600 hover:text-blue-800">
-              ← Return to OrthoIQ
+              ← Return to AequOs
             </Link>
           </p>
         </div>

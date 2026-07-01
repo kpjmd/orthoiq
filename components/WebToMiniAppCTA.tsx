@@ -54,7 +54,7 @@ export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, total
               <>
                 <div className="text-4xl mb-3">💡</div>
                 <h2 className="text-2xl font-bold text-blue-900 mb-2">
-                  Enjoying OrthoIQ?
+                  Enjoying AequOs?
                 </h2>
                 <p className="text-blue-700">
                   <span className="font-semibold">{questionsRemaining} question{questionsRemaining !== 1 ? 's' : ''} remaining</span> on web
@@ -107,7 +107,7 @@ export default function WebToMiniAppCTA({ questionsRemaining, isHardLimit, total
                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
             } text-white px-8 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 inline-flex items-center space-x-2`}
           >
-            <span>Join OrthoIQ on Farcaster</span>
+            <span>Join AequOs on Farcaster</span>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>

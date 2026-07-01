@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 
 // Patient-readable by default; "clinician view" reveals evidenceGrade /
 // populationMatch / confidence / PMIDs. Page-level, persisted to localStorage.
-const STORAGE_KEY = 'orthoiq:clinicianView';
+const STORAGE_KEY = 'aequos:clinicianView';
 
 interface ClinicianViewValue {
   clinicianView: boolean;

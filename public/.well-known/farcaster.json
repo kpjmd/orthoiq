@@ -6,10 +6,10 @@
   },
   "miniapp": {
     "version": "1",
-    "name": "OrthoIQ - AI Orthopedic Expert",
+    "name": "AequOs - AI Orthopedic Expert",
     "iconUrl": "https://orthoiq.vercel.app/icon-solid.png",
     "imageUrl": "https://orthoiq.vercel.app/og-image.png",
-    "buttonTitle": "Ask OrthoIQ",
+    "buttonTitle": "Ask AequOs",
     "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
     "splashBackgroundColor": "#1e3a8a",
     "webhookUrl": "https://orthoiq.vercel.app/api/webhook",
@@ -24,13 +24,13 @@
       "health",
       "doctor"
     ],
-    "ogTitle": "OrthoIQ - AI Orthopedic Expert",
+    "ogTitle": "AequOs - AI Orthopedic Expert",
     "ogImageUrl": "https://orthoiq.vercel.app/og-image.png",
     "heroImageUrl": "https://orthoiq.vercel.app/embed-image.png",
     "castShareUrl": "https://orthoiq.vercel.app/miniapp",
     "ogDescription": "Get your orthopedic questions answers here, powered by Claude AI. Responses reviewed by MD.",
     "screenshotUrls": [
-      "https://orthoiq.vercel.app/orthoiq-screenshot.jpg"
+      "https://orthoiq.vercel.app/aequos-screenshot.jpg"
     ],
     "primaryCategory": "health-fitness"
   },

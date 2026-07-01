@@ -23,7 +23,7 @@ export default function WebHomePage() {
     <div className="text-center max-w-4xl mx-auto">
       <div className="medical-gradient text-white p-8 rounded-lg mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-4xl font-bold">OrthoIQ</h1>
+          <h1 className="text-4xl font-bold">AequOs</h1>
           <div className="flex items-center gap-3">
             <a
               href="/stats?from=web"

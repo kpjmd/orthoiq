@@ -267,7 +267,7 @@ export default function UserProfileView({
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">Wallet</h3>
           <p className="text-sm font-mono text-gray-600 break-all">{profile.walletAddress}</p>
-          <p className="text-xs text-gray-400 mt-2">OrthoIQ Token: Coming soon (testnet)</p>
+          <p className="text-xs text-gray-400 mt-2">AequOs Token: Coming soon (testnet)</p>
         </div>
       )}
     </div>

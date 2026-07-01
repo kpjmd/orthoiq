@@ -20,13 +20,13 @@ export async function generateMetadata({ params }: TrackPageProps): Promise<Meta
 
   if (!payload) {
     return {
-      title: 'Case Not Found - OrthoIQ',
+      title: 'Case Not Found - AequOs',
       description: 'The requested case could not be found.',
     };
   }
 
   const phrase = bodyPartPhrase(payload.consultation.bodyPart);
-  const title = `Track Case ${caseId} - OrthoIQ`;
+  const title = `Track Case ${caseId} - AequOs`;
   const description = `${payload.consultation.daysSince} days since ${phrase} consultation.`;
 
   return {

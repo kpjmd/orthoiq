@@ -131,10 +131,10 @@ export default function IntelligenceCardModal({
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
 
-      const shareText = `🧠 OrthoIQ Intelligence Card\n\n📊 ${cardData.participatingCount} AI Specialists • ${cardData.consensusPercentage}% Consensus\n💰 ${cardData.totalStake.toFixed(1)} tokens staked\n🎯 ${tierConfig.label} Tier\n\n${cardData.primaryPrediction.text}`;
+      const shareText = `🧠 AequOs Intelligence Card\n\n📊 ${cardData.participatingCount} AI Specialists • ${cardData.consensusPercentage}% Consensus\n💰 ${cardData.totalStake.toFixed(1)} tokens staked\n🎯 ${tierConfig.label} Tier\n\n${cardData.primaryPrediction.text}`;
 
       const webShareData = {
-        title: 'OrthoIQ Intelligence Card',
+        title: 'AequOs Intelligence Card',
         text: shareText,
         url: shareUrl
       };
@@ -228,7 +228,7 @@ export default function IntelligenceCardModal({
           }
 
           try {
-            const fileName = `OrthoIQ-Intelligence-Card-${cardData.caseId}.png`;
+            const fileName = `AequOs-Intelligence-Card-${cardData.caseId}.png`;
 
             // Try native share/save for mobile
             if (navigator.share && navigator.canShare) {
@@ -443,7 +443,7 @@ export default function IntelligenceCardModal({
             ) : (
               <p className="text-white/50 text-sm">
                 Scan QR code or visit{' '}
-                <span className="text-blue-400">orthoiq.app/track/{cardData.caseId}</span>
+                <span className="text-blue-400">orthoiq.vercel.app/track/{cardData.caseId}</span>
                 {' '}to validate predictions
               </p>
             )}

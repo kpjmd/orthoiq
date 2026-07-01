@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const host = request.headers.get('host') || 'orthoiq.com';
+    const host = request.headers.get('host') || 'orthoiq.vercel.app';
     const verified = await verifySiwe({
       message: challenge.message,
       signature,

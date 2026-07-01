@@ -42,7 +42,7 @@ export async function sendNotification(
     }
     
     // Generate a unique notification ID
-    const notificationId = `orthoiq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const notificationId = `aequos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     let success = false;
     

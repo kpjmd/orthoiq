@@ -100,7 +100,7 @@ export function generateInstagramStoryFormat(
       <!-- Header -->
       <rect x="60" y="100" width="960" height="200" fill="white" rx="20" />
       <text x="540" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="${metadata.theme.primaryColor}">
-        OrthoIQ Medical Intelligence
+        AequOs Medical Intelligence
       </text>
       <text x="540" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="${metadata.theme.accentColor}">
         AI-Powered Orthopedic Insights
@@ -129,12 +129,12 @@ export function generateInstagramStoryFormat(
       <!-- Call to Action -->
       <rect x="120" y="1700" width="840" height="100" fill="${metadata.theme.primaryColor}" rx="50" />
       <text x="540" y="1760" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="white">
-        Get Your OrthoIQ Prescription
+        Get Your AequOs Prescription
       </text>
       
       <!-- Footer -->
       <text x="540" y="1850" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#9ca3af">
-        orthoiq.com • AI-Powered Medical Intelligence
+        orthoiq.vercel.app • AI-Powered Medical Intelligence
       </text>
     </svg>
   `;
@@ -162,7 +162,7 @@ export function generateLinkedInPost(
       
       <!-- Header -->
       <text x="100" y="120" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="${metadata.theme.primaryColor}">
-        OrthoIQ Medical Intelligence
+        AequOs Medical Intelligence
       </text>
       <text x="100" y="155" font-family="Arial, sans-serif" font-size="20" fill="${metadata.theme.accentColor}">
         Professional AI-Generated Medical Prescription
@@ -191,7 +191,7 @@ export function generateLinkedInPost(
       <!-- Footer -->
       <rect x="100" y="500" width="1000" height="50" fill="${metadata.theme.primaryColor}" rx="25" />
       <text x="600" y="530" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
-        Experience AI-Powered Orthopedic Care at orthoiq.com
+        Experience AI-Powered Orthopedic Care at orthoiq.vercel.app
       </text>
     </svg>
   `;
@@ -219,7 +219,7 @@ export function generateTwitterCard(
       
       <!-- Header -->
       <text x="600" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="${metadata.theme.primaryColor}">
-        OrthoIQ
+        AequOs
       </text>
       <text x="600" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="${metadata.theme.accentColor}">
         AI-Powered Medical Intelligence
@@ -244,12 +244,12 @@ export function generateTwitterCard(
       
       <!-- CTA -->
       <text x="600" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#374151">
-        Get your AI prescription at orthoiq.com
+        Get your AI prescription at orthoiq.vercel.app
       </text>
       
       <!-- Footer -->
       <text x="600" y="580" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#9ca3af">
-        #OrthoIQ #AIHealthcare #OrthopedicCare #MedicalAI
+        #AequOs #AIHealthcare #OrthopedicCare #MedicalAI
       </text>
     </svg>
   `;
@@ -279,7 +279,7 @@ export function generateFarcasterFrame(
       <!-- Header with Farcaster purple accent -->
       <rect x="60" y="60" width="1080" height="120" fill="linear-gradient(45deg, #8A63D2, #472A91)" rx="15" />
       <text x="600" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white">
-        🩺 OrthoIQ Prescription Generated
+        🩺 AequOs Prescription Generated
       </text>
       <text x="600" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.9)">
         AI-Powered Medical Intelligence on Farcaster
@@ -321,7 +321,7 @@ export function generateFarcasterFrame(
       <!-- CTA -->
       <rect x="200" y="420" width="800" height="80" fill="#8A63D2" rx="40" />
       <text x="600" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white">
-        🚀 Ask Your Own Question on OrthoIQ
+        🚀 Ask Your Own Question on AequOs
       </text>
       
       <!-- Footer -->
@@ -348,11 +348,11 @@ export function generateNFTMetadata(
   
   // Generate NFT-compatible metadata following ERC-721 standard
   return {
-    name: `OrthoIQ Prescription #${metadata.id}`,
+    name: `AequOs Prescription #${metadata.id}`,
     description: `${mdReviewed ? 'MD-Reviewed ' : ''}AI-generated orthopedic prescription: "${prescriptionData.userQuestion.substring(0, 150)}..."${mdReviewed ? ` Reviewed by ${mdReviewerName || 'Dr. KPJMD'}.` : ''}`,
-    image: `https://orthoiq.com/api/prescription-image/${metadata.id}`,
-    external_url: `https://orthoiq.com/prescription/${metadata.id}`,
-    animation_url: metadata.rarity === 'ultra-rare' ? `https://orthoiq.com/api/prescription-animation/${metadata.id}` : undefined,
+    image: `https://orthoiq.vercel.app/api/prescription-image/${metadata.id}`,
+    external_url: `https://orthoiq.vercel.app/prescription/${metadata.id}`,
+    animation_url: metadata.rarity === 'ultra-rare' ? `https://orthoiq.vercel.app/api/prescription-animation/${metadata.id}` : undefined,
     attributes: [
       {
         trait_type: "Rarity",
@@ -400,8 +400,8 @@ export function generateNFTMetadata(
     ],
     properties: {
       category: "Medical AI",
-      collection: "OrthoIQ Prescriptions",
-      creator: "OrthoIQ AI System",
+      collection: "AequOs Prescriptions",
+      creator: "AequOs AI System",
       medical_disclaimer: "This is AI-generated information for educational purposes only. Always consult with a healthcare provider.",
       mint_status: mdReviewed ? "ready_to_mint" : "not_minted",
       blockchain: "Base",
@@ -427,7 +427,7 @@ function detectPlatformCapabilities(): PlatformCapabilities {
   const hasClipboard = 'clipboard' in navigator && 'writeText' in navigator.clipboard;
   
   // Check for mini app environment
-  const isMiniApp = window.__ORTHOIQ_MINI_APP__ ||
+  const isMiniApp = window.__AEQUOS_MINI_APP__ ||
     window.location.pathname.startsWith('/miniapp') ||
     (isInFrame && document.referrer && (
       document.referrer.includes('farcaster.xyz') ||
@@ -559,8 +559,8 @@ async function saveViaNativeShare(blob: Blob, filename: string): Promise<void> {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: 'OrthoIQ Prescription',
-        text: 'My AI-generated medical prescription from OrthoIQ'
+        title: 'AequOs Prescription',
+        text: 'My AI-generated medical prescription from AequOs'
       });
       return;
     }
@@ -597,7 +597,7 @@ export async function savePrescriptionAsImage(svgElement: SVGSVGElement, prescri
   const capabilities = detectPlatformCapabilities();
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
   const identifier = prescriptionId || timestamp;
-  const filename = `OrthoIQ-Prescription-${identifier}.png`;
+  const filename = `AequOs-Prescription-${identifier}.png`;
   
   console.log('Save Image: Platform capabilities:', capabilities);
   
@@ -627,7 +627,7 @@ export async function savePrescriptionAsImage(svgElement: SVGSVGElement, prescri
       if (navigator.share && navigator.canShare({ url })) {
         await navigator.share({
           url,
-          title: 'OrthoIQ Prescription',
+          title: 'AequOs Prescription',
           text: 'View my AI-generated medical prescription'
         });
       } else {
@@ -690,16 +690,16 @@ export async function generateNFTReadyImage(svgElement: SVGSVGElement, prescript
   const blob = await generateImageBlob(svgElement);
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
   const identifier = prescriptionId || timestamp;
-  const filename = `OrthoIQ-NFT-${identifier}.png`;
+  const filename = `AequOs-NFT-${identifier}.png`;
   
   // This could be enhanced with actual prescription metadata
   const metadata = {
-    name: `OrthoIQ Prescription #${identifier}`,
+    name: `AequOs Prescription #${identifier}`,
     description: 'AI-generated orthopedic prescription ready for NFT minting',
     image: filename,
     attributes: [
       { trait_type: "Generation Date", value: new Date().toISOString().split('T')[0] },
-      { trait_type: "Platform", value: "OrthoIQ" },
+      { trait_type: "Platform", value: "AequOs" },
       { trait_type: "Type", value: "Medical Prescription" }
     ]
   };
@@ -743,11 +743,11 @@ export async function exportPrescription(
 ): Promise<void> {
   switch (options.format) {
     case 'png':
-      await downloadAsPNG(svgElement, `orthoiq-prescription-${metadata.id}`, options.quality || 1);
+      await downloadAsPNG(svgElement, `aequos-prescription-${metadata.id}`, options.quality || 1);
       break;
       
     case 'svg':
-      await downloadAsSVG(svgElement, `orthoiq-prescription-${metadata.id}`);
+      await downloadAsSVG(svgElement, `aequos-prescription-${metadata.id}`);
       break;
       
     case 'instagram':
@@ -756,7 +756,7 @@ export async function exportPrescription(
       const igUrl = URL.createObjectURL(igBlob);
       const igLink = document.createElement('a');
       igLink.href = igUrl;
-      igLink.download = `orthoiq-instagram-${metadata.id}.svg`;
+      igLink.download = `aequos-instagram-${metadata.id}.svg`;
       igLink.click();
       URL.revokeObjectURL(igUrl);
       break;
@@ -767,7 +767,7 @@ export async function exportPrescription(
       const lnUrl = URL.createObjectURL(lnBlob);
       const lnLink = document.createElement('a');
       lnLink.href = lnUrl;
-      lnLink.download = `orthoiq-linkedin-${metadata.id}.svg`;
+      lnLink.download = `aequos-linkedin-${metadata.id}.svg`;
       lnLink.click();
       URL.revokeObjectURL(lnUrl);
       break;
@@ -778,7 +778,7 @@ export async function exportPrescription(
       const twUrl = URL.createObjectURL(twBlob);
       const twLink = document.createElement('a');
       twLink.href = twUrl;
-      twLink.download = `orthoiq-twitter-${metadata.id}.svg`;
+      twLink.download = `aequos-twitter-${metadata.id}.svg`;
       twLink.click();
       URL.revokeObjectURL(twUrl);
       break;
@@ -789,7 +789,7 @@ export async function exportPrescription(
       const fcUrl = URL.createObjectURL(fcBlob);
       const fcLink = document.createElement('a');
       fcLink.href = fcUrl;
-      fcLink.download = `orthoiq-farcaster-${metadata.id}.svg`;
+      fcLink.download = `aequos-farcaster-${metadata.id}.svg`;
       fcLink.click();
       URL.revokeObjectURL(fcUrl);
       break;
@@ -811,7 +811,7 @@ export async function exportIntelligenceCard(
   options: IntelligenceCardExportOptions
 ): Promise<void> {
   const tierConfig = getTierConfig(cardData.tier);
-  const filename = `orthoiq-intelligence-card-${cardData.caseId}`;
+  const filename = `aequos-intelligence-card-${cardData.caseId}`;
 
   switch (options.format) {
     case 'png':
@@ -830,7 +830,7 @@ export async function exportIntelligenceCard(
 export function generateIntelligenceCardShareText(cardData: IntelligenceCardData): string {
   const tierConfig = getTierConfig(cardData.tier);
 
-  return `🧠 OrthoIQ Intelligence Card
+  return `🧠 AequOs Intelligence Card
 
 📊 ${cardData.participatingCount} AI Specialists • ${cardData.consensusPercentage}% Consensus
 💰 ${cardData.totalStake.toFixed(1)} tokens staked
@@ -838,5 +838,5 @@ export function generateIntelligenceCardShareText(cardData: IntelligenceCardData
 
 ${cardData.primaryPrediction.text}
 
-Track predictions: orthoiq.app/track/${cardData.caseId}`;
+Track predictions: orthoiq.vercel.app/track/${cardData.caseId}`;
 }

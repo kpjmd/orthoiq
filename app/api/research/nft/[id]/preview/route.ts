@@ -13,7 +13,7 @@ export async function GET(
     
     const mockNFTData = {
       id: nftId,
-      name: `OrthoIQ Research #${nftId.slice(-6)}`,
+      name: `AequOs Research #${nftId.slice(-6)}`,
       description: 'AI-synthesized orthopedic research with medical professional review',
       image: `${process.env.NEXT_PUBLIC_HOST}/api/research/nft/${nftId}/image`,
       external_url: `${process.env.NEXT_PUBLIC_HOST}/research/nft/${nftId}`,
@@ -66,9 +66,9 @@ export async function GET(
       ],
       properties: {
         category: 'Medical Research',
-        platform: 'OrthoIQ',
+        platform: 'AequOs',
         blockchain: 'Base',
-        creator: 'OrthoIQ AI + MD Review',
+        creator: 'AequOs AI + MD Review',
         license: 'Educational Use'
       }
     };

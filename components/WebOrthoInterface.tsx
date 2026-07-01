@@ -7,7 +7,7 @@ import { useWebAuth } from './WebAuthProvider';
 import ResponseCard from './ResponseCard';
 import ActionMenu from './ActionMenu';
 import PrescriptionModal from './PrescriptionModal';
-import OrthoIQLogo from './OrthoIQLogo';
+import AequOsLogo from './AequOsLogo';
 import WebToMiniAppCTA from './WebToMiniAppCTA';
 import AgentLoadingCards from './AgentLoadingCards';
 import FeedbackModal from './FeedbackModal';
@@ -685,8 +685,8 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6 rounded-t-lg">
         <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <OrthoIQLogo size="medium" variant="blue" />
-            <h2 className="text-3xl font-bold">OrthoIQ</h2>
+            <AequOsLogo size="medium" variant="blue" />
+            <h2 className="text-3xl font-bold">AequOs</h2>
           </div>
           <p className="text-lg opacity-90">Web Experience</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
@@ -988,7 +988,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                     Ask an Orthopedic Question
                   </button>
                   <span className="text-sm text-blue-600">
-                    OrthoIQ specializes in bones, joints, muscles, and sports medicine
+                    AequOs specializes in bones, joints, muscles, and sports medicine
                   </span>
                 </div>
               </div>
@@ -1317,7 +1317,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
                 <div className="flex items-start mb-3">
                   <span className="text-3xl mr-3">🚀</span>
                   <div>
-                    <h3 className="font-bold text-purple-900 text-lg">Get the Full OrthoIQ Experience</h3>
+                    <h3 className="font-bold text-purple-900 text-lg">Get the Full AequOs Experience</h3>
                     <p className="text-purple-700 text-sm mt-1">Continue tracking your recovery in the mini app</p>
                   </div>
                 </div>
@@ -1380,7 +1380,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-3xl mb-3">✅</p>
-              <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
+              <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using AequOs!</h3>
               <p className="text-sm text-green-700 mb-4">We hope the triage assessment was helpful.</p>
 
               {/* Post-consultation chatbot */}
@@ -1483,7 +1483,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
 
         {/* Call to Action */}
         <div className="text-center mt-8 p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-teal-50 border-2 border-blue-300 rounded-xl shadow-lg">
-          <h3 className="text-blue-900 font-bold text-xl mb-2">🎯 Unlock the Full OrthoIQ Experience</h3>
+          <h3 className="text-blue-900 font-bold text-xl mb-2">🎯 Unlock the Full AequOs Experience</h3>
           <p className="text-blue-700 text-sm mb-4 max-w-2xl mx-auto">
             Get unlimited questions, milestone tracking, token rewards, and personalized recovery guidance in our Farcaster mini app!
           </p>
@@ -1516,7 +1516,7 @@ export default function WebOrthoInterface({ className = "" }: WebOrthoInterfaceP
             className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-bold shadow-lg transform hover:scale-105"
           >
             <span className="mr-2">🚀</span>
-            Launch OrthoIQ Mini App
+            Launch AequOs Mini App
           </button>
 
           <p className="text-xs text-blue-600 mt-3">

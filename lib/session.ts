@@ -9,7 +9,7 @@ import {
 } from './database';
 
 // Session configuration
-const SESSION_COOKIE_NAME = 'orthoiq_session';
+const SESSION_COOKIE_NAME = 'aequos_session';
 const SESSION_DURATION_DAYS = 90; // For milestone journey support
 
 export interface SessionData {

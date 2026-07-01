@@ -10,9 +10,9 @@ const ALLOWED_PURPOSES: WalletChallengePurpose[] = ['connect', 'verify', 'backfi
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
 const STATEMENT_FOR_PURPOSE: Record<WalletChallengePurpose, string> = {
-  connect: 'Sign in to OrthoIQ with your wallet. This creates your profile.',
-  verify: 'Confirm wallet ownership to link this wallet to your OrthoIQ profile.',
-  backfill: 'Confirm wallet ownership to attach your earlier OrthoIQ consultations to your profile.',
+  connect: 'Sign in to AequOs with your wallet. This creates your profile.',
+  verify: 'Confirm wallet ownership to link this wallet to your AequOs profile.',
+  backfill: 'Confirm wallet ownership to attach your earlier AequOs consultations to your profile.',
 };
 
 export async function POST(request: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const host = request.headers.get('host') || 'orthoiq.com';
+    const host = request.headers.get('host') || 'orthoiq.vercel.app';
     const proto = request.headers.get('x-forwarded-proto') || 'https';
     const issuedAt = new Date().toISOString();
     const nonce = crypto.randomBytes(32).toString('hex');

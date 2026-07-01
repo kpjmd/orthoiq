@@ -1,18 +1,18 @@
 'use client';
 
-interface OrthoIQLogoProps {
+interface AequOsLogoProps {
   size?: 'small' | 'medium' | 'large' | number;
   variant?: 'blue' | 'teal' | 'monochrome' | 'gold';
   circular?: boolean;
   className?: string;
 }
 
-export default function OrthoIQLogo({ 
+export default function AequOsLogo({ 
   size = 'medium', 
   variant = 'blue', 
   circular = false,
   className = "" 
-}: OrthoIQLogoProps) {
+}: AequOsLogoProps) {
   
   const getSizeValues = () => {
     if (typeof size === 'number') {

@@ -18,7 +18,7 @@ export default function AuthSection() {
   return (
     <>
       <h2 className="text-2xl font-semibold mb-4 text-gray-800 text-center">
-        {shouldShowSignIn ? 'Get Started' : 'Ask OrthoIQ'}
+        {shouldShowSignIn ? 'Get Started' : 'Ask AequOs'}
       </h2>
       {shouldShowSignIn ? (
         <WebSignIn />

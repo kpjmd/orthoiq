@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import ResponseCard from './ResponseCard';
-import OrthoIQLogo from './OrthoIQLogo';
+import AequOsLogo from './AequOsLogo';
 import Disclaimer from './Disclaimer';
 
 interface OrthoFrameProps {
@@ -81,8 +81,8 @@ export default function OrthoFrame({ className = "" }: OrthoFrameProps) {
     <div className={`frame-container ${className}`}>
       <div className="medical-gradient text-white p-6 text-center">
         <div className="flex items-center justify-center gap-3 mb-2">
-          <OrthoIQLogo size="medium" variant="blue" />
-          <h1 className="text-3xl font-bold">OrthoIQ</h1>
+          <AequOsLogo size="medium" variant="blue" />
+          <h1 className="text-3xl font-bold">AequOs</h1>
         </div>
         <p className="text-lg opacity-90">Ask the Orthopedic AI</p>
         <p className="text-sm mt-2 opacity-75">by KPJMD</p>

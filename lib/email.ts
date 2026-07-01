@@ -16,7 +16,7 @@ function getResendClient(): Resend {
 }
 
 // Email configuration
-const FROM_EMAIL = process.env.FROM_EMAIL || 'OrthoIQ <onboarding@resend.dev>';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'AequOs <onboarding@resend.dev>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orthoiq.vercel.app';
 
 // ============================================
@@ -42,18 +42,18 @@ export async function sendMagicLinkEmail(
     const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: 'Sign in to OrthoIQ',
+      subject: 'Sign in to AequOs',
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Sign in to OrthoIQ</title>
+          <title>Sign in to AequOs</title>
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">OrthoIQ</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">AequOs</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">AI-Powered Orthopedic Consultation</p>
           </div>
 
@@ -61,7 +61,7 @@ export async function sendMagicLinkEmail(
             <p style="font-size: 16px; margin-bottom: 20px;">Hi there,</p>
 
             <p style="font-size: 16px; margin-bottom: 25px;">
-              Click the button below to securely access OrthoIQ:
+              Click the button below to securely access AequOs:
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
@@ -74,7 +74,7 @@ export async function sendMagicLinkEmail(
                         font-weight: 600;
                         font-size: 16px;
                         display: inline-block;">
-                Sign In to OrthoIQ
+                Sign In to AequOs
               </a>
             </div>
 
@@ -91,7 +91,7 @@ export async function sendMagicLinkEmail(
           </div>
 
           <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-            <p>Best,<br>The OrthoIQ Team</p>
+            <p>Best,<br>The AequOs Team</p>
           </div>
         </body>
         </html>
@@ -99,14 +99,14 @@ export async function sendMagicLinkEmail(
       text: `
 Hi there,
 
-Click the link below to securely access OrthoIQ:
+Click the link below to securely access AequOs:
 
 ${magicLink}
 
 This link expires in 15 minutes. If you didn't request this, you can safely ignore this email.
 
 Best,
-The OrthoIQ Team
+The AequOs Team
       `.trim()
     });
 
@@ -131,18 +131,18 @@ export async function sendWelcomeEmail(email: string): Promise<EmailResult> {
     const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: 'Welcome to OrthoIQ - Your Recovery Journey Begins',
+      subject: 'Welcome to AequOs - Your Recovery Journey Begins',
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to OrthoIQ</title>
+          <title>Welcome to AequOs</title>
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to OrthoIQ!</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to AequOs!</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Your AI-Powered Recovery Partner</p>
           </div>
 
@@ -180,13 +180,13 @@ export async function sendWelcomeEmail(email: string): Promise<EmailResult> {
           </div>
 
           <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-            <p>Best,<br>The OrthoIQ Team</p>
+            <p>Best,<br>The AequOs Team</p>
           </div>
         </body>
         </html>
       `,
       text: `
-Welcome to OrthoIQ!
+Welcome to AequOs!
 
 You now have access to AI-powered orthopedic consultations backed by a panel of specialist agents.
 
@@ -200,7 +200,7 @@ Visit ${APP_URL} to start your consultation.
 We're here to support your recovery journey.
 
 Best,
-The OrthoIQ Team
+The AequOs Team
       `.trim()
     });
 
@@ -303,7 +303,7 @@ export async function sendMilestoneEmail(
     `Start week ${weekNumber} check-in:`,
     trackingLink,
     '',
-    '— OrthoIQ follow-up',
+    '— AequOs follow-up',
   ].join('\n');
 
   const htmlBody = `<!DOCTYPE html>
@@ -323,7 +323,7 @@ export async function sendMilestoneEmail(
     </a>
   </p>
   <p style="font-size: 13px; color: #6b7280; margin: 32px 0 0 0; border-top: 1px solid #e5e7eb; padding-top: 16px;">
-    — OrthoIQ follow-up
+    — AequOs follow-up
   </p>
 </body>
 </html>`;
@@ -362,7 +362,7 @@ export async function sendRateLimitWarningEmail(
     const { data, error } = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: 'OrthoIQ: Daily Question Limit Reached',
+      subject: 'AequOs: Daily Question Limit Reached',
       html: `
         <!DOCTYPE html>
         <html>
@@ -380,22 +380,22 @@ export async function sendRateLimitWarningEmail(
             <p style="font-size: 16px; margin-bottom: 20px;">Hi there,</p>
 
             <p style="font-size: 16px; margin-bottom: 20px;">
-              You've used all ${limit} of your daily consultations on OrthoIQ. Your questions will reset at midnight UTC.
+              You've used all ${limit} of your daily consultations on AequOs. Your questions will reset at midnight UTC.
             </p>
 
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
               <p style="margin: 0; font-size: 14px;">
-                <strong>Want unlimited access?</strong> Try OrthoIQ on Farcaster for unlimited consultations and exclusive features like recovery tracking with PROMIS milestones.
+                <strong>Want unlimited access?</strong> Try AequOs on Farcaster for unlimited consultations and exclusive features like recovery tracking with PROMIS milestones.
               </p>
             </div>
 
             <p style="font-size: 14px; color: #666;">
-              Thank you for using OrthoIQ. We're here to support your recovery journey.
+              Thank you for using AequOs. We're here to support your recovery journey.
             </p>
           </div>
 
           <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-            <p>Best,<br>The OrthoIQ Team</p>
+            <p>Best,<br>The AequOs Team</p>
           </div>
         </body>
         </html>
@@ -403,14 +403,14 @@ export async function sendRateLimitWarningEmail(
       text: `
 Hi there,
 
-You've used all ${limit} of your daily consultations on OrthoIQ. Your questions will reset at midnight UTC.
+You've used all ${limit} of your daily consultations on AequOs. Your questions will reset at midnight UTC.
 
-Want unlimited access? Try OrthoIQ on Farcaster for unlimited consultations and exclusive features like recovery tracking with PROMIS milestones.
+Want unlimited access? Try AequOs on Farcaster for unlimited consultations and exclusive features like recovery tracking with PROMIS milestones.
 
-Thank you for using OrthoIQ. We're here to support your recovery journey.
+Thank you for using AequOs. We're here to support your recovery journey.
 
 Best,
-The OrthoIQ Team
+The AequOs Team
       `.trim()
     });
 
