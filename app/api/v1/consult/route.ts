@@ -7,10 +7,11 @@ import {
   storeConsultation,
   initDatabase,
 } from '@/lib/database';
+import { assembleConsultationPayload } from '@/lib/consultAssembly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const CONTENT_PIPELINE_FID = 'content-pipeline';
 
@@ -103,9 +104,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ jobId, status: 'pending', createdAt });
   }
 
-  // Fallback path: Railway returned a synchronous result (or Claude fallback fired).
-  // No multi-specialist payload to assemble — store whatever we have and mark completed.
+  // Synchronous full consultation: Railway returned a complete multi-specialist
+  // panel (e.g. a /consultation cache hit) rather than acking async. transformNormalModeResponse
+  // maps it to a ClaudeResponse with fromAgentsSystem:true + populated rawConsultationData/
+  // participatingSpecialists but NO processingAsync. Assemble the real payload (specialists,
+  // equipoiseCards, divergences, bodyPart, executionTime) exactly as the GET handler does —
+  // never degrade it.
+  const isSyncFullConsultation =
+    claudeResponse?.fromAgentsSystem === true &&
+    !claudeResponse.processingAsync &&
+    !!claudeResponse.rawConsultationData &&
+    Array.isArray(claudeResponse.participatingSpecialists) &&
+    claudeResponse.participatingSpecialists.length > 0;
+
+  if (isSyncFullConsultation && claudeResponse.consultationId) {
+    const consultationId = claudeResponse.consultationId;
+
+    // Persist consultation_id BEFORE staging so a research-pending job is pollable
+    // via GET (finishResearchPhase reads job.consultation_id; markContentJobConsultationComplete
+    // does not write it).
+    try {
+      await setContentJobConsultationId(jobId, consultationId);
+    } catch (err) {
+      console.error(`[v1/consult] Failed to set consultation_id on sync job ${jobId}:`, err);
+    }
+
+    const result = await assembleConsultationPayload({
+      claudeResponse,
+      jobId,
+      question,
+      createdAt,
+      consultationId,
+      responseTime: (claudeResponse.rawConsultationData as any)?.totalResponseTime ?? 0,
+    });
+
+    return NextResponse.json(result.payload);
+  }
+
+  // Fallback path: a non-panel agents response (informational / out-of-scope) or a
+  // genuine Claude-only fallback. `degraded` is reserved for the latter
+  // (fromAgentsSystem !== true); keep specialists and participatingSpecialists
+  // consistent (both empty when degraded — no roster-default 5-vs-0 mismatch).
   const completedAt = new Date().toISOString();
+  const degraded = claudeResponse?.fromAgentsSystem !== true;
   const fallbackPayload = {
     jobId,
     status: 'completed' as const,
@@ -128,10 +169,10 @@ export async function POST(request: NextRequest) {
     meta: {
       bodyPart: null,
       predictedRecoveryDays: null,
-      participatingSpecialists: claudeResponse?.participatingSpecialists || [],
+      participatingSpecialists: degraded ? [] : (claudeResponse?.participatingSpecialists || []),
       executionTime: null,
       fromAgentsSystem: claudeResponse?.fromAgentsSystem ?? false,
-      degraded: true,
+      degraded,
       researchStatus: claudeResponse?.researchData ? 'complete' : null,
     },
   };
