@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchConsultationStatus, transformNormalModeResponse, getOrthoResponse } from '@/lib/claude';
-import { fetchResearchStatus, triggerResearchAgents, fetchEquipoiseCards } from '@/lib/agentsClient';
+import { fetchResearchStatus } from '@/lib/agentsClient';
 import {
   getContentJob,
   finalizeContentJob,
-  markContentJobConsultationComplete,
   updateConsultationResponse,
   patchConsultationResearchData,
   storeConsultation,
   setContentJobConsultationId,
 } from '@/lib/database';
-import { extractBodyPart } from '@/lib/bodyPart';
-import { extractRecoveryDays } from '@/lib/recoveryDays';
-import { buildEnrichments } from '@/lib/specialists';
-import { toContentDivergences } from '@/lib/divergence';
+import {
+  assembleConsultationPayload,
+  isResearchStub,
+  withPopulatedEquipoiseCards,
+} from '@/lib/consultAssembly';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const CONTENT_PIPELINE_FID = 'content-pipeline';
 const SELF_HEAL_GRACE_MS = 15_000;
@@ -34,27 +34,6 @@ function researchTimeoutMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
 }
 
-// Best-effort: swap the skeleton equipoise cards in a finalized payload for the
-// persisted set (with populated evidence ledgers) once the backend has them.
-// Falls back to whatever is already on the payload if the populated set isn't
-// ready (count short) or the fetch fails. Mutates and returns the payload.
-async function withPopulatedEquipoiseCards(payload: any, consultationId: string): Promise<any> {
-  try {
-    const current = payload?.consultation?.equipoiseCards;
-    const expected = Array.isArray(current) ? current.length : 0;
-    if (expected === 0) return payload;
-    const { cards: populated, ready } = await fetchEquipoiseCards(consultationId);
-    // Only ship the persisted set once the backend says it's ready and complete;
-    // otherwise keep the skeletons rather than emit half-compiled ledgers.
-    if (ready && populated.length >= expected) {
-      payload.consultation.equipoiseCards = populated;
-    }
-  } catch (e) {
-    console.error(`[v1/consult] populate equipoise cards failed for ${consultationId}:`, e);
-  }
-  return payload;
-}
-
 function toIso(value: any): string | null {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
@@ -63,30 +42,6 @@ function toIso(value: any): string | null {
   } catch {
     return null;
   }
-}
-
-function buildResearchCaseData(question: string, rawConsultationData: any): any {
-  const cd = rawConsultationData?.caseData;
-  if (cd) {
-    return {
-      primaryComplaint: cd.primaryComplaint || question,
-      symptoms: cd.symptoms,
-      duration: cd.duration,
-      location: cd.location,
-      painLevel: cd.painLevel,
-      age: cd.age,
-      rawQuery: cd.rawQuery || question,
-    };
-  }
-  return { primaryComplaint: question, rawQuery: question };
-}
-
-// Returns true when `data` is the Railway research-kickoff stub rather than a
-// completed research result. Railway embeds { status: 'pending', estimatedSeconds,
-// pollEndpoint } in the consultation response while the research agent is still running.
-function isResearchStub(data: any): boolean {
-  if (!data || typeof data !== 'object') return false;
-  return data.status === 'pending' || typeof data.pollEndpoint === 'string';
 }
 
 export async function GET(
@@ -346,173 +301,22 @@ export async function GET(
     return NextResponse.json({ jobId, status: 'pending', createdAt });
   }
 
-  // Railway → completed. Assemble the consultation payload.
+  // Railway → completed. Assemble the consultation payload via the shared helper
+  // (same assembly used by the POST synchronous-consultation path).
   const claudeResponse = transformNormalModeResponse(railwayData, undefined, job.question);
-  const specialists = claudeResponse.participatingSpecialists || [];
-  const enrichments = buildEnrichments(claudeResponse.rawConsultationData);
-
-  let extractedBodyPart: string | null = null;
-  try {
-    extractedBodyPart = await extractBodyPart({
-      question: job.question,
-      keyFindings: Array.isArray((claudeResponse.rawConsultationData as any)?.keyFindings)
-        ? ((claudeResponse.rawConsultationData as any).keyFindings as any[])
-            .map((f: any) => (typeof f === 'string' ? f : f?.finding || ''))
-            .filter(Boolean)
-        : [],
-    });
-  } catch (e) {
-    console.error(`[v1/consult/${jobId}] extractBodyPart failed:`, e);
-  }
-
-  let estimatedRecoveryDays: number | null = null;
-  try {
-    estimatedRecoveryDays = await extractRecoveryDays({
-      question: job.question,
-      bodyPart: extractedBodyPart,
-    });
-  } catch (e) {
-    console.error(`[v1/consult/${jobId}] extractRecoveryDays failed:`, e);
-  }
-
-  const rawResearch = railwayData.research ?? null;
-  const inlineResearch = rawResearch && !isResearchStub(rawResearch) ? rawResearch : null;
-
-  try {
-    const { updated, exists } = await updateConsultationResponse({
-      consultationId,
-      status: 'completed',
-      responseText: claudeResponse.response || '',
-      rawConsultationData: claudeResponse.rawConsultationData,
-      researchData: inlineResearch,
-      participatingSpecialists: specialists,
-      specialistCount: specialists.length,
-      executionTime: railwayData.responseTime || 0,
-      bodyPart: extractedBodyPart,
-      predictedRecoveryDays: estimatedRecoveryDays,
-    });
-
-    if (!exists && claudeResponse.response) {
-      try {
-        await storeConsultation({
-          consultationId,
-          questionId: null,
-          fid: CONTENT_PIPELINE_FID,
-          mode: 'normal',
-          participatingSpecialists: specialists,
-          specialistCount: specialists.length,
-          executionTime: railwayData.responseTime || 0,
-          status: 'completed',
-          questionText: job.question,
-          responseText: claudeResponse.response,
-          rawConsultationData: claudeResponse.rawConsultationData,
-          researchData: inlineResearch,
-          bodyPart: extractedBodyPart,
-          predictedRecoveryDays: estimatedRecoveryDays,
-        });
-        console.log(`[v1/consult/${jobId}] Fallback insert created consultations row`);
-      } catch (e) {
-        console.error(`[v1/consult/${jobId}] Fallback insert failed:`, e);
-      }
-    }
-
-    console.log(`[v1/consult/${jobId}] Persisted consultation ${consultationId} (updated=${updated})`);
-  } catch (e) {
-    console.error(`[v1/consult/${jobId}] Persist consultation failed:`, e);
-  }
-
-  const specialistPayload = enrichments.map(e => {
-    const raw = (claudeResponse.rawConsultationData as any)?.responses?.find(
-      (r: any) => (r.response?.specialistType || r.specialistType) === e.metadata.agentType
-    );
-    const recommendations = raw?.response?.recommendations || raw?.recommendations || [];
-    return {
-      name: e.title,
-      type: e.metadata.specialist,
-      response: e.content,
-      confidence: e.metadata.confidence,
-      recommendations,
-    };
-  });
-
-  const synthesized = (claudeResponse.rawConsultationData as any)?.synthesizedRecommendations || null;
-  const divergences = toContentDivergences(synthesized?.coordinationMetadata?.divergences, consultationId);
-
-  const buildPayload = (researchStatus: 'complete' | 'pending', researchData: any) => {
-    const completedIso = researchStatus === 'complete' ? new Date().toISOString() : null;
-    return {
-      jobId,
-      status: researchStatus === 'complete' ? ('completed' as const) : ('pending' as const),
-      question: job.question,
-      createdAt,
-      completedAt: completedIso,
-      consultation: {
-        response: claudeResponse.response || '',
-        inquiry: claudeResponse.inquiry,
-        keyPoints: claudeResponse.keyPoints || [],
-        urgencyLevel: claudeResponse.urgencyLevel,
-        dataCompleteness: claudeResponse.dataCompleteness,
-        triageConfidence: claudeResponse.triageConfidence,
-        suggestedFollowUp: claudeResponse.suggestedFollowUp || [],
-        specialists: specialistPayload,
-        treatmentPlan: synthesized,
-        equipoiseCards: synthesized?.equipoiseCards || [],
-        divergences,
-        researchData,
-      },
-      meta: {
-        bodyPart: extractedBodyPart,
-        predictedRecoveryDays: estimatedRecoveryDays,
-        participatingSpecialists: specialists,
-        executionTime: railwayData.responseTime || 0,
-        consultationId,
-        researchStatus,
-      },
-    };
-  };
-
-  // Inline research present — finalize immediately.
-  if (inlineResearch) {
-    const payload = await withPopulatedEquipoiseCards(buildPayload('complete', inlineResearch), consultationId);
-    try {
-      await finalizeContentJob({
-        jobId,
-        status: 'completed',
-        resultPayload: payload,
-        researchStatus: 'complete',
-      });
-    } catch (e) {
-      console.error(`[v1/consult/${jobId}] finalize completed write failed:`, e);
-    }
-    return NextResponse.json(payload);
-  }
-
-  // Research is missing — trigger it, stage the partial payload, return pending.
-  const stagedPayload = buildPayload('pending', null);
-  const note = 'Consultation complete, awaiting research';
-
-  const triggerResult = await triggerResearchAgents({
+  const result = await assembleConsultationPayload({
+    claudeResponse,
+    jobId,
+    question: job.question,
+    createdAt,
     consultationId,
-    caseData: buildResearchCaseData(job.question, claudeResponse.rawConsultationData),
-    consultationResult: claudeResponse.rawConsultationData,
+    responseTime: railwayData.responseTime || 0,
   });
-  if (!triggerResult.ok) {
-    console.warn(
-      `[v1/consult/${jobId}] triggerResearchAgents returned not-ok (status=${triggerResult.status}): ${triggerResult.error || 'unknown'} — polling anyway`
-    );
-  }
 
-  try {
-    await markContentJobConsultationComplete({
-      jobId,
-      researchStatus: 'pending',
-      resultPayload: stagedPayload,
-    });
-  } catch (e) {
-    console.error(`[v1/consult/${jobId}] markContentJobConsultationComplete failed:`, e);
+  if (result.kind === 'completed') {
+    return NextResponse.json(result.payload);
   }
-
-  return NextResponse.json({ jobId, status: 'pending', createdAt, note });
+  return NextResponse.json({ jobId, status: 'pending', createdAt, note: result.note });
 }
 
 /**
