@@ -39,6 +39,7 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
   }
   
   const embedImageUrl = `/api/og-image?shareId=${shareId}`;
+  const host = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
 
   const title = `AequOs: ${question.substring(0, 60)}${question.length > 60 ? '...' : ''}`;
   const description = `AI Response: ${response.substring(0, 150)}${response.length > 150 ? '...' : ''}`;
@@ -75,7 +76,7 @@ export async function generateMetadata({ params, searchParams }: SharePageProps)
           action: {
             type: 'launch_frame',
             name: 'AequOs',
-            url: 'https://orthoiq.vercel.app/miniapp'
+            url: `${host}/miniapp`
           }
         }
       })

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { AuthProvider } from '@/components/AuthProvider';
 
+const host = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
+
 export const metadata: Metadata = {
   title: 'AequOs - AI Orthopedic Expert',
   description: 'Get expert orthopedic advice from AI founded by KPJMD. Premier medical assistant for bone, joint, and muscle questions.',
@@ -9,7 +11,7 @@ export const metadata: Metadata = {
     description: 'Get expert orthopedic advice from AI founded by KPJMD. Premier medical assistant for bone, joint, and muscle questions.',
     images: [
       {
-        url: 'https://orthoiq.vercel.app/og-image.png',
+        url: `${host}/og-image.png`,
         width: 1200,
         height: 630,
         alt: 'AequOs - AI Orthopedic Expert'
@@ -20,14 +22,14 @@ export const metadata: Metadata = {
   other: {
     'fc:miniapp': JSON.stringify({
       name: 'AequOs - AI Orthopedic Expert',
-      icon: 'https://orthoiq.vercel.app/icon.png',
-      splashImage: 'https://orthoiq.vercel.app/splash-image1.png',
+      icon: `${host}/icon.png`,
+      splashImage: `${host}/splash-image1.png`,
       splashBackgroundColor: '#1e3a8a',
       buttonTitle: 'Ask AequOs'
     }),
     'fc:miniapp:name': 'AequOs - AI Orthopedic Expert',
-    'fc:miniapp:icon': 'https://orthoiq.vercel.app/icon.png',
-    'fc:miniapp:splash_image': 'https://orthoiq.vercel.app/splash-image1.png',
+    'fc:miniapp:icon': `${host}/icon.png`,
+    'fc:miniapp:splash_image': `${host}/splash-image1.png`,
     'fc:miniapp:splash_background_color': '#1e3a8a',
     'fc:miniapp:button_title': 'Ask AequOs'
   }

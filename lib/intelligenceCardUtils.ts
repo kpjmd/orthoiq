@@ -620,7 +620,7 @@ export function generateIntelligenceCardNFTMetadata(
       collection: 'AequOs Intelligence Cards',
       category: 'Medical AI',
       royalty: '5%',
-      trackingUrl: `https://orthoiq.vercel.app/track/${cardData.caseId}`
+      trackingUrl: `${process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app'}/track/${cardData.caseId}`
     }
   };
 }

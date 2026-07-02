@@ -443,7 +443,7 @@ export default function IntelligenceCardModal({
             ) : (
               <p className="text-white/50 text-sm">
                 Scan QR code or visit{' '}
-                <span className="text-blue-400">orthoiq.vercel.app/track/{cardData.caseId}</span>
+                <span className="text-blue-400">{(process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app').replace(/^https?:\/\//, '')}/track/{cardData.caseId}</span>
                 {' '}to validate predictions
               </p>
             )}

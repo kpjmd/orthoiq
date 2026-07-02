@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Create clean share URL
-    const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://orthoiq.vercel.app'}/share/${shareId}`;
+    const shareUrl = `${process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app'}/share/${shareId}`;
 
     return NextResponse.json({
       success: true,

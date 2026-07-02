@@ -4140,7 +4140,7 @@ export async function createPlatformHandoff(data: {
 
   try {
     const handoffId = `handoff_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    const miniappUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'https://orthoiq.vercel.app';
+    const miniappUrl = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
     const handoffLink = `${miniappUrl}?handoff=${handoffId}${data.consultationId ? `&consultation=${data.consultationId}` : ''}`;
 
     await sql`

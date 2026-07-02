@@ -3,7 +3,7 @@ import { UserTier } from './rateLimit';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orthoiq.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
 
 export interface NotificationData {
   title: string;
@@ -130,7 +130,7 @@ export async function sendResponseReviewNotification(data: ResponseReviewNotific
     title,
     body,
     targetUrl: `/miniapp?questionId=${data.questionId}`,
-    imageUrl: 'https://orthoiq.vercel.app/icon.png'
+    imageUrl: `${APP_URL}/icon.png`
   };
 
   return await sendNotification(data.fid, notification);
@@ -144,7 +144,7 @@ export async function sendRateLimitResetNotification(fid: string, tier: UserTier
     title: '🔄 Questions Reset',
     body: `Your daily question limit has reset! You can now ask ${dailyLimit} new question${dailyLimit > 1 ? 's' : ''}.`,
     targetUrl: '/miniapp',
-    imageUrl: 'https://orthoiq.vercel.app/icon.png'
+    imageUrl: `${APP_URL}/icon.png`
   };
 
   return await sendNotification(fid, notification);
@@ -165,7 +165,7 @@ export async function sendMilestoneNotification(
     title: `Week ${weekNumber} check-in`,
     body: `${weekNumber} weeks since ${consultationPhrase}. A short check-in shows how recovery is tracking.`,
     targetUrl: `/miniapp?track=${consultationId}&milestone=${milestoneDay}`,
-    imageUrl: 'https://orthoiq.vercel.app/icon.png'
+    imageUrl: `${APP_URL}/icon.png`
   };
 
   return await sendNotification(fid, notification, {

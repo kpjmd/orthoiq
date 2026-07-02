@@ -17,7 +17,7 @@ function getResendClient(): Resend {
 
 // Email configuration
 const FROM_EMAIL = process.env.FROM_EMAIL || 'AequOs <onboarding@resend.dev>';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orthoiq.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
 
 // ============================================
 // Email Templates - Professional but Approachable

@@ -1,6 +1,9 @@
 import { PrescriptionData, PrescriptionMetadata } from './types';
 import { IntelligenceCardData, getTierConfig, generateIntelligenceCardNFTMetadata } from './intelligenceCardUtils';
 
+const HOST = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
+const BARE_HOST = HOST.replace(/^https?:\/\//, '');
+
 export interface ExportOptions {
   format: 'png' | 'svg' | 'instagram' | 'linkedin' | 'twitter' | 'farcaster';
   quality?: number;
@@ -134,7 +137,7 @@ export function generateInstagramStoryFormat(
       
       <!-- Footer -->
       <text x="540" y="1850" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#9ca3af">
-        orthoiq.vercel.app • AI-Powered Medical Intelligence
+        ${BARE_HOST} • AI-Powered Medical Intelligence
       </text>
     </svg>
   `;
@@ -191,7 +194,7 @@ export function generateLinkedInPost(
       <!-- Footer -->
       <rect x="100" y="500" width="1000" height="50" fill="${metadata.theme.primaryColor}" rx="25" />
       <text x="600" y="530" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
-        Experience AI-Powered Orthopedic Care at orthoiq.vercel.app
+        Experience AI-Powered Orthopedic Care at ${BARE_HOST}
       </text>
     </svg>
   `;
@@ -244,7 +247,7 @@ export function generateTwitterCard(
       
       <!-- CTA -->
       <text x="600" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#374151">
-        Get your AI prescription at orthoiq.vercel.app
+        Get your AI prescription at ${BARE_HOST}
       </text>
       
       <!-- Footer -->
@@ -350,9 +353,9 @@ export function generateNFTMetadata(
   return {
     name: `AequOs Prescription #${metadata.id}`,
     description: `${mdReviewed ? 'MD-Reviewed ' : ''}AI-generated orthopedic prescription: "${prescriptionData.userQuestion.substring(0, 150)}..."${mdReviewed ? ` Reviewed by ${mdReviewerName || 'Dr. KPJMD'}.` : ''}`,
-    image: `https://orthoiq.vercel.app/api/prescription-image/${metadata.id}`,
-    external_url: `https://orthoiq.vercel.app/prescription/${metadata.id}`,
-    animation_url: metadata.rarity === 'ultra-rare' ? `https://orthoiq.vercel.app/api/prescription-animation/${metadata.id}` : undefined,
+    image: `${HOST}/api/prescription-image/${metadata.id}`,
+    external_url: `${HOST}/prescription/${metadata.id}`,
+    animation_url: metadata.rarity === 'ultra-rare' ? `${HOST}/api/prescription-animation/${metadata.id}` : undefined,
     attributes: [
       {
         trait_type: "Rarity",
@@ -838,5 +841,5 @@ export function generateIntelligenceCardShareText(cardData: IntelligenceCardData
 
 ${cardData.primaryPrediction.text}
 
-Track predictions: orthoiq.vercel.app/track/${cardData.caseId}`;
+Track predictions: ${BARE_HOST}/track/${cardData.caseId}`;
 }

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     
     try {
       // Get domain from environment - handle both local and production
-      const domain = process.env.NEXT_PUBLIC_DOMAIN || 'orthoiq.vercel.app';
+      const domain = (process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app').replace(/^https?:\/\//, '');
       console.log(`Auth: Verifying token for domain: ${domain}`);
       
       // Verify the JWT token

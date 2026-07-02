@@ -37,6 +37,9 @@ export default function WebHomePage() {
             <ProfileHeader />
           </div>
         </div>
+        <p className="text-lg opacity-90 mb-2">
+          Welcome to AequOs, a validated orthopedic protocol that diverges if and only if there&apos;s genuine equipoise.
+        </p>
         <p className="text-xl mb-2">AI-Powered Orthopedic Intelligence</p>
         <p className="text-lg opacity-90 mb-4">
           5 AI specialists collaborate on your case for comprehensive orthopedic guidance

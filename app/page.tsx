@@ -53,14 +53,14 @@ export async function generateMetadata() {
       // Farcaster Mini App embed metadata for shareability
       "fc:miniapp": JSON.stringify({
         "version": "1",
-        "imageUrl": "https://orthoiq.vercel.app/embed-image.png",
+        "imageUrl": `${baseUrl}/embed-image.png`,
         "button": {
           "title": "Ask AequOs",
           "action": {
             "type": "launch_frame",
             "name": "AequOs",
-            "url": "https://orthoiq.vercel.app/miniapp",
-            "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
+            "url": `${baseUrl}/miniapp`,
+            "splashImageUrl": `${baseUrl}/splash-image1.png`,
             "splashBackgroundColor": "#1e3a8a"
           }
         }
@@ -68,14 +68,14 @@ export async function generateMetadata() {
       // Backward compatibility
       "fc:frame": JSON.stringify({
         "version": "1",
-        "imageUrl": "https://orthoiq.vercel.app/embed-image.png",
+        "imageUrl": `${baseUrl}/embed-image.png`,
         "button": {
           "title": "Ask AequOs",
           "action": {
             "type": "launch_frame",
             "name": "AequOs",
-            "url": "https://orthoiq.vercel.app/miniapp",
-            "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
+            "url": `${baseUrl}/miniapp`,
+            "splashImageUrl": `${baseUrl}/splash-image1.png`,
             "splashBackgroundColor": "#1e3a8a"
           }
         }
