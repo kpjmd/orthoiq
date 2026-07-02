@@ -15,7 +15,7 @@ export const wagmiConfig = createConfig({
   chains: [base],
   connectors: [
     injected(),                           // MetaMask, Rabby, Coinbase extension, Base App injected wallet
-    baseAccount({ appName: 'OrthoIQ' }), // Base Account (native Base App flow)
+    baseAccount({ appName: 'AequOs' }), // Base Account (native Base App flow)
   ],
   storage: createStorage({ storage: cookieStorage }),
   ssr: true,

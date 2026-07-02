@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Create share and tracking URLs
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://orthoiq.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
     const shareUrl = `${baseUrl}/share/${shareId}`;
     const trackUrl = `${baseUrl}/track/${caseId}`;
 

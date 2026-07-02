@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         
         <rect x="100" y="100" width="1000" height="600" fill="white" rx="20"/>
         
-        <text x="150" y="200" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#1e3a8a">🦴 OrthoIQ</text>
+        <text x="150" y="200" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#1e3a8a">🦴 AequOs</text>
         <text x="150" y="240" font-family="Arial, sans-serif" font-size="18" fill="#6b7280">Premier Medical AI on Farcaster</text>
         
         <text x="150" y="320" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#3b82f6">Q:</text>

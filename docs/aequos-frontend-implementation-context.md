@@ -1,14 +1,14 @@
-# OrthoIQ Frontend Implementation Context
+# AequOs Frontend Implementation Context
 
 ## Current State Summary
 
 ### Platform Overview
-OrthoIQ is an AI-powered orthopedic and sports medicine consultation platform operating across:
+AequOs is an AI-powered orthopedic and sports medicine consultation platform operating across:
 - **Farcaster/Base miniapp** for crypto-native users
 - **Web application** targeting Instagram following
 - Built with **Railway deployment** and **Neon Serverless PostgreSQL**
 - Backend: **OrthoIQ-Agents** (5 specialized AI agents + Research Agent)
-- Frontend: **OrthoIQ** (React-based consultation interface)
+- Frontend: **AequOs** (React-based consultation interface)
 
 ### Backend Completion Status
 ✅ **Phase 1A Complete**: Research Agent fully implemented and deployed
@@ -340,7 +340,7 @@ function calculateConfidence(tokenStake, totalStaked) {
 
 ## Current Codebase Structure
 
-### Frontend (OrthoIQ Repository)
+### Frontend (AequOs Repository)
 ```
 src/
 ├── components/
@@ -420,7 +420,7 @@ src/
 ## Claude Code Implementation Strategy
 
 ### Terminal Setup
-- **Terminal 1**: OrthoIQ frontend (React)
+- **Terminal 1**: AequOs frontend (React)
 - **Terminal 2**: OrthoIQ-Agents backend (monitoring only - already deployed)
 
 ### Testing Approach

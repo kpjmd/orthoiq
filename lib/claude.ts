@@ -5,7 +5,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
-const ORTHOPEDIC_PROMPT = `You are OrthoIQ, a specialized AI assistant focused exclusively on orthopedic and sports medicine questions. Your role is to provide educational information about:
+const ORTHOPEDIC_PROMPT = `You are AequOs, a specialized AI assistant focused exclusively on orthopedic and sports medicine questions. Your role is to provide educational information about:
 
 - Orthopedic conditions and injuries
 - Sports medicine and athletic injuries  
@@ -193,8 +193,8 @@ async function tryOrthoIQAgents(
   const AGENTS_TIMEOUT = mode === 'fast' ? 100000 : 120000; // 100s for fast, 120s for normal
 
   // Debug: Log the endpoint being used to verify env var is correct
-  console.log(`[${requestId || 'unknown'}] [OrthoIQ] AGENTS_ENDPOINT resolved to: ${AGENTS_ENDPOINT}`);
-  console.log(`[${requestId || 'unknown'}] [OrthoIQ] ORTHOIQ_AGENTS_URL env var: ${process.env.ORTHOIQ_AGENTS_URL || 'NOT SET - using default'}`);
+  console.log(`[${requestId || 'unknown'}] [AequOs] AGENTS_ENDPOINT resolved to: ${AGENTS_ENDPOINT}`);
+  console.log(`[${requestId || 'unknown'}] [AequOs] ORTHOIQ_AGENTS_URL env var: ${process.env.ORTHOIQ_AGENTS_URL || 'NOT SET - using default'}`);
 
   try {
     // Health check first

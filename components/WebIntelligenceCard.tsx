@@ -32,7 +32,7 @@ export default function WebIntelligenceCard({ data, caseId }: WebIntelligenceCar
     window.addEventListener('resize', checkMobile);
 
     // Generate QR code
-    const trackingUrl = `https://orthoiq.vercel.app/track/${caseId}`;
+    const trackingUrl = `${process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app'}/track/${caseId}`;
     QRCode.toDataURL(trackingUrl, {
       width: 80,
       margin: 1,

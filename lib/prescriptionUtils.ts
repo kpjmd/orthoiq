@@ -290,7 +290,7 @@ export function generateMetadata(prescriptionData: PrescriptionData, rarity: Rar
     generatedAt: new Date().toISOString(),
     verificationHash: generateVerificationHash(prescriptionData),
     patientId: `ANON-${prescriptionData.fid}`,
-    prescriberId: 'ORTHOIQ-AI-001',
+    prescriberId: 'AEQUOS-AI-001',
     watermarkType
   };
 }

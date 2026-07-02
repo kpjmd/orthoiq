@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       milestone_day: day,
       consultation_id,
       fid,
-      message: `Day ${day} Check-in: How is your recovery progressing? Share your feedback to earn tokens and help improve OrthoIQ.`,
+      message: `Day ${day} Check-in: How is your recovery progressing? Share your feedback to earn tokens and help improve AequOs.`,
       type: 'milestone_reminder',
       created_at: new Date().toISOString()
     }));

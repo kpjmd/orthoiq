@@ -46,10 +46,10 @@ export default function ActionMenu({ response, question, onAskAnother, onViewArt
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
       
-      const shareText = `Just asked OrthoIQ: "${question.substring(0, 80)}${question.length > 80 ? '...' : ''}" 🦴 Get AI-powered orthopedic insights reviewed by a board-certified surgeon!`;
+      const shareText = `Just asked AequOs: "${question.substring(0, 80)}${question.length > 80 ? '...' : ''}" 🦴 Get AI-powered orthopedic insights reviewed by a board-certified surgeon!`;
       
       const webShareData = {
-        title: 'OrthoIQ Medical Insight',
+        title: 'AequOs Medical Insight',
         text: shareText,
         url: shareUrl
       };

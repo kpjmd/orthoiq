@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (sdk.quickAuth.token) {
           setToken(sdk.quickAuth.token);
           // Try to get user info from saved session
-          const savedUser = localStorage.getItem('orthoiq_user');
+          const savedUser = localStorage.getItem('aequos_user');
           if (savedUser) {
             const parsedUser = JSON.parse(savedUser);
             if (parsedUser.fid && typeof parsedUser.fid === 'number') {
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
           
           setUser(user);
-          localStorage.setItem('orthoiq_user', JSON.stringify(user));
+          localStorage.setItem('aequos_user', JSON.stringify(user));
           console.log('Auth: Sign-in successful for user:', user.username || `FID ${user.fid}`);
         } else {
           console.warn('Auth: API call failed, attempting fallback...');
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               };
               
               setUser(basicUser);
-              localStorage.setItem('orthoiq_user', JSON.stringify(basicUser));
+              localStorage.setItem('aequos_user', JSON.stringify(basicUser));
               console.log('Auth: Fallback sign-in successful for FID:', fid);
             } else {
               throw new Error('Could not extract valid FID from token');
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('orthoiq_user');
+    localStorage.removeItem('aequos_user');
     // Clear any Quick Auth session
     // Note: SDK doesn't provide a clear method, so we reload to reset
     setTimeout(() => {

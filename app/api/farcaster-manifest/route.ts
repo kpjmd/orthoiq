@@ -6,13 +6,13 @@ export async function GET() {
   
   const manifest = {
     accountAssociation: {
-      header: "eyJmaWQiOjE1MjMwLCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4NDI0QjM2REM0MmREYjEwZGZlNzVCZjkxODg5NzJlNUQ4Qzk0NzViNSJ9",
-      payload: "eyJkb21haW4iOiJvcnRob2lxLnZlcmNlbC5hcHAifQ",
-      signature: "MHg4YjRkMTZkY2QyODQ5YTdlY2U5MWY3ODM3OTY4OWEyYzQ3ZTAxZjJhMzQyOWRkYjJlYzE5ZWM3OWQ0MTIxMzJlMDY3ZDA5YjM3MTk2NmM3OWVjZDE5MmI2ZWUxZDkxN2U2OTAzMjJiZjYwZTk4MDgzNGRkMmE1YzYwMTc1OTYwMTFj"
+      header: "eyJmaWQiOjE1MjMwLCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4NzgyOTlmZkViQ0ZmN2EwNTQ0RjZmOUUzYUVjZTk3MzlCREZENTA0RiJ9",
+      payload: "eyJkb21haW4iOiJhZXF1b3MuaW8ifQ",
+      signature: "6D5FN8Zg69U12ztRF7z3W3QGa24Ki0TXqlWEKyxUk+o99EVcWY4wE35+wGu2hZxAokaLj/VtSgJcCo7vH4YufRw="
     },
     miniapp: {
       version: "1",
-      name: "OrthoIQ - AI Orthopedic Assistant",
+      name: "AequOs - AI Orthopedic Assistant",
       iconUrl: `${host}/icon.png`,
       splashImageUrl: `${host}/og-image.png`,
       splashBackgroundColor: "#1e3a8a",

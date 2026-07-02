@@ -1,19 +1,19 @@
 {
   "accountAssociation": {
-    "header": "eyJmaWQiOjE1MjMwLCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4NDI0QjM2REM0MmREYjEwZGZlNzVCZjkxODg5NzJlNUQ4Qzk0NzViNSJ9",
-    "payload": "eyJkb21haW4iOiJvcnRob2lxLnZlcmNlbC5hcHAifQ",
-    "signature": "MHg4YjRkMTZkY2QyODQ5YTdlY2U5MWY3ODM3OTY4OWEyYzQ3ZTAxZjJhMzQyOWRkYjJlYzE5ZWM3OWQ0MTIxMzJlMDY3ZDA5YjM3MTk2NmM3OWVjZDE5MmI2ZWUxZDkxN2U2OTAzMjJiZjYwZTk4MDgzNGRkMmE1YzYwMTc1OTYwMTFj"
+    "header": "eyJmaWQiOjE1MjMwLCJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4NzgyOTlmZkViQ0ZmN2EwNTQ0RjZmOUUzYUVjZTk3MzlCREZENTA0RiJ9",
+    "payload": "eyJkb21haW4iOiJhZXF1b3MuaW8ifQ",
+    "signature": "6D5FN8Zg69U12ztRF7z3W3QGa24Ki0TXqlWEKyxUk+o99EVcWY4wE35+wGu2hZxAokaLj/VtSgJcCo7vH4YufRw="
   },
   "miniapp": {
     "version": "1",
-    "name": "OrthoIQ - AI Orthopedic Expert",
-    "iconUrl": "https://orthoiq.vercel.app/icon-solid.png",
-    "imageUrl": "https://orthoiq.vercel.app/og-image.png",
-    "buttonTitle": "Ask OrthoIQ",
-    "splashImageUrl": "https://orthoiq.vercel.app/splash-image1.png",
+    "name": "AequOs - AI Orthopedic Expert",
+    "iconUrl": "https://aequos.io/icon-solid.png",
+    "imageUrl": "https://aequos.io/og-image.png",
+    "buttonTitle": "Ask AequOs",
+    "splashImageUrl": "https://aequos.io/splash-image1.png",
     "splashBackgroundColor": "#1e3a8a",
-    "webhookUrl": "https://orthoiq.vercel.app/api/webhook",
-    "homeUrl": "https://orthoiq.vercel.app/miniapp",
+    "webhookUrl": "https://aequos.io/api/webhook",
+    "homeUrl": "https://aequos.io/miniapp",
     "subtitle": "AI Orthopedic Expert",
     "description": "Get expert AI powered orthopedic advice with responses under MD review. Premier medical assistant for bone, joint, and muscle questions.",
     "tagline": "Premier Medical AI Assistant",
@@ -24,13 +24,13 @@
       "health",
       "doctor"
     ],
-    "ogTitle": "OrthoIQ - AI Orthopedic Expert",
-    "ogImageUrl": "https://orthoiq.vercel.app/og-image.png",
-    "heroImageUrl": "https://orthoiq.vercel.app/embed-image.png",
-    "castShareUrl": "https://orthoiq.vercel.app/miniapp",
+    "ogTitle": "AequOs - AI Orthopedic Expert",
+    "ogImageUrl": "https://aequos.io/og-image.png",
+    "heroImageUrl": "https://aequos.io/embed-image.png",
+    "castShareUrl": "https://aequos.io/miniapp",
     "ogDescription": "Get your orthopedic questions answers here, powered by Claude AI. Responses reviewed by MD.",
     "screenshotUrls": [
-      "https://orthoiq.vercel.app/orthoiq-screenshot.jpg"
+      "https://aequos.io/aequos-screenshot.jpg"
     ],
     "primaryCategory": "health-fitness"
   },

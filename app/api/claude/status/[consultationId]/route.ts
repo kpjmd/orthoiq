@@ -199,7 +199,7 @@ export async function GET(
         networkUtilization: specialists.length / 5,
       },
       agentRouting: {
-        selectedAgent: 'orthoiq-consultation',
+        selectedAgent: 'aequos-consultation',
         routingReason: 'multi_specialist_consultation',
         alternativeAgents: [],
         networkExecuted: true,

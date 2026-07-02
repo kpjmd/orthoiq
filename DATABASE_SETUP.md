@@ -1,4 +1,4 @@
-# Database Setup Guide for OrthoIQ
+# Database Setup Guide for AequOs
 
 ## Current Setup: Neon Database
 

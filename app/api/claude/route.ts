@@ -361,7 +361,7 @@ export async function POST(request: NextRequest) {
         }));
 
         agentRouting = {
-          selectedAgent: 'orthoiq-consultation',
+          selectedAgent: 'aequos-consultation',
           routingReason: 'multi_specialist_consultation',
           alternativeAgents: [],
           networkExecuted: true
@@ -787,5 +787,5 @@ function validateEnvironment(): { valid: boolean; errors: string[] } {
 }
 
 export async function GET() {
-  return NextResponse.json({ message: 'OrthoIQ Claude API is running' });
+  return NextResponse.json({ message: 'AequOs Claude API is running' });
 }

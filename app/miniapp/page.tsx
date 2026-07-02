@@ -9,7 +9,7 @@ import CountdownTimer from '@/components/CountdownTimer';
 import NotificationPermissions from '@/components/NotificationPermissions';
 import { useAuth } from '@/components/AuthProvider';
 import SignInButton from '@/components/SignInButton';
-import OrthoIQLogo from '@/components/OrthoIQLogo';
+import AequOsLogo from '@/components/AequOsLogo';
 import AgentLoadingCards from '@/components/AgentLoadingCards';
 import FeedbackModal from '@/components/FeedbackModal';
 import TriageResponseCard from '@/components/TriageResponseCard';
@@ -375,7 +375,7 @@ function MiniAppContent() {
     console.log('MiniApp Context Check:');
     console.log('- Has miniApp param:', hasMiniAppParam);
     console.log('- Is in frame:', isInFrame);
-    console.log('- Global Mini App flag:', window.__ORTHOIQ_MINI_APP__ || false);
+    console.log('- Global Mini App flag:', window.__AEQUOS_MINI_APP__ || false);
 
     // Enhanced context detection using SDK
     const checkMiniAppContext = async () => {
@@ -875,7 +875,7 @@ function MiniAppContent() {
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-600 flex items-center justify-center">
         <div className="text-center text-white max-w-md mx-auto p-6">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-lg mb-2">Loading OrthoIQ...</p>
+          <p className="text-lg mb-2">Loading AequOs...</p>
           <p className="text-sm opacity-75">Initializing Farcaster Mini App SDK</p>
           {error && (
             <div className="mt-4 p-3 bg-red-500 bg-opacity-20 border border-red-400 rounded-lg">
@@ -893,8 +893,8 @@ function MiniAppContent() {
       <div className="min-h-screen bg-gray-900 text-white">
         <div className="px-5 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <OrthoIQLogo size="small" variant="blue" className="text-white" />
-            <span className="text-sm text-gray-300">OrthoIQ</span>
+            <AequOsLogo size="small" variant="blue" className="text-white" />
+            <span className="text-sm text-gray-300">AequOs</span>
           </div>
           <button
             onClick={() => {
@@ -928,8 +928,8 @@ function MiniAppContent() {
         <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <OrthoIQLogo size="medium" variant="blue" className="text-white" />
-              <h1 className="text-3xl font-bold">OrthoIQ</h1>
+              <AequOsLogo size="medium" variant="blue" className="text-white" />
+              <h1 className="text-3xl font-bold">AequOs</h1>
             </div>
             <p className="text-lg opacity-90">Your Profile</p>
             <button
@@ -972,8 +972,8 @@ function MiniAppContent() {
       <div className="bg-gradient-to-br from-blue-900 to-blue-600 text-white p-6">
         <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <OrthoIQLogo size="medium" variant="blue" className="text-white" />
-            <h1 className="text-3xl font-bold">OrthoIQ</h1>
+            <AequOsLogo size="medium" variant="blue" className="text-white" />
+            <h1 className="text-3xl font-bold">AequOs</h1>
           </div>
           <p className="text-lg opacity-90">AI Orthopedic Expert</p>
           <p className="text-sm mt-2 opacity-75">by Dr. KPJMD</p>
@@ -1530,7 +1530,7 @@ function MiniAppContent() {
 
             <div className="p-6 bg-green-50 border border-green-200 rounded-xl text-center">
               <p className="text-3xl mb-3">✅</p>
-              <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using OrthoIQ!</h3>
+              <h3 className="font-semibold text-green-900 text-lg mb-2">Thank you for using AequOs!</h3>
               <p className="text-sm text-green-700 mb-4">We hope the triage assessment was helpful.</p>
 
               {/* Post-consultation chatbot */}
@@ -1645,7 +1645,7 @@ function MiniAppContent() {
           <summary className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg cursor-pointer list-none flex items-center justify-between hover:from-indigo-100 hover:to-blue-100 transition-colors">
             <div className="flex items-center space-x-2">
               <span className="text-lg">🤖</span>
-              <span className="text-sm font-semibold text-indigo-900">About OrthoIQ AI Platform</span>
+              <span className="text-sm font-semibold text-indigo-900">About AequOs AI Platform</span>
             </div>
             <svg className="w-5 h-5 text-indigo-500 transform group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

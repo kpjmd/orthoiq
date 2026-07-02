@@ -472,7 +472,7 @@ function QRSection({ caseId, yOffset, isMobile }: { caseId: string; yOffset: num
 
   useEffect(() => {
     // Generate QR code data URL
-    const trackingUrl = `https://orthoiq.vercel.app/track/${caseId}`;
+    const trackingUrl = `${process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app'}/track/${caseId}`;
     QRCode.toDataURL(trackingUrl, {
       width: 80,
       margin: 1,

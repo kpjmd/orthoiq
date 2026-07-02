@@ -13,7 +13,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'OrthoIQ - Ask the Orthopedic AI',
+  title: 'AequOs - Ask the Orthopedic AI',
   description: 'AI assistant for orthopedic and sports medicine questions',
   keywords: ['orthopedic', 'sports medicine', 'AI assistant', 'medical questions'],
   authors: [{ name: 'KPJMD' }],
@@ -21,18 +21,18 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'OrthoIQ',
+    title: 'AequOs',
   },
   openGraph: {
-    title: 'OrthoIQ - Ask the Orthopedic AI',
+    title: 'AequOs - Ask the Orthopedic AI',
     description: 'AI assistant for orthopedic and sports medicine questions',
-    siteName: 'OrthoIQ',
+    siteName: 'AequOs',
     locale: 'en_US',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'OrthoIQ - Ask the Orthopedic AI',
+    title: 'AequOs - Ask the Orthopedic AI',
     description: 'AI assistant for orthopedic and sports medicine questions',
   },
   icons: {
@@ -57,10 +57,10 @@ export default function RootLayout({
         {/* PWA meta tags - Modern approach */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="OrthoIQ" />
+        <meta name="apple-mobile-web-app-title" content="AequOs" />
         <link rel="apple-touch-icon" href="/icon.svg" />
         
-        {/* Mini App detection — sets window.__ORTHOIQ_MINI_APP__ flag read by page.tsx and PrescriptionModal */}
+        {/* Mini App detection — sets window.__AEQUOS_MINI_APP__ flag read by page.tsx and PrescriptionModal */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -70,13 +70,13 @@ export default function RootLayout({
                   url.pathname.startsWith('/miniapp') ||
                   url.searchParams.get('miniApp') === 'true';
                 if (isMiniApp) {
-                  window.__ORTHOIQ_MINI_APP__ = true;
+                  window.__AEQUOS_MINI_APP__ = true;
                 } else {
                   if ('serviceWorker' in navigator) {
                     window.addEventListener('load', function() {
                       navigator.serviceWorker.register('/sw.js')
-                        .then(function(r) { console.log('OrthoIQ SW registered:', r); })
-                        .catch(function(e) { console.log('OrthoIQ SW registration failed:', e); });
+                        .then(function(r) { console.log('AequOs SW registered:', r); })
+                        .catch(function(e) { console.log('AequOs SW registration failed:', e); });
                     });
                   }
                 }

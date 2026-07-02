@@ -20,7 +20,7 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold mb-2">OrthoIQ Admin Dashboard</h1>
+              <h1 className="text-3xl font-bold mb-2">AequOs Admin Dashboard</h1>
               <p className="text-lg opacity-90">Agent Performance Analytics</p>
             </div>
             <div className="flex space-x-3">

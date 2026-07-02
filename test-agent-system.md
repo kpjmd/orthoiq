@@ -1,7 +1,7 @@
-# OrthoIQ Agent System Test Guide
+# AequOs Agent System Test Guide
 
 ## Overview
-The OrthoIQ Agent System has been successfully implemented with the following components:
+The AequOs Agent System has been successfully implemented with the following components:
 
 ### ✅ Completed Features
 

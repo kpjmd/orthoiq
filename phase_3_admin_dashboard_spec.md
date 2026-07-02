@@ -808,7 +808,7 @@ import { RecentActivity } from './components/RecentActivity';
 export default async function AdminDashboard() {
   return (
     <div className="admin-dashboard">
-      <h1>OrthoIQ Admin Dashboard</h1>
+      <h1>AequOs Admin Dashboard</h1>
       
       <SystemOverview />
       

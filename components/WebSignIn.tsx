@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useWebAuth } from './WebAuthProvider';
-import OrthoIQLogo from './OrthoIQLogo';
+import AequOsLogo from './AequOsLogo';
 import { WalletSignInButton } from './WalletSignIn';
 
 export default function WebSignIn() {
@@ -125,10 +125,10 @@ export default function WebSignIn() {
       <div className="text-center mb-6">
         <div className="mb-4">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-900 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-            <OrthoIQLogo size="small" variant="blue" />
+            <AequOsLogo size="small" variant="blue" />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to OrthoIQ</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to AequOs</h2>
         <p className="text-gray-600">Get started with your orthopedic AI assistant</p>
       </div>
 
@@ -227,7 +227,7 @@ export default function WebSignIn() {
           <strong>Want unlimited access?</strong>
         </p>
         <p className="text-blue-700 text-xs mt-1">
-          Connect a wallet above, or use OrthoIQ on Farcaster / Base
+          Connect a wallet above, or use AequOs on Farcaster / Base
         </p>
       </div>
     </div>

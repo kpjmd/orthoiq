@@ -152,7 +152,7 @@ export default function ResponseCard({
   useEffect(() => {
     const checkPlatform = () => {
       const isMini =
-        (typeof window !== 'undefined' && (window as any).__ORTHOIQ_MINI_APP__ === true) ||
+        (typeof window !== 'undefined' && (window as any).__AEQUOS_MINI_APP__ === true) ||
         window.location.pathname.startsWith('/miniapp') ||
         new URL(window.location.href).searchParams.get('miniApp') === 'true';
       setIsMiniApp(isMini);
@@ -172,7 +172,7 @@ export default function ResponseCard({
 
       // Check for web session - only need user data for UI, not session token
       try {
-        const userStr = localStorage.getItem('orthoiq_web_user');
+        const userStr = localStorage.getItem('aequos_web_user');
         if (userStr) {
           const user = JSON.parse(userStr);
           const isVerified = user?.emailVerified === true;
@@ -565,7 +565,7 @@ export default function ResponseCard({
           <div className="flex items-center">
             <span className="text-2xl mr-2">🔬</span>
             <h3 className="text-lg font-semibold bg-gradient-to-r from-medical-primary to-medical-accent bg-clip-text text-transparent">
-              OrthoIQ Assessment
+              AequOs Assessment
             </h3>
           </div>
           

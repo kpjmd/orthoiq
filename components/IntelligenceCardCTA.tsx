@@ -119,7 +119,7 @@ export default function IntelligenceCardCTA({ onVerifyEmail }: IntelligenceCardC
               Enjoyed your trial?
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Return daily for more questions while exploring OrthoIQ
+              Return daily for more questions while exploring AequOs
             </p>
           </div>
         </div>
@@ -128,7 +128,7 @@ export default function IntelligenceCardCTA({ onVerifyEmail }: IntelligenceCardC
       {/* Share prompt */}
       <div className="text-center">
         <p className="text-xs text-gray-500">
-          Found OrthoIQ helpful? <span className="text-purple-600 font-medium">Please share with others!</span>
+          Found AequOs helpful? <span className="text-purple-600 font-medium">Please share with others!</span>
         </p>
       </div>
     </motion.div>

@@ -98,7 +98,7 @@ async function checkWebRateLimitWithVerification(
       upgradePrompt = "Verify your email to unlock 10 questions per day!";
     } else {
       softWarning = "You've reached today's limit of 10 questions.";
-      upgradePrompt = "Try OrthoIQ on Farcaster for unlimited consultations!";
+      upgradePrompt = "Try AequOs on Farcaster for unlimited consultations!";
     }
 
     return {

@@ -1,4 +1,4 @@
-# OrthoIQ Pre-Testnet Frontend Audit
+# AequOs Pre-Testnet Frontend Audit
 
 Tracks the five audit tasks to complete before pushing the `orthoiq-agents` backend
 (currently local-only at commit `71d3193`) to remote and deploying to testnet.
@@ -43,7 +43,7 @@ from `/recovery/complete`; Zod caps free-text at 2048 chars.
 **Findings and fixes applied (2026-05-10):**
 
 - [x] **C1 — Admin API routes unprotected:** Created `lib/adminAuth.ts` (HMAC-signed httpOnly
-  `orthoiq_admin_session` cookie). Modified `password-auth` route to set the cookie on success.
+  `aequos_admin_session` cookie). Modified `password-auth` route to set the cookie on success.
   Added `requireAdmin()` to all 26 admin API routes. Updated admin dashboard layout to use
   `GET /api/admin/whoami` (server-side cookie check) instead of `localStorage` flag.
   Added `GET /api/admin/whoami` and `POST /api/admin/logout` routes.

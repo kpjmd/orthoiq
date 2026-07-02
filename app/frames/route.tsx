@@ -46,7 +46,7 @@ const handleRequest = frames(async (ctx) => {
                 mask: 'radial-gradient(circle 18px at center, transparent 18px, black 18px)'
               }}></div>
             </div>
-            <div tw="text-6xl font-bold">OrthoIQ</div>
+            <div tw="text-6xl font-bold">AequOs</div>
           </div>
           <div tw="text-3xl mb-6">Ask the Orthopedic AI</div>
           <div tw="text-xl text-center mb-8 max-w-lg">
@@ -162,7 +162,7 @@ const handleRequest = frames(async (ctx) => {
           <div tw="flex flex-col w-full h-full bg-white p-6">
             <div tw="flex items-center mb-4">
               <div tw="text-4xl mr-3">🔬</div>
-              <div tw="text-3xl font-bold text-blue-800">OrthoIQ Response</div>
+              <div tw="text-3xl font-bold text-blue-800">AequOs Response</div>
             </div>
             <div tw="text-lg font-semibold mb-3 text-gray-800">
               Q: {userQuestion.slice(0, 100)}{userQuestion.length > 100 ? '...' : ''}
@@ -274,7 +274,7 @@ const handleRequest = frames(async (ctx) => {
               mask: 'radial-gradient(circle 18px at center, transparent 18px, black 18px)'
             }}></div>
           </div>
-          <div tw="text-6xl font-bold">OrthoIQ</div>
+          <div tw="text-6xl font-bold">AequOs</div>
         </div>
         <div tw="text-3xl mb-6">Ask the Orthopedic AI</div>
         <div tw="text-xl text-center mb-8 max-w-lg">

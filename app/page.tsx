@@ -25,13 +25,13 @@ export async function generateMetadata() {
   }
                   
   return {
-    title: "OrthoIQ - Ask the Orthopedic AI",
+    title: "AequOs - Ask the Orthopedic AI",
     description: "AI assistant for orthopedic and sports medicine questions",
     openGraph: {
-      title: "OrthoIQ - Ask the Orthopedic AI",
+      title: "AequOs - Ask the Orthopedic AI",
       description: "AI assistant for orthopedic and sports medicine questions",
       url: baseUrl,
-      siteName: "OrthoIQ",
+      siteName: "AequOs",
       images: [
         {
           url: `${baseUrl}/og-image.png`,
@@ -44,7 +44,7 @@ export async function generateMetadata() {
     },
     twitter: {
       card: "summary_large_image",
-      title: "OrthoIQ - Ask the Orthopedic AI",
+      title: "AequOs - Ask the Orthopedic AI",
       description: "AI assistant for orthopedic and sports medicine questions",
       images: [`${baseUrl}/og-image.png`],
     },
@@ -53,14 +53,14 @@ export async function generateMetadata() {
       // Farcaster Mini App embed metadata for shareability
       "fc:miniapp": JSON.stringify({
         "version": "1",
-        "imageUrl": "https://orthoiq.vercel.app/embed-image.png",
+        "imageUrl": `${baseUrl}/embed-image.png`,
         "button": {
-          "title": "Ask OrthoIQ",
+          "title": "Ask AequOs",
           "action": {
             "type": "launch_frame",
-            "name": "OrthoIQ",
-            "url": "https://orthoiq.vercel.app/miniapp",
-            "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
+            "name": "AequOs",
+            "url": `${baseUrl}/miniapp`,
+            "splashImageUrl": `${baseUrl}/splash-image1.png`,
             "splashBackgroundColor": "#1e3a8a"
           }
         }
@@ -68,14 +68,14 @@ export async function generateMetadata() {
       // Backward compatibility
       "fc:frame": JSON.stringify({
         "version": "1",
-        "imageUrl": "https://orthoiq.vercel.app/embed-image.png",
+        "imageUrl": `${baseUrl}/embed-image.png`,
         "button": {
-          "title": "Ask OrthoIQ",
+          "title": "Ask AequOs",
           "action": {
             "type": "launch_frame",
-            "name": "OrthoIQ",
-            "url": "https://orthoiq.vercel.app/miniapp",
-            "splashImageUrl": "https://orthoiq.vercel.app/splash-image.png",
+            "name": "AequOs",
+            "url": `${baseUrl}/miniapp`,
+            "splashImageUrl": `${baseUrl}/splash-image1.png`,
             "splashBackgroundColor": "#1e3a8a"
           }
         }
@@ -112,7 +112,7 @@ export default function HomePage() {
               console.log('- Document referrer:', referrer);
               
               // Check if we're already flagged as a Mini App context
-              const isMiniAppContext = (window.__ORTHOIQ_MINI_APP__ || false) || isMiniAppParam;
+              const isMiniAppContext = (window.__AEQUOS_MINI_APP__ || false) || isMiniAppParam;
               
               if (isMiniAppContext) {
                 console.log('Mini App context detected, ensuring proper SDK initialization');

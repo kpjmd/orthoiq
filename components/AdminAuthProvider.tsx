@@ -108,10 +108,11 @@ function AdminAuthContent({ children }: { children: ReactNode }) {
 }
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
+  const host = process.env.NEXT_PUBLIC_HOST || 'https://orthoiq.vercel.app';
   const config = {
     rpcUrl: 'https://mainnet.optimism.io',
-    domain: 'orthoiq.vercel.app',
-    siweUri: 'https://orthoiq.vercel.app/admin',
+    domain: host.replace(/^https?:\/\//, ''),
+    siweUri: `${host}/admin`,
   };
 
   return (

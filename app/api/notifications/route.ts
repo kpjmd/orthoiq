@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    message: 'OrthoIQ Notifications API',
+    message: 'AequOs Notifications API',
     supportedTypes: ['response_review', 'rate_limit_reset', 'request_permissions', 'enable_permissions', 'disable_permissions']
   });
 }

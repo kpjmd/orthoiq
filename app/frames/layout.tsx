@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'OrthoIQ Frame',
+  title: 'AequOs Frame',
   description: 'AI-powered orthopedic assistant for Farcaster',
   openGraph: {
-    title: 'OrthoIQ - Orthopedic AI Assistant',
+    title: 'AequOs - Orthopedic AI Assistant',
     description: 'Ask orthopedic and sports medicine questions powered by AI',
     images: [{
       url: '/og-image.png',

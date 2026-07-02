@@ -187,10 +187,10 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       const shareData = await shareResponse.json();
       const shareUrl = shareData.shareUrl;
       
-      const shareText = `🩺 Just generated my OrthoIQ prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}`;
+      const shareText = `🩺 Just generated my AequOs prescription! AI-powered orthopedic insights reviewed by board-certified surgeons.\n\n🎯 ${prescriptionMetadata.rarity.toUpperCase().replace('-', ' ')}`;
       
       const webShareData = {
-        title: 'OrthoIQ Medical Prescription',
+        title: 'AequOs Medical Prescription',
         text: shareText,
         url: shareUrl
       };
@@ -309,7 +309,7 @@ export default function PrescriptionModal({ isOpen, onClose, question, response,
       // Detect platform for appropriate success message
       const userAgent = navigator.userAgent;
       const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-      const isMiniApp = window.__ORTHOIQ_MINI_APP__ ||
+      const isMiniApp = window.__AEQUOS_MINI_APP__ ||
         window.location.pathname.startsWith('/miniapp');
       
       let successMessage = 'Image saved successfully!';

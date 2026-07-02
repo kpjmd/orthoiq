@@ -97,7 +97,7 @@ function generateNFTImage(nftId: string, rarity: string): string {
       <rect x="30" y="30" width="340" height="60" fill="${colors.primary}" opacity="0.1" rx="10"/>
       <text x="200" y="55" text-anchor="middle" fill="${colors.primary}" 
             font-family="Arial, sans-serif" font-size="18" font-weight="bold">
-        ORTHOIQ RESEARCH
+        AEQUOS RESEARCH
       </text>
       <text x="200" y="75" text-anchor="middle" fill="${colors.secondary}" 
             font-family="Arial, sans-serif" font-size="14">
